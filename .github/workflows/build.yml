@@ -7,7 +7,7 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-20.04  # 더 안정적인 버전 사용
     
     steps:
     - name: Checkout code
@@ -23,13 +23,6 @@ jobs:
       with:
         distribution: 'temurin'
         java-version: '8'
-        
-    - name: Setup Android SDK
-      uses: android-actions/setup-android@v3
-      with:
-        api-level: 30
-        build-tools: 30.0.3
-        ndk-version: 23.2.8568313
         
     - name: Install system dependencies
       run: |
@@ -51,22 +44,6 @@ jobs:
         pip install Cython==0.29.33
         pip install buildozer==1.5.0
         
-    - name: Accept Android SDK licenses
-      run: |
-        echo "Accepting Android SDK licenses..."
-        mkdir -p $ANDROID_HOME/licenses
-        echo "24333f8a63b6825ea9c5514f83c2829b004d1fee" > $ANDROID_HOME/licenses/android-sdk-license
-        echo "84831b9409646a918e30573bab4c9c91346d8abd" > $ANDROID_HOME/licenses/android-sdk-preview-license
-        echo "d975f751698a77b662f1254ddbeed3901e976f5a" > $ANDROID_HOME/licenses/intel-android-extra-license
-        
-    - name: Install additional Android components
-      run: |
-        echo "Installing additional Android SDK components..."
-        $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platforms;android-30"
-        $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "build-tools;30.0.3"
-        $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platform-tools"
-        $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "ndk;23.2.8568313"
-        
     - name: Create buildozer.spec
       run: |
         cat > buildozer.spec << 'EOF'
@@ -84,20 +61,15 @@ jobs:
         orientation = portrait
         fullscreen = 0
         
-        # Android settings
+        # Android settings - buildozer가 자동으로 관리하도록 설정
         android.permissions = INTERNET,WAKE_LOCK,RECEIVE_BOOT_COMPLETED,VIBRATE
         android.api = 30
         android.minapi = 21
-        android.ndk = 23.2.8568313
+        android.ndk = 23c
         android.ndk_api = 21
         android.accept_sdk_license = True
         android.archs = armeabi-v7a
         android.allow_backup = True
-        android.skip_update = False
-        
-        # Use system Android SDK
-        android.sdk_path = /usr/local/lib/android/sdk
-        android.ndk_path = /usr/local/lib/android/sdk/ndk/23.2.8568313
         
         [buildozer]
         log_level = 2
@@ -109,15 +81,6 @@ jobs:
         echo "=== buildozer.spec content ==="
         cat buildozer.spec
         
-    - name: Show Android SDK info
-      run: |
-        echo "=== Android SDK Info ==="
-        echo "ANDROID_HOME: $ANDROID_HOME"
-        echo "ANDROID_SDK_ROOT: $ANDROID_SDK_ROOT"
-        ls -la $ANDROID_HOME/ || echo "Android home not found"
-        ls -la $ANDROID_HOME/build-tools/ || echo "Build tools not found"
-        ls -la $ANDROID_HOME/ndk/ || echo "NDK not found"
-        
     - name: Clean build
       run: |
         rm -rf .buildozer
@@ -125,27 +88,30 @@ jobs:
         
     - name: Set environment variables
       run: |
-        export JAVA_HOME=$JAVA_HOME_8_X64
         echo "JAVA_HOME=$JAVA_HOME_8_X64" >> $GITHUB_ENV
-        echo "ANDROID_HOME=$ANDROID_HOME" >> $GITHUB_ENV
-        echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT" >> $GITHUB_ENV
-        echo "ANDROIDSDK=$ANDROID_HOME" >> $GITHUB_ENV
-        echo "ANDROIDNDK=$ANDROID_HOME/ndk/23.2.8568313" >> $GITHUB_ENV
-        echo "ANDROIDAPI=30" >> $GITHUB_ENV
-        echo "ANDROIDMINAPI=21" >> $GITHUB_ENV
+        echo "P4A_NUM_PROCS=1" >> $GITHUB_ENV
+        echo "GRADLE_OPTS=-Dorg.gradle.daemon=false -Dorg.gradle.jvmargs='-Xmx1536m'" >> $GITHUB_ENV
         
-    - name: Build APK
+    - name: Initialize buildozer (download Android SDK/NDK)
       run: |
-        export P4A_NUM_PROCS=1
-        export GRADLE_OPTS="-Dorg.gradle.daemon=false -Dorg.gradle.jvmargs='-Xmx1536m'"
-        
         echo "=== Environment Check ==="
         echo "Java: $(java -version)"
         echo "Python: $(python --version)"
         echo "JAVA_HOME: $JAVA_HOME"
-        echo "ANDROID_HOME: $ANDROID_HOME"
         
-        echo "=== Starting build ==="
+        echo "=== Initializing buildozer ==="
+        # buildozer가 Android SDK/NDK를 자동으로 다운로드하도록 함
+        buildozer android update
+        
+    - name: Accept SDK licenses
+      run: |
+        echo "=== Accepting Android SDK licenses ==="
+        # buildozer가 다운로드한 SDK의 라이선스 승인
+        yes | ~/.buildozer/android/platform/android-sdk/cmdline-tools/*/bin/sdkmanager --licenses || true
+        
+    - name: Build APK
+      run: |
+        echo "=== Starting APK build ==="
         buildozer android debug --verbose
         
     - name: List build results
@@ -159,6 +125,7 @@ jobs:
             if [ -f "$apk" ]; then
               echo "APK file: $apk"
               file "$apk"
+              echo "APK size: $(du -h "$apk")"
             fi
           done
         else
@@ -169,7 +136,7 @@ jobs:
       if: success()
       uses: actions/upload-artifact@v4
       with:
-        name: android-apk
+        name: skku-timetable-apk
         path: bin/*.apk
         retention-days: 7
         if-no-files-found: error
