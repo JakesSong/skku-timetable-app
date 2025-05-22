@@ -65,6 +65,7 @@ from kivymd.uix.textfield import MDTextField
 from kivymd.uix.spinner import MDSpinner
 from kivymd.uix.menu import MDDropdownMenu
 from db_handler import TimeTableStorage
+from kivy.logger import Logger
 
 from kivy.metrics import dp
 from kivy.clock import Clock
@@ -1371,7 +1372,16 @@ class MainScreen(MDScreen):
 
 class TimeTableApp(MDApp):
     def build(self):
-        # 📌 한글 폰트 설정p
+        print("✅ build() 실행됨")
+        Logger.info("MetaCheck: build 시작됨")
+
+        try:
+            with open("/sdcard/metacheck_log.txt", "a") as f:
+                f.write("✅ build() 진입\n")
+        except:
+            pass  # PC에서는 이 경로가 없으므로 무시
+
+        # 한글 폰트 설정
         self.theme_cls.font_styles.update({
             "H5": [FONT_NAME, 24, False, 0.15],
             "H6": [FONT_NAME, 20, False, 0.15],
@@ -1384,61 +1394,61 @@ class TimeTableApp(MDApp):
             "Overline": [FONT_NAME, 10, True, 1.5],
         })
 
-        # 📌 테마 설정
+        # 테마 설정
         self.theme_cls.primary_palette = "DeepPurple"
         self.theme_cls.accent_palette = "Teal"
         self.theme_cls.theme_style = "Light"
 
-        # 📌 개발환경용 윈도우 크기
+        # 개발환경용 윈도우 크기
         Window.size = (480, 800)
 
-        # 📌 메인화면 구성
+        # 메인화면 구성
         self.main_screen = MainScreen(name="main", app=self)
-        
+
         # Android에서 알림 채널 생성
         if 'ANDROID_STORAGE' in os.environ:
             try:
                 from jnius import autoclass
-                
-                # Android 클래스 가져오기
+
                 Context = autoclass('android.content.Context')
                 NotificationManager = autoclass('android.app.NotificationManager')
                 NotificationChannel = autoclass('android.app.NotificationChannel')
                 PythonActivity = autoclass('org.kivy.android.PythonActivity')
-                
-                # 현재 컨텍스트 가져오기
+
                 context = PythonActivity.mActivity.getApplicationContext()
-                
-                # 알림 관리자 가져오기
                 notification_manager = context.getSystemService(Context.NOTIFICATION_SERVICE)
-                
-                # 알림 채널 생성 (Android 8.0 이상)
+
                 if notification_manager:
                     channel_id = "timetable_alarm_channel"
                     name = "시간표 알람"
                     description = "수업 시작 전 알람 알림"
                     importance = NotificationManager.IMPORTANCE_HIGH
-                    
+
                     channel = NotificationChannel(channel_id, name, importance)
                     channel.setDescription(description)
                     channel.enableVibration(True)
                     channel.setVibrationPattern([0, 250, 250, 250])
-                    
                     notification_manager.createNotificationChannel(channel)
-                    print("알림 채널 생성 완료")
+
+                    print("✅ 알림 채널 생성 완료")
+                    Logger.info("MetaCheck: 알림 채널 생성 성공")
+
             except Exception as e:
-                print(f"알림 채널 생성 오류: {e}")
-        
+                import traceback
+                try:
+                    with open("/sdcard/metacheck_error.txt", "w") as f:
+                        f.write(traceback.format_exc())
+                except:
+                    Logger.error(f"MetaCheck: 알림 채널 예외 - {e}")
+
         return self.main_screen
-    
+
     def show_alarm_notification(self, class_name, class_room, class_time, class_professor):
-        """알람 알림 표시"""
         try:
             from plyer import notification
-            
             title = f"수업 알림: {class_name}"
             message = f"{class_time}에 {class_room}에서 {class_professor} 교수님 수업이 있습니다."
-            
+
             notification.notify(
                 title=title,
                 message=message,
@@ -1449,9 +1459,17 @@ class TimeTableApp(MDApp):
             print(f"알림 표시 오류: {e}")
 
 if __name__ == "__main__":
-    # 한글 인코딩 설정 확인
     import sys
+    print("✅ __main__ 진입")
     print(f"기본 인코딩: {sys.getdefaultencoding()}")
-    print(f"사용 폰트: {FONT_NAME}")  # 사용 중인 폰트 출력
+    print(f"사용 폰트: {FONT_NAME}")
 
-    TimeTableApp().run()
+    try:
+        TimeTableApp().run()
+    except Exception as e:
+        import traceback
+        try:
+            with open("/sdcard/metacheck_error.txt", "w") as f:
+                f.write(traceback.format_exc())
+        except:
+            print(traceback.format_exc())
