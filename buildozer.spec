@@ -1,7 +1,7 @@
 [app]
 
 # (str) Title of your application
-title = 성균관대학교 시간표
+title = 출결쳌
 
 # (str) Package name
 package.name = skkutimetable
@@ -9,11 +9,11 @@ package.name = skkutimetable
 # (str) Package domain (needed for android/ios packaging)
 package.domain = org.kivy
 
-# (str) Source code where the main_simple.py live
+# (str) Source code where the main.py live
 source.dir = .
 
 # (str) Main filename
-source.filename = main_simple.py
+source.filename = main.py
 
 # (list) Source files to include (let empty to include all the files)
 source.include_exts = py,png,jpg,kv,atlas,ttf
