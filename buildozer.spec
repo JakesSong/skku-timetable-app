@@ -1,10 +1,11 @@
 [app]
 
 # (str) Title of your application
-title = 출결쳌
+title = MetaCheck
+icon.filename = icon.png
 
 # (str) Package name
-package.name = skkutimetable
+package.name = MetaCheck
 
 # (str) Package domain (needed for android/ios packaging)
 package.domain = org.kivy
