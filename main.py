@@ -3,55 +3,56 @@
 # Required libraries:
 # pip install kivy kivymd
 
+# 기존 폰트 설정 코드를 모두 삭제하고 다음으로 교체
+
 # 한글 지원을 위한 설정
 import os
-os.environ['KIVY_TEXT'] = 'sdl2'  # SDL2 텍스트 제공자 사용
-os.environ['LANG'] = 'ko_KR.UTF-8'  # 한국어 로케일 설정
+os.environ['KIVY_TEXT'] = 'sdl2'
+os.environ['LANG'] = 'ko_KR.UTF-8'
 
-# kivy 관련 라이브러리 임포트
-from kivy.core.text import LabelBase  # 먼저 LabelBase 임포트
-from kivy.resources import resource_add_path
+from kivy.core.text import LabelBase
 
-# 현재 디렉토리에 fonts 폴더 경로 추가
-current_dir = os.path.dirname(os.path.abspath(__file__))
-fonts_dir = os.path.join(current_dir, 'fonts')
-resource_add_path(fonts_dir)
-print(f"폰트 경로 추가: {fonts_dir}")
+# APK용 폰트 설정
+def setup_korean_font():
+    FONT_NAME = "KoreanFont"
+    
+    # 현재 디렉토리에서 폰트 파일 찾기
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    font_candidates = [
+        os.path.join(current_dir, 'NanumSquareR.ttf'),
+        os.path.join(current_dir, 'fonts', 'NanumSquareR.ttf'),
+    ]
+    
+    # Android 환경인 경우 추가 경로
+    if 'ANDROID_STORAGE' in os.environ:
+        font_candidates.extend([
+            "/system/fonts/NotoSansCJK-Regular.ttc",
+            "/system/fonts/DroidSansFallback.ttf"
+        ])
+    
+    # 폰트 등록 시도
+    for font_path in font_candidates:
+        if os.path.exists(font_path):
+            try:
+                LabelBase.register(FONT_NAME, font_path)
+                print(f"✅ 폰트 등록 성공: {font_path}")
+                return FONT_NAME
+            except Exception as e:
+                print(f"폰트 등록 실패: {font_path} - {e}")
+                continue
+    
+    # 폰트를 찾을 수 없는 경우 안전한 처리
+    print("한글 폰트를 찾을 수 없습니다. 기본 폰트를 사용합니다.")
+    try:
+        # 기본 폰트로 등록 (None 대신 빈 문자열 사용)
+        LabelBase.register(FONT_NAME, fn_regular="")
+        return FONT_NAME
+    except:
+        # 최후의 수단
+        return "Roboto"
 
-# 기존 시스템 폰트 경로도 유지 (개발 중에만 사용)
-resource_add_path('C:/Windows/Fonts')
-
-# 마루 부리 폰트 등록
-NanumSquareR_font = os.path.join(fonts_dir, 'NanumSquareR.ttf')
-system_fonts = [
-    'C:/Windows/Fonts/malgun.ttf',        # 맑은 고딕
-    'C:/Windows/Fonts/gulim.ttc',         # 굴림
-    'C:/Windows/Fonts/batang.ttc',        # 바탕
-    'C:/Windows/Fonts/dotum.ttc',         # 돋움
-    'C:/Windows/Fonts/ngulim.ttf'         # 새굴림
-]
-
-# 사용할 폰트 목록 (마루 부리를 첫 번째로)
-font_paths = [NanumSquareR_font] + system_fonts
-
-# 내부적으로 사용할 폰트 이름 
-FONT_NAME = "NanumSquareR"  # 폰트 이름 설정
-
-font_found = False
-for font_path in font_paths:
-    if os.path.exists(font_path):
-        try:
-            LabelBase.register(FONT_NAME, font_path)
-            print(f"폰트 등록 성공: {font_path}")
-            font_found = True
-            break
-        except Exception as e:
-            print(f"폰트 등록 실패: {font_path}, 오류: {e}")
-
-if not font_found:
-    print("사용 가능한 한글 폰트를 찾을 수 없습니다. 기본 폰트를 사용합니다.")
-    # 대체 방법: 기본 폰트 사용
-    LabelBase.register(FONT_NAME, None)  # 기본 폰트 사용
+# 폰트 설정 실행
+FONT_NAME = setup_korean_font()
 
 from kivymd.app import MDApp
 from kivymd.uix.screen import MDScreen
