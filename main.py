@@ -552,8 +552,7 @@ class AddClassDialog:
             font_style="Body2",
             font_name=FONT_NAME,  # FONT_NAME 변수 사용
             size_hint_y=None,
-            height=dp(16),
-            padding=[0, dp(15), 0, dp(25)]  # 아래쪽에 5dp 패딩 추가
+            height=dp(16)
         )
         self.color_label.font_size = "15.5sp" 
         self.content.add_widget(self.color_label)
@@ -611,8 +610,7 @@ class AddClassDialog:
             font_style="Body2",
             font_name=FONT_NAME,
             size_hint_y=None,
-            height=dp(20),
-            padding=[0, 0, 0, 0]
+            height=dp(20)
         )
 
         self.notify_label.font_size = "15.5sp" 
@@ -1202,8 +1200,7 @@ class MainScreen(MDScreen):
                 size_hint_y=None,
                 height=hour_height,
                 theme_text_color="Secondary",
-                font_name=FONT_NAME,  # FONT_NAME 변수 사용
-                padding=(dp(10), 0, 0, dp(40))
+                font_name=FONT_NAME  # FONT_NAME 변수 사용
             ))
 
         self.time_grid_layout.add_widget(self.time_column)
