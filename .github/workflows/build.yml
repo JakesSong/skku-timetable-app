@@ -61,14 +61,14 @@ jobs:
         source.filename = main.py
         source.include_exts = py,png,jpg,kv,atlas,ttf
         
-        requirements = python3,kivy==2.1.0,kivymd==1.1.1,plyer,pyjnius
+        requirements = python3,kivy==2.1.0,kivymd==1.1.1,plyer,requests
         
         version = 0.1
         orientation = portrait
         fullscreen = 0
         
-        # Android settings - buildozer가 자동으로 관리하도록 설정
-        android.permissions = INTERNET,WAKE_LOCK,RECEIVE_BOOT_COMPLETED,VIBRATE
+        # Android settings - 더 안정적인 설정
+        android.permissions = INTERNET,WAKE_LOCK
         android.api = 30
         android.minapi = 21
         android.ndk = 25b
@@ -76,6 +76,7 @@ jobs:
         android.accept_sdk_license = True
         android.archs = armeabi-v7a
         android.allow_backup = True
+        android.gradle_dependencies = androidx.appcompat:appcompat:1.4.0, androidx.constraintlayout:constraintlayout:2.1.0
         
         [buildozer]
         log_level = 2
@@ -100,9 +101,12 @@ jobs:
         echo "JAVA_HOME_11=$JAVA_HOME_11_X64" >> $GITHUB_ENV
         echo "JAVA_HOME=$JAVA_HOME_8_X64" >> $GITHUB_ENV
         echo "P4A_NUM_PROCS=1" >> $GITHUB_ENV
-        echo "GRADLE_OPTS=-Dorg.gradle.daemon=false -Dorg.gradle.jvmargs='-Xmx1536m'" >> $GITHUB_ENV
+        echo "GRADLE_OPTS=-Dorg.gradle.daemon=false -Dorg.gradle.jvmargs='-Xmx2048m -XX:MaxMetaspaceSize=512m'" >> $GITHUB_ENV
         # NDK 25b 사용 강제
         echo "ANDROIDNDK=" >> $GITHUB_ENV
+        # Gradle 추가 설정
+        echo "P4A_RELEASE_KEYSTORE=" >> $GITHUB_ENV
+        echo "P4A_RELEASE_KEYALIAS=" >> $GITHUB_ENV
         
     - name: Initialize buildozer (download Android SDK/NDK)
       run: |
@@ -132,7 +136,7 @@ jobs:
         # 빌드를 위해 Java 8로 복원
         export JAVA_HOME=$JAVA_HOME_8
         
-    - name: Build APK
+    - name: Build APK with retry
       run: |
         echo "=== Starting APK build ==="
         # buildozer build를 위해 Java 8 사용
@@ -140,7 +144,27 @@ jobs:
         echo "Using Java 8 for build: $JAVA_HOME"
         java -version
         
-        buildozer android debug --verbose
+        # 첫 번째 시도
+        if ! buildozer android debug --verbose; then
+          echo "=== First build failed, cleaning and retrying ==="
+          rm -rf .buildozer/android/platform/build-*
+          rm -rf bin
+          
+          echo "=== Second attempt ==="
+          buildozer android debug --verbose
+        fi
+        
+    - name: Check Gradle logs on failure
+      if: failure()
+      run: |
+        echo "=== Checking Gradle build logs ==="
+        find .buildozer -name "*.log" -type f -exec echo "=== {} ===" \; -exec cat {} \; || true
+        
+        echo "=== Gradle wrapper logs ==="
+        find .buildozer -path "*/dists/*/gradle*" -name "*.log" -type f -exec echo "=== {} ===" \; -exec cat {} \; || true
+        
+        echo "=== Build directory structure ==="
+        find .buildozer/android/platform/build-* -maxdepth 3 -type d || true
         
     - name: List build results
       run: |
