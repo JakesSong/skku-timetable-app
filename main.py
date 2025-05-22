@@ -346,6 +346,21 @@ class AddClassDialog:
         if hasattr(self, 'end_time_dropdown'):
             self.end_time_dropdown.dismiss()  # 드롭다운 닫기
 
+    # ← 여기에 새 메서드들 추가!
+    def on_start_time_touch(self, instance, touch):
+        """시작 시간 필드 터치 이벤트"""
+        if instance.collide_point(*touch.pos):
+            self.show_start_time_dropdown(instance, True)
+            return True
+        return False
+
+    def on_end_time_touch(self, instance, touch):
+        """종료 시간 필드 터치 이벤트"""
+        if instance.collide_point(*touch.pos):
+            self.show_end_time_dropdown(instance, True)
+            return True
+        return False    
+    
     # 여기에 새 메서드를 추가합니다
     def apply_fonts_to_dialog(self, instance):
         """다이얼로그 내 모든 위젯에 폰트 설정"""
@@ -417,7 +432,7 @@ class AddClassDialog:
             spacing=dp(5),
             size_hint_y=None,
             height=dp(800),
-            padding=(dp(10), 0, dp(10), 0)
+            padding=(dp(20), dp(-30), dp(20), dp(15))
         )
         
         # MDTextField의 폰트 속성을 직접 설정하기 위한 함수
@@ -499,7 +514,7 @@ class AddClassDialog:
             font_name=FONT_NAME,
             readonly=True  # 직접 입력 불가능하게 설정
         )
-        self.start_time_field.bind(focus=self.show_start_time_dropdown)
+        self.start_time_field.bind(on_touch_down=self.on_start_time_touch)
         set_font_for_textfield(self.start_time_field)
         self.content.add_widget(self.start_time_field)
         
@@ -512,7 +527,7 @@ class AddClassDialog:
             font_name=FONT_NAME,
             readonly=True  # 직접 입력 불가능하게 설정
         )
-        self.end_time_field.bind(focus=self.show_end_time_dropdown)
+        self.end_time_field.bind(on_touch_down=self.on_end_time_touch)
         set_font_for_textfield(self.end_time_field)
         self.content.add_widget(self.end_time_field)
         
