@@ -1394,7 +1394,6 @@ class TimeTableApp(MDApp):
 
         # 📌 메인화면 구성
         self.main_screen = MainScreen(name="main", app=self)
-        return self.main_screen
         
         # Android에서 알림 채널 생성
         if 'ANDROID_STORAGE' in os.environ:
