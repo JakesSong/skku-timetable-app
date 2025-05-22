@@ -22,7 +22,7 @@ source.include_exts = py,png,jpg,kv,atlas,ttf
 source.include_patterns = fonts/*.ttf
 
 # (list) Application requirements
-requirements = python3==3.10.0,kivy==2.1.0,kivymd==1.1.1,plyer,pyjnius,android
+requirements = python3==3.10.0,kivy==2.1.0,kivymd==1.1.1,plyer,pyjnius,android,requests,pillow,certifi,urllib3,charset-normalizer
 
 # (str) Application versioning
 version = 0.1
@@ -37,7 +37,7 @@ fullscreen = 0
 android.wakelock = True
 
 # (list) Android permissions
-android.permissions = INTERNET,WAKE_LOCK,RECEIVE_BOOT_COMPLETED,VIBRATE,FOREGROUND_SERVICE
+android.permissions = INTERNET,WAKE_LOCK,RECEIVE_BOOT_COMPLETED,VIBRATE,FOREGROUND_SERVICE,WRITE_EXTERNAL_STORAGE,READ_EXTERNAL_STORAGE
 
 # (int) Target Android API, should be as high as possible.
 android.api = 33
