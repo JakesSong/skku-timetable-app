@@ -7,7 +7,7 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-20.04  # 더 안정적인 버전 사용
+    runs-on: ubuntu-22.04
     
     steps:
     - name: Checkout code
@@ -18,7 +18,13 @@ jobs:
       with:
         python-version: '3.9'
         
-    - name: Set up Java 8
+    - name: Set up Java 11 (for SDK tools) and Java 8 (for build)
+      uses: actions/setup-java@v4
+      with:
+        distribution: 'temurin'
+        java-version: '11'
+        
+    - name: Set up Java 8 for buildozer
       uses: actions/setup-java@v4
       with:
         distribution: 'temurin'
@@ -88,6 +94,8 @@ jobs:
         
     - name: Set environment variables
       run: |
+        echo "JAVA_HOME_8=$JAVA_HOME_8_X64" >> $GITHUB_ENV
+        echo "JAVA_HOME_11=$JAVA_HOME_11_X64" >> $GITHUB_ENV
         echo "JAVA_HOME=$JAVA_HOME_8_X64" >> $GITHUB_ENV
         echo "P4A_NUM_PROCS=1" >> $GITHUB_ENV
         echo "GRADLE_OPTS=-Dorg.gradle.daemon=false -Dorg.gradle.jvmargs='-Xmx1536m'" >> $GITHUB_ENV
@@ -95,23 +103,39 @@ jobs:
     - name: Initialize buildozer (download Android SDK/NDK)
       run: |
         echo "=== Environment Check ==="
-        echo "Java: $(java -version)"
+        echo "Java 8: $JAVA_HOME_8"
+        echo "Java 11: $JAVA_HOME_11"
+        echo "Current JAVA_HOME: $JAVA_HOME"
+        java -version
         echo "Python: $(python --version)"
-        echo "JAVA_HOME: $JAVA_HOME"
         
         echo "=== Initializing buildozer ==="
-        # buildozer가 Android SDK/NDK를 자동으로 다운로드하도록 함
+        # SDK manager를 위해 일시적으로 Java 11 사용
+        export JAVA_HOME=$JAVA_HOME_11
         buildozer android update
+        
+        # 빌드를 위해 Java 8로 복원
+        export JAVA_HOME=$JAVA_HOME_8
+        echo "JAVA_HOME=$JAVA_HOME_8" >> $GITHUB_ENV
         
     - name: Accept SDK licenses
       run: |
         echo "=== Accepting Android SDK licenses ==="
-        # buildozer가 다운로드한 SDK의 라이선스 승인
+        # SDK manager를 위해 Java 11 사용
+        export JAVA_HOME=$JAVA_HOME_11
         yes | ~/.buildozer/android/platform/android-sdk/cmdline-tools/*/bin/sdkmanager --licenses || true
+        
+        # 빌드를 위해 Java 8로 복원
+        export JAVA_HOME=$JAVA_HOME_8
         
     - name: Build APK
       run: |
         echo "=== Starting APK build ==="
+        # buildozer build를 위해 Java 8 사용
+        export JAVA_HOME=$JAVA_HOME_8
+        echo "Using Java 8 for build: $JAVA_HOME"
+        java -version
+        
         buildozer android debug --verbose
         
     - name: List build results
