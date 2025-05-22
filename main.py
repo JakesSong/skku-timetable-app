@@ -454,8 +454,7 @@ class AddClassDialog:
             helper_text_mode="on_focus",
             font_name=FONT_NAME,
             height=dp(20),
-            readonly=True,
-            padding=[0, 0, 0, dp(10)]  # 아래쪽에 5dp 패딩 추가
+            readonly=True
         )
 
         self.day_field.font_size = "15.5sp" 
@@ -485,8 +484,7 @@ class AddClassDialog:
                 text=day_kr,  # 한글 요일 표시
                 font_name=FONT_NAME,
                 on_release=lambda x, d=day, k=day_names[day]: self.set_day(d, k),
-                size_hint_x=0.2,
-                padding=(0, 0)
+                size_hint_x=0.2
             )
             days_layout.add_widget(day_btn)
         
@@ -634,7 +632,6 @@ class AddClassDialog:
             size_hint_x=0.2,  # 너비 30%로 제한
         )
 
-        self.notify_input.padding = [0, dp(15), 0, 0]  # 상단에 패딩 추가
         set_font_for_textfield(self.notify_input)
 
         # "Minute" 레이블
@@ -647,7 +644,6 @@ class AddClassDialog:
             valign="center"
         )
 
-        minute_label.padding = [0, dp(-5), 0, 0]  # 상단에 패딩 추가하여 시각적으로 중앙에 오도록
 
         # 레이아웃에 위젯 추가
         notify_layout.add_widget(self.notify_input)
