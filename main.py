@@ -416,7 +416,7 @@ class AddClassDialog:
             orientation="vertical",
             spacing=dp(5),
             size_hint_y=None,
-            height=dp(580),
+            height=dp(800),
             padding=(dp(10), 0, dp(10), 0)
         )
         
@@ -672,6 +672,7 @@ class AddClassDialog:
             title="새 과목 추가",
             type="custom",
             content_cls=self.content,
+            size_hint=(0.90, None),
             buttons=[
                 MDFlatButton(
                     text="취소",
