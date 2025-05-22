@@ -1,7 +1,7 @@
 name: Build Android APK
 
 on:
-  workflow_dispatch:  # 수동 실행만 허용
+  workflow_dispatch:
   push:
     branches: [ main, master ]
 
@@ -24,11 +24,18 @@ jobs:
         distribution: 'temurin'
         java-version: '8'
         
+    - name: Setup Android SDK
+      uses: android-actions/setup-android@v3
+      with:
+        api-level: 30
+        build-tools: 30.0.3
+        ndk-version: 23.2.8568313
+        
     - name: Install system dependencies
       run: |
         sudo apt-get update -qq
         sudo apt-get install -y \
-          git zip unzip openjdk-8-jdk autoconf libtool pkg-config \
+          git zip unzip autoconf libtool pkg-config \
           zlib1g-dev libncurses5-dev libncursesw5-dev libtinfo5 cmake \
           libffi-dev libssl-dev build-essential libsqlite3-dev sqlite3 \
           bzip2 libbz2-dev libreadline-dev llvm \
@@ -44,7 +51,23 @@ jobs:
         pip install Cython==0.29.33
         pip install buildozer==1.5.0
         
-    - name: Create simple buildozer.spec
+    - name: Accept Android SDK licenses
+      run: |
+        echo "Accepting Android SDK licenses..."
+        mkdir -p $ANDROID_HOME/licenses
+        echo "24333f8a63b6825ea9c5514f83c2829b004d1fee" > $ANDROID_HOME/licenses/android-sdk-license
+        echo "84831b9409646a918e30573bab4c9c91346d8abd" > $ANDROID_HOME/licenses/android-sdk-preview-license
+        echo "d975f751698a77b662f1254ddbeed3901e976f5a" > $ANDROID_HOME/licenses/intel-android-extra-license
+        
+    - name: Install additional Android components
+      run: |
+        echo "Installing additional Android SDK components..."
+        $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platforms;android-30"
+        $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "build-tools;30.0.3"
+        $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platform-tools"
+        $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "ndk;23.2.8568313"
+        
+    - name: Create buildozer.spec
       run: |
         cat > buildozer.spec << 'EOF'
         [app]
@@ -55,23 +78,26 @@ jobs:
         source.filename = main.py
         source.include_exts = py,png,jpg,kv,atlas,ttf
         
-        # Requirements - KivyMD 포함
         requirements = python3,kivy==2.1.0,kivymd==1.1.1,plyer,pyjnius
         
         version = 0.1
         orientation = portrait
         fullscreen = 0
         
-        # Android settings - 간소화
-        android.permissions = INTERNET,WAKE_LOCK
+        # Android settings
+        android.permissions = INTERNET,WAKE_LOCK,RECEIVE_BOOT_COMPLETED,VIBRATE
         android.api = 30
         android.minapi = 21
-        android.ndk = 23c
+        android.ndk = 23.2.8568313
         android.ndk_api = 21
         android.accept_sdk_license = True
         android.archs = armeabi-v7a
         android.allow_backup = True
-        android.skip_update = True
+        android.skip_update = False
+        
+        # Use system Android SDK
+        android.sdk_path = /usr/local/lib/android/sdk
+        android.ndk_path = /usr/local/lib/android/sdk/ndk/23.2.8568313
         
         [buildozer]
         log_level = 2
@@ -83,33 +109,58 @@ jobs:
         echo "=== buildozer.spec content ==="
         cat buildozer.spec
         
+    - name: Show Android SDK info
+      run: |
+        echo "=== Android SDK Info ==="
+        echo "ANDROID_HOME: $ANDROID_HOME"
+        echo "ANDROID_SDK_ROOT: $ANDROID_SDK_ROOT"
+        ls -la $ANDROID_HOME/ || echo "Android home not found"
+        ls -la $ANDROID_HOME/build-tools/ || echo "Build tools not found"
+        ls -la $ANDROID_HOME/ndk/ || echo "NDK not found"
+        
     - name: Clean build
       run: |
         rm -rf .buildozer
         rm -rf bin
         
-    - name: Set Java 8 environment
+    - name: Set environment variables
       run: |
         export JAVA_HOME=$JAVA_HOME_8_X64
         echo "JAVA_HOME=$JAVA_HOME_8_X64" >> $GITHUB_ENV
-        echo "Java version: $(java -version)"
+        echo "ANDROID_HOME=$ANDROID_HOME" >> $GITHUB_ENV
+        echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT" >> $GITHUB_ENV
+        echo "ANDROIDSDK=$ANDROID_HOME" >> $GITHUB_ENV
+        echo "ANDROIDNDK=$ANDROID_HOME/ndk/23.2.8568313" >> $GITHUB_ENV
+        echo "ANDROIDAPI=30" >> $GITHUB_ENV
+        echo "ANDROIDMINAPI=21" >> $GITHUB_ENV
         
-    - name: Build APK with simplified settings
+    - name: Build APK
       run: |
         export P4A_NUM_PROCS=1
         export GRADLE_OPTS="-Dorg.gradle.daemon=false -Dorg.gradle.jvmargs='-Xmx1536m'"
         
-        echo "Starting build..."
+        echo "=== Environment Check ==="
+        echo "Java: $(java -version)"
+        echo "Python: $(python --version)"
+        echo "JAVA_HOME: $JAVA_HOME"
+        echo "ANDROID_HOME: $ANDROID_HOME"
+        
+        echo "=== Starting build ==="
         buildozer android debug --verbose
         
     - name: List build results
       run: |
-        echo "=== Build directory contents ==="
+        echo "=== Build Results ==="
         ls -la
         if [ -d "bin" ]; then
           echo "=== APK files ==="
           ls -la bin/
-          file bin/*.apk || echo "No APK files found"
+          for apk in bin/*.apk; do
+            if [ -f "$apk" ]; then
+              echo "APK file: $apk"
+              file "$apk"
+            fi
+          done
         else
           echo "No bin directory found"
         fi
