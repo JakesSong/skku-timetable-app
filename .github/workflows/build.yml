@@ -54,27 +54,27 @@ jobs:
       run: |
         cat > buildozer.spec << 'EOF'
         [app]
-        title = SKKU Timetable
-        package.name = skkutimetable
+        title = MetaCheck
+        package.name = MetaCheck
         package.domain = org.kivy
         source.dir = .
-        source.filename = main_simple.py
+        source.filename = main.py
         source.include_exts = py,png,jpg,kv,atlas,ttf
         
-        requirements = python3,kivy==2.1.0
+        requirements = python3,kivy==2.1.0,requests,pillow,certifi,urllib3
         
         version = 0.1
         orientation = portrait
         fullscreen = 0
         
         # Minimal Android settings
-        android.permissions = INTERNET
-        android.api = 28
+        android.permissions = INTERNET,WRITE_EXTERNAL_STORAGE,READ_EXTERNAL_STORAGE
+        android.api = 33
         android.minapi = 21
         android.ndk = 25b
         android.ndk_api = 21
         android.accept_sdk_license = True
-        android.archs = armeabi-v7a
+        android.archs = arm64-v8a
         android.allow_backup = True
         android.skip_update = False
         android.auto_last_revision = False
@@ -86,7 +86,7 @@ jobs:
         
     - name: Create simple test app (optional)
       run: |
-        cat > main_simple.py << 'EOF'
+        cat > main.py << 'EOF'
         from kivy.app import App
         from kivy.uix.label import Label
         
@@ -101,7 +101,7 @@ jobs:
         EOF
         
         echo "=== Simple test app created ==="
-        cat main_simple.py
+        cat main.py
         
     - name: Show buildozer.spec
       run: |
