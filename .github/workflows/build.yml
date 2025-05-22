@@ -59,29 +59,51 @@ jobs:
         package.domain = org.kivy
         source.dir = .
         source.filename = main.py
+        # 테스트용으로 main_simple.py 사용하려면 위를 main_simple.py로 변경
         source.include_exts = py,png,jpg,kv,atlas,ttf
         
-        requirements = python3,kivy==2.1.0,kivymd==1.1.1,plyer,requests
+        requirements = python3,kivy==2.1.0,requests
         
         version = 0.1
         orientation = portrait
         fullscreen = 0
         
-        # Android settings - 더 안정적인 설정
-        android.permissions = INTERNET,WAKE_LOCK
-        android.api = 30
+        # Android settings - 더 보수적인 설정
+        android.permissions = INTERNET
+        android.api = 29
         android.minapi = 21
         android.ndk = 25b
         android.ndk_api = 21
         android.accept_sdk_license = True
         android.archs = armeabi-v7a
         android.allow_backup = True
-        android.gradle_dependencies = androidx.appcompat:appcompat:1.4.0, androidx.constraintlayout:constraintlayout:2.1.0
+        # Gradle 설정 간소화
+        android.skip_update = False
+        android.auto_last_revision = False
         
         [buildozer]
         log_level = 2
         warn_on_root = 1
         EOF
+        
+    - name: Create simple test app (optional)
+      run: |
+        cat > main_simple.py << 'EOF'
+        from kivy.app import App
+        from kivy.uix.label import Label
+        
+        class SimpleApp(App):
+            def build(self):
+                return Label(text='SKKU Timetable Test\n성균관대학교 시간표 테스트', 
+                           font_size='20sp',
+                           halign='center')
+        
+        if __name__ == '__main__':
+            SimpleApp().run()
+        EOF
+        
+        echo "=== Simple test app created ==="
+        cat main_simple.py
         
     - name: Show buildozer.spec
       run: |
@@ -101,12 +123,11 @@ jobs:
         echo "JAVA_HOME_11=$JAVA_HOME_11_X64" >> $GITHUB_ENV
         echo "JAVA_HOME=$JAVA_HOME_8_X64" >> $GITHUB_ENV
         echo "P4A_NUM_PROCS=1" >> $GITHUB_ENV
-        echo "GRADLE_OPTS=-Dorg.gradle.daemon=false -Dorg.gradle.jvmargs='-Xmx2048m -XX:MaxMetaspaceSize=512m'" >> $GITHUB_ENV
+        echo "GRADLE_OPTS=-Dorg.gradle.daemon=false -Dorg.gradle.jvmargs='-Xmx3072m -XX:MaxMetaspaceSize=768m' -Dorg.gradle.parallel=false" >> $GITHUB_ENV
         # NDK 25b 사용 강제
         echo "ANDROIDNDK=" >> $GITHUB_ENV
-        # Gradle 추가 설정
-        echo "P4A_RELEASE_KEYSTORE=" >> $GITHUB_ENV
-        echo "P4A_RELEASE_KEYALIAS=" >> $GITHUB_ENV
+        # Gradle wrapper 권한 설정
+        echo "P4A_GRADLE_OPTS=--stacktrace --info" >> $GITHUB_ENV
         
     - name: Initialize buildozer (download Android SDK/NDK)
       run: |
@@ -136,7 +157,7 @@ jobs:
         # 빌드를 위해 Java 8로 복원
         export JAVA_HOME=$JAVA_HOME_8
         
-    - name: Build APK with retry
+    - name: Build APK with detailed logging
       run: |
         echo "=== Starting APK build ==="
         # buildozer build를 위해 Java 8 사용
@@ -144,13 +165,20 @@ jobs:
         echo "Using Java 8 for build: $JAVA_HOME"
         java -version
         
-        # 첫 번째 시도
+        # Gradle wrapper에 실행 권한 부여
+        echo "=== Setting up Gradle permissions ==="
+        
+        echo "=== Starting build with maximum verbosity ==="
         if ! buildozer android debug --verbose; then
-          echo "=== First build failed, cleaning and retrying ==="
-          rm -rf .buildozer/android/platform/build-*
-          rm -rf bin
+          echo "=== Build failed, checking Gradle wrapper ==="
           
-          echo "=== Second attempt ==="
+          # Gradle wrapper 파일 찾기 및 권한 부여
+          find .buildozer -name "gradlew" -type f -exec chmod +x {} \; || true
+          
+          echo "=== Cleaning build artifacts ==="
+          rm -rf .buildozer/android/platform/build-*
+          
+          echo "=== Second attempt with clean build ==="
           buildozer android debug --verbose
         fi
         
