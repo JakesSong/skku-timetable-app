@@ -1372,13 +1372,19 @@ class TimeTableApp(MDApp):
     def build(self):
         print("✅ build() 실행됨")
         Logger.info("MetaCheck: build 시작됨")
-
+    
         try:
             with open("/sdcard/metacheck_log.txt", "a") as f:
                 f.write("✅ build() 진입\n")
         except:
             pass  # PC에서는 이 경로가 없으므로 무시
 
+
+        # 안드로이드에서는 윈도우 크기 설정하지 않음
+        if 'ANDROID_STORAGE' not in os.environ:
+            # PC 개발환경에서만 윈도우 크기 설정
+            Window.size = (480, 800)
+            
         # 한글 폰트 설정
         self.theme_cls.font_styles.update({
             "H5": [FONT_NAME, 24, False, 0.15],
@@ -1396,9 +1402,6 @@ class TimeTableApp(MDApp):
         self.theme_cls.primary_palette = "DeepPurple"
         self.theme_cls.accent_palette = "Teal"
         self.theme_cls.theme_style = "Light"
-
-        # 개발환경용 윈도우 크기
-        Window.size = (480, 800)
 
         # 메인화면 구성
         self.main_screen = MainScreen(name="main", app=self)
