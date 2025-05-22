@@ -58,26 +58,24 @@ jobs:
         package.name = skkutimetable
         package.domain = org.kivy
         source.dir = .
-        source.filename = main.py
-        # 테스트용으로 main_simple.py 사용하려면 위를 main_simple.py로 변경
+        source.filename = main_simple.py
         source.include_exts = py,png,jpg,kv,atlas,ttf
         
-        requirements = python3,kivy==2.1.0,requests
+        requirements = python3,kivy==2.1.0
         
         version = 0.1
         orientation = portrait
         fullscreen = 0
         
-        # Android settings - 더 보수적인 설정
+        # Minimal Android settings
         android.permissions = INTERNET
-        android.api = 29
+        android.api = 28
         android.minapi = 21
         android.ndk = 25b
         android.ndk_api = 21
         android.accept_sdk_license = True
         android.archs = armeabi-v7a
         android.allow_backup = True
-        # Gradle 설정 간소화
         android.skip_update = False
         android.auto_last_revision = False
         
@@ -116,12 +114,14 @@ jobs:
         rm -rf bin
         # 캐시된 패키지도 정리
         rm -rf ~/.buildozer/android/packages
+        # Gradle 캐시도 정리 (Java 버전 변경으로 인한)
+        rm -rf ~/.gradle
         
     - name: Set environment variables
       run: |
         echo "JAVA_HOME_8=$JAVA_HOME_8_X64" >> $GITHUB_ENV
         echo "JAVA_HOME_11=$JAVA_HOME_11_X64" >> $GITHUB_ENV
-        echo "JAVA_HOME=$JAVA_HOME_8_X64" >> $GITHUB_ENV
+        echo "JAVA_HOME=$JAVA_HOME_11_X64" >> $GITHUB_ENV
         echo "P4A_NUM_PROCS=1" >> $GITHUB_ENV
         echo "GRADLE_OPTS=-Dorg.gradle.daemon=false -Dorg.gradle.jvmargs='-Xmx3072m -XX:MaxMetaspaceSize=768m' -Dorg.gradle.parallel=false" >> $GITHUB_ENV
         # NDK 25b 사용 강제
@@ -157,30 +157,19 @@ jobs:
         # 빌드를 위해 Java 8로 복원
         export JAVA_HOME=$JAVA_HOME_8
         
-    - name: Build APK with detailed logging
+    - name: Build APK with Java 11
       run: |
         echo "=== Starting APK build ==="
-        # buildozer build를 위해 Java 8 사용
-        export JAVA_HOME=$JAVA_HOME_8
-        echo "Using Java 8 for build: $JAVA_HOME"
+        export JAVA_HOME=$JAVA_HOME_11
+        echo "Using Java 11 for build: $JAVA_HOME"
         java -version
         
-        # Gradle wrapper에 실행 권한 부여
-        echo "=== Setting up Gradle permissions ==="
+        echo "=== Environment variables ==="
+        echo "GRADLE_OPTS: $GRADLE_OPTS"
+        echo "P4A_GRADLE_OPTS: $P4A_GRADLE_OPTS"
         
-        echo "=== Starting build with maximum verbosity ==="
-        if ! buildozer android debug --verbose; then
-          echo "=== Build failed, checking Gradle wrapper ==="
-          
-          # Gradle wrapper 파일 찾기 및 권한 부여
-          find .buildozer -name "gradlew" -type f -exec chmod +x {} \; || true
-          
-          echo "=== Cleaning build artifacts ==="
-          rm -rf .buildozer/android/platform/build-*
-          
-          echo "=== Second attempt with clean build ==="
-          buildozer android debug --verbose
-        fi
+        echo "=== Starting buildozer with Java 11 ==="
+        buildozer android debug --verbose
         
     - name: Check Gradle logs on failure
       if: failure()
