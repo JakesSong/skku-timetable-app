@@ -983,12 +983,80 @@ class MainScreen(MDScreen):
         # 저장 시스템 초기화
         self.storage = TimeTableStorage()
 
+        # 부제목 저장 (기본값)
+        self.subtitle_text = "2025년 1학기 소재부품융합공학과"    
+        
         # 알람 관리자 초기화
         from alarm_manager import AlarmManager
         self.alarm_manager = AlarmManager(app)
         
         Clock.schedule_once(self.setup_layout, 0)
 
+    def show_subtitle_edit_dialog(self, instance):
+        """부제목 편집 대화상자 표시"""
+        self.subtitle_field = MDTextField(
+            text=self.subtitle_text,
+            hint_text="부제목 입력",
+            font_name=FONT_NAME,
+            size_hint_y=None,
+            height=dp(50)
+        )
+        
+        content = MDBoxLayout(
+            orientation="vertical",
+            size_hint_y=None,
+            height=dp(100),
+            spacing=dp(10)
+        )
+        content.add_widget(self.subtitle_field)
+        
+        self.subtitle_dialog = MDDialog(
+            title="부제목 편집",
+            type="custom",
+            content_cls=content,
+            buttons=[
+                MDFlatButton(
+                    text="취소",
+                    theme_text_color="Custom",
+                    text_color=self.app.theme_cls.primary_color,
+                    font_name=FONT_NAME,
+                    on_release=lambda x: self.subtitle_dialog.dismiss()
+                ),
+                MDFlatButton(
+                    text="저장",
+                    theme_text_color="Custom", 
+                    text_color=self.app.theme_cls.primary_color,
+                    font_name=FONT_NAME,
+                    on_release=self.save_subtitle
+                ),
+            ],
+        )
+        self.subtitle_dialog.open()
+    
+    def save_subtitle(self, *args):
+        """부제목 저장"""
+        new_text = self.subtitle_field.text.strip()
+        if new_text:
+            self.subtitle_text = new_text
+            self.subtitle_label.text = new_text
+            
+            # 부제목 저장 (간단하게 파일로)
+            try:
+                with open('subtitle.txt', 'w', encoding='utf-8') as f:
+                    f.write(new_text)
+            except:
+                pass
+        
+        self.subtitle_dialog.dismiss()
+    
+    def load_subtitle(self):
+        """저장된 부제목 불러오기"""
+        try:
+            with open('subtitle.txt', 'r', encoding='utf-8') as f:
+                self.subtitle_text = f.read().strip()
+        except:
+            self.subtitle_text = "2025년 1학기 소재부품융합공학과"  # 기본값
+        
     def open_attendance_app(self, instance):
         """성균관대 전자출결 앱 실행"""
         try:
@@ -1111,8 +1179,8 @@ class MainScreen(MDScreen):
             self.add_class_dialog.next_class_id = max_id + 1
                 
     def setup_layout(self, dt):
+        self.load_subtitle()
         self.layout_data = LayoutConfig.calculate(Window.width)
-
         self.layout = MDBoxLayout(orientation="vertical")
         self.add_widget(self.layout)
 
@@ -1125,19 +1193,22 @@ class MainScreen(MDScreen):
             size_hint_y=None,
             height=dp(50)
         ))
-
-        # 새로운 부제목 레이블 추가
-        self.layout.add_widget(MDLabel(
-            text="2025년 1학기 소재부품융합공학과",
+    
+        # 편집 가능한 부제목
+        self.subtitle_label = MDLabel(
+            text=self.subtitle_text,  # 저장된 텍스트 사용
             halign="center",
-            theme_text_color="Secondary",  # 색상을 약간 다르게
-            font_style="Subtitle1",        # 더 작은 폰트 스타일
-            font_name=FONT_NAME,  # FONT_NAME 변수 사용
+            theme_text_color="Secondary",
+            font_style="Subtitle1",
+            font_name=FONT_NAME,
             size_hint_y=None,
-            height=dp(30)                  # 높이도 더 작게
-        ))
-
-
+            height=dp(30)
+        )
+    
+    # 부제목 클릭 시 편집 가능하도록
+    self.subtitle_label.bind(on_touch_down=self.on_subtitle_touch)
+    self.layout.add_widget(self.subtitle_label)
+        
         # 스크롤뷰 설정 - 전체 화면 너비 사용
         self.scroll_view = ScrollView(
             do_scroll_x=True,
@@ -1227,6 +1298,13 @@ class MainScreen(MDScreen):
         # 메인 화면 초기화 후 샘플 카드 추가
         Clock.schedule_once(lambda dt: self.load_saved_timetable(), 0.5)
 
+    def on_subtitle_touch(self, instance, touch):
+        """부제목 터치 이벤트"""
+        if instance.collide_point(*touch.pos):
+            self.show_subtitle_edit_dialog(instance)
+            return True
+        return False
+    
     def save_timetable(self):
         """현재 시간표 저장"""
         success = self.storage.save_classes(self.classes_data)
