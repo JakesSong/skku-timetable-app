@@ -533,7 +533,7 @@ class AddClassDialog:
             helper_text="Ex: Kim Bumjun",
             helper_text_mode="on_focus",
             height=dp(20),
-            font_name='/System/Library/Fonts/AppleSDGothicNeo.ttc'
+            font_name=FONT_NAME
         )
         set_font_for_textfield(self.professor_field)
         self.content.add_widget(self.professor_field)
@@ -1205,9 +1205,9 @@ class MainScreen(MDScreen):
             height=dp(30)
         )
     
-    # 부제목 클릭 시 편집 가능하도록
-    self.subtitle_label.bind(on_touch_down=self.on_subtitle_touch)
-    self.layout.add_widget(self.subtitle_label)
+        # 부제목 클릭 시 편집 가능하도록
+        self.subtitle_label.bind(on_touch_down=self.on_subtitle_touch)
+        self.layout.add_widget(self.subtitle_label)
         
         # 스크롤뷰 설정 - 전체 화면 너비 사용
         self.scroll_view = ScrollView(
