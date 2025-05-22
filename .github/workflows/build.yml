@@ -121,7 +121,8 @@ jobs:
       run: |
         echo "JAVA_HOME_8=$JAVA_HOME_8_X64" >> $GITHUB_ENV
         echo "JAVA_HOME_11=$JAVA_HOME_11_X64" >> $GITHUB_ENV
-        echo "JAVA_HOME=$JAVA_HOME_11_X64" >> $GITHUB_ENV
+        echo "JAVA_HOME_17=$JAVA_HOME_17_X64" >> $GITHUB_ENV
+        echo "JAVA_HOME=$JAVA_HOME_17_X64" >> $GITHUB_ENV
         echo "P4A_NUM_PROCS=1" >> $GITHUB_ENV
         echo "GRADLE_OPTS=-Dorg.gradle.daemon=false -Dorg.gradle.jvmargs='-Xmx3072m -XX:MaxMetaspaceSize=768m' -Dorg.gradle.parallel=false" >> $GITHUB_ENV
         # NDK 25b 사용 강제
@@ -157,18 +158,18 @@ jobs:
         # 빌드를 위해 Java 8로 복원
         export JAVA_HOME=$JAVA_HOME_8
         
-    - name: Build APK with Java 11
+    - name: Build APK with Java 17
       run: |
         echo "=== Starting APK build ==="
-        export JAVA_HOME=$JAVA_HOME_11
-        echo "Using Java 11 for build: $JAVA_HOME"
+        export JAVA_HOME=$JAVA_HOME_17
+        echo "Using Java 17 for build: $JAVA_HOME"
         java -version
         
         echo "=== Environment variables ==="
         echo "GRADLE_OPTS: $GRADLE_OPTS"
         echo "P4A_GRADLE_OPTS: $P4A_GRADLE_OPTS"
         
-        echo "=== Starting buildozer with Java 11 ==="
+        echo "=== Starting buildozer with Java 17 ==="
         buildozer android debug --verbose
         
     - name: Check Gradle logs on failure
