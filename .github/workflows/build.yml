@@ -169,6 +169,9 @@ jobs:
         echo "GRADLE_OPTS: $GRADLE_OPTS"
         echo "P4A_GRADLE_OPTS: $P4A_GRADLE_OPTS"
         
+        echo "=== Clean build for fresh start ==="
+        buildozer android clean
+        
         echo "=== Starting buildozer with Java 17 ==="
         buildozer android debug --verbose
         
