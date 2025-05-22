@@ -71,7 +71,7 @@ jobs:
         android.permissions = INTERNET,WAKE_LOCK,RECEIVE_BOOT_COMPLETED,VIBRATE
         android.api = 30
         android.minapi = 21
-        android.ndk = 23c
+        android.ndk = 25b
         android.ndk_api = 21
         android.accept_sdk_license = True
         android.archs = armeabi-v7a
@@ -91,6 +91,8 @@ jobs:
       run: |
         rm -rf .buildozer
         rm -rf bin
+        # 캐시된 패키지도 정리
+        rm -rf ~/.buildozer/android/packages
         
     - name: Set environment variables
       run: |
@@ -99,6 +101,8 @@ jobs:
         echo "JAVA_HOME=$JAVA_HOME_8_X64" >> $GITHUB_ENV
         echo "P4A_NUM_PROCS=1" >> $GITHUB_ENV
         echo "GRADLE_OPTS=-Dorg.gradle.daemon=false -Dorg.gradle.jvmargs='-Xmx1536m'" >> $GITHUB_ENV
+        # NDK 25b 사용 강제
+        echo "ANDROIDNDK=" >> $GITHUB_ENV
         
     - name: Initialize buildozer (download Android SDK/NDK)
       run: |
