@@ -18,17 +18,11 @@ jobs:
       with:
         python-version: '3.9'
         
-    - name: Set up Java 11 (for SDK tools) and Java 8 (for build)
+    - name: Set up Java 17 for buildozer
       uses: actions/setup-java@v4
       with:
         distribution: 'temurin'
-        java-version: '11'
-        
-    - name: Set up Java 8 for buildozer
-      uses: actions/setup-java@v4
-      with:
-        distribution: 'temurin'
-        java-version: '8'
+        java-version: '17'
         
     - name: Install system dependencies
       run: |
@@ -50,147 +44,67 @@ jobs:
         pip install Cython==0.29.33
         pip install buildozer==1.5.0
         
-    - name: Create buildozer.spec
-      run: |
-        cat > buildozer.spec << 'EOF'
-        [app]
-        title = MetaCheck
-        package.name = MetaCheck
-        package.domain = org.kivy
-        source.dir = .
-        source.filename = main.py
-        source.include_exts = py,png,jpg,kv,atlas,ttf
-        
-        requirements = python3,kivy==2.1.0,requests,pillow,certifi,urllib3
-        
-        version = 0.1
-        orientation = portrait
-        fullscreen = 0
-        
-        # Minimal Android settings
-        android.permissions = INTERNET,WRITE_EXTERNAL_STORAGE,READ_EXTERNAL_STORAGE
-        android.api = 33
-        android.minapi = 21
-        android.ndk = 25b
-        android.ndk_api = 21
-        android.accept_sdk_license = True
-        android.archs = arm64-v8a
-        android.allow_backup = True
-        android.skip_update = False
-        android.auto_last_revision = False
-        
-        [buildozer]
-        log_level = 2
-        warn_on_root = 1
-        EOF
-        
-    - name: Create simple test app (optional)
-      run: |
-        cat > main.py << 'EOF'
-        from kivy.app import App
-        from kivy.uix.label import Label
-        
-        class SimpleApp(App):
-            def build(self):
-                return Label(text='SKKU Timetable Test\n성균관대학교 시간표 테스트', 
-                           font_size='20sp',
-                           halign='center')
-        
-        if __name__ == '__main__':
-            SimpleApp().run()
-        EOF
-        
-        echo "=== Simple test app created ==="
-        cat main.py
-        
-    - name: Show buildozer.spec
-      run: |
-        echo "=== buildozer.spec content ==="
-        cat buildozer.spec
-        
-    - name: Clean build
-      run: |
-        rm -rf .buildozer
-        rm -rf bin
-        # 캐시된 패키지도 정리
-        rm -rf ~/.buildozer/android/packages
-        # Gradle 캐시도 정리 (Java 버전 변경으로 인한)
-        rm -rf ~/.gradle
-        
     - name: Set environment variables
       run: |
-        echo "JAVA_HOME_8=$JAVA_HOME_8_X64" >> $GITHUB_ENV
-        echo "JAVA_HOME_11=$JAVA_HOME_11_X64" >> $GITHUB_ENV
-        echo "JAVA_HOME_17=$JAVA_HOME_17_X64" >> $GITHUB_ENV
-        echo "JAVA_HOME=$JAVA_HOME_17_X64" >> $GITHUB_ENV
         echo "P4A_NUM_PROCS=1" >> $GITHUB_ENV
         echo "GRADLE_OPTS=-Dorg.gradle.daemon=false -Dorg.gradle.jvmargs='-Xmx3072m -XX:MaxMetaspaceSize=768m' -Dorg.gradle.parallel=false" >> $GITHUB_ENV
-        # NDK 25b 사용 강제
-        echo "ANDROIDNDK=" >> $GITHUB_ENV
-        # Gradle wrapper 권한 설정
         echo "P4A_GRADLE_OPTS=--stacktrace --info" >> $GITHUB_ENV
         
-    - name: Initialize buildozer (download Android SDK/NDK)
+    - name: Complete clean build
       run: |
-        echo "=== Environment Check ==="
-        echo "Java 8: $JAVA_HOME_8"
-        echo "Java 11: $JAVA_HOME_11"
-        echo "Current JAVA_HOME: $JAVA_HOME"
-        java -version
-        echo "Python: $(python --version)"
+        echo "=== Completely cleaning build environment ==="
+        rm -rf .buildozer
+        rm -rf bin
+        rm -rf ~/.buildozer
+        rm -rf ~/.gradle
+        rm -rf ~/.android
         
-        echo "=== Initializing buildozer ==="
-        # SDK manager를 위해 일시적으로 Java 11 사용
-        export JAVA_HOME=$JAVA_HOME_11
-        buildozer android update
-        
-        # 빌드를 위해 Java 8로 복원
-        export JAVA_HOME=$JAVA_HOME_8
-        echo "JAVA_HOME=$JAVA_HOME_8" >> $GITHUB_ENV
-        
-    - name: Accept SDK licenses
+    - name: Verify buildozer.spec and main files
       run: |
-        echo "=== Accepting Android SDK licenses ==="
-        # SDK manager를 위해 Java 11 사용
-        export JAVA_HOME=$JAVA_HOME_11
-        yes | ~/.buildozer/android/platform/android-sdk/cmdline-tools/*/bin/sdkmanager --licenses || true
+        echo "=== Checking current files ==="
+        ls -la
         
-        # 빌드를 위해 Java 8로 복원
-        export JAVA_HOME=$JAVA_HOME_8
+        echo "=== buildozer.spec content ==="
+        if [ -f "buildozer.spec" ]; then
+          cat buildozer.spec
+        else
+          echo "No buildozer.spec found!"
+        fi
         
-    - name: Build APK with Java 17
+        echo "=== main.py content ==="
+        if [ -f "main.py" ]; then
+          echo "main.py exists:"
+          head -20 main.py
+        else
+          echo "No main.py found!"
+        fi
+        
+        echo "=== main_simple.py content ==="
+        if [ -f "main_simple.py" ]; then
+          echo "main_simple.py exists:"
+          head -10 main_simple.py
+        else
+          echo "No main_simple.py found!"
+        fi
+        
+    - name: Build APK
       run: |
         echo "=== Starting APK build ==="
-        export JAVA_HOME=$JAVA_HOME_17
-        echo "Using Java 17 for build: $JAVA_HOME"
+        echo "Using Java 17 for build"
         java -version
         
         echo "=== Environment variables ==="
         echo "GRADLE_OPTS: $GRADLE_OPTS"
         echo "P4A_GRADLE_OPTS: $P4A_GRADLE_OPTS"
         
-        echo "=== Clean build for fresh start ==="
-        buildozer android clean
-        
-        echo "=== Starting buildozer with Java 17 ==="
+        echo "=== Starting fresh buildozer build ==="
         buildozer android debug --verbose
         
-    - name: Check Gradle logs on failure
-      if: failure()
-      run: |
-        echo "=== Checking Gradle build logs ==="
-        find .buildozer -name "*.log" -type f -exec echo "=== {} ===" \; -exec cat {} \; || true
-        
-        echo "=== Gradle wrapper logs ==="
-        find .buildozer -path "*/dists/*/gradle*" -name "*.log" -type f -exec echo "=== {} ===" \; -exec cat {} \; || true
-        
-        echo "=== Build directory structure ==="
-        find .buildozer/android/platform/build-* -maxdepth 3 -type d || true
-        
-    - name: List build results
+    - name: Check build results
       run: |
         echo "=== Build Results ==="
         ls -la
+        
         if [ -d "bin" ]; then
           echo "=== APK files ==="
           ls -la bin/
@@ -202,8 +116,17 @@ jobs:
             fi
           done
         else
-          echo "No bin directory found"
+          echo "No bin directory found - build may have failed"
         fi
+        
+    - name: Check build logs on failure
+      if: failure()
+      run: |
+        echo "=== Checking build logs ==="
+        find .buildozer -name "*.log" -type f -exec echo "=== {} ===" \; -exec head -50 {} \; || true
+        
+        echo "=== Last 100 lines of build output ==="
+        find .buildozer -name "*.log" -type f -exec tail -100 {} \; || true
         
     - name: Upload APK
       if: success()
