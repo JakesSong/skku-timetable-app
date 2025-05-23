@@ -56,7 +56,7 @@ FONT_NAME = setup_korean_font()
 
 from kivymd.app import MDApp
 from kivymd.uix.screen import MDScreen
-from kivymd.uix.button import MDFloatingActionButton, MDFlatButton
+from kivymd.uix.button import MDFloatingActionButton, MDFlatButton, MDRaisedButton
 from kivymd.uix.boxlayout import MDBoxLayout
 from kivymd.uix.label import MDLabel
 from kivymd.uix.card import MDCard
@@ -488,7 +488,7 @@ class AddClassDialog:
             height=dp(10),
             spacing=dp(2),
             padding=(dp(20), 0, dp(20), 0),
-            adaptive_width=true
+            adaptive_width=True
         )
         
         # 한글 요일 이름과 영어 요일 매핑 사용
@@ -1398,17 +1398,6 @@ class MainScreen(MDScreen):
             print("✅ UI 새로고침 완료")
         except Exception as e:
             print(f"UI 새로고침 오류: {e}")
-
-    def on_class_touch(self, instance, touch, class_id):
-        """과목 카드 터치 시 수정 팝업 열기"""
-        if instance.collide_point(*touch.pos):
-            # 수정 모드로 팝업 열기
-            self.add_class_dialog.create_dialog(edit_mode=True, class_id=class_id)
-            # 기존 데이터로 필드 채우기
-            self.populate_edit_fields(class_id)
-            self.add_class_dialog.dialog.open()
-            return True
-        return False
     
     def populate_edit_fields(self, class_id):
         """수정할 과목 데이터로 필드 채우기"""
@@ -1564,7 +1553,16 @@ class MainScreen(MDScreen):
             )
 
             # 터치 이벤트 추가
-            card.bind(on_touch_down=lambda instance, touch: self.on_class_touch(instance, touch, class_id))
+        def make_touch_handler(card_instance, class_id):
+            def handle_touch(instance, touch):
+                if instance.collide_point(*touch.pos):
+                    self.edit_class_dialog.show_edit_dialog(card_instance)
+                    return True
+                return False
+            return handle_touch
+    
+        card.bind(on_touch_down=make_touch_handler(card, class_id))
+        
             print(f"카드 생성: 크기=({card_width}, {duration_height}), 위치=({x}, {y})")
             
             # 카드에 클래스 데이터 저장
