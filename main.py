@@ -731,7 +731,6 @@ class AddClassDialog:
             title="새 과목 추가" if not edit_mode else "과목 수정",
             type="custom",
             content_cls=self.content,
-            halign="center",  # 수평 중앙 정렬
             size_hint=(0.90, None),
             buttons=buttons
         )
