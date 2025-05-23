@@ -283,7 +283,7 @@ class AddClassDialog:
             self.start_time_dropdown = MDDropdownMenu(
                 caller=instance,  # 텍스트 필드를 기준으로 표시
                 items=time_options,
-                width=dp(200),  # width_mult 대신 직접 너비 설정
+                width=dp(400),  # width_mult 대신 직접 너비 설정
                 max_height=dp(250),  # 높이 제한
                 position="auto"  # 자동 위치
             )
@@ -320,7 +320,7 @@ class AddClassDialog:
             self.end_time_dropdown = MDDropdownMenu(
                 caller=instance,  # 텍스트 필드를 기준으로 표시
                 items=time_options,
-                width=dp(200),  # width_mult 대신 직접 너비 설정
+                width=dp(400),  # width_mult 대신 직접 너비 설정
                 max_height=dp(250),  # 높이 제한
                 position="auto"  # 자동 위치
             )
@@ -431,9 +431,13 @@ class AddClassDialog:
             orientation="vertical",
             spacing=dp(5),
             size_hint_y=None,
-            height=dp(800),
-            padding=(dp(20), dp(-30), dp(20), dp(15))
+            height=dp(700),
+            padding=(dp(20), dp(10), dp(20), dp(15))
         )
+    
+        # 🔥 제목과의 간격을 줄이는 음수 스페이서 추가
+        negative_spacer = Widget(size_hint_y=None, height=dp(-40))
+        self.content.add_widget(negative_spacer)
         
         # MDTextField의 폰트 속성을 직접 설정하기 위한 함수
         def set_font_for_textfield(textfield):
@@ -574,7 +578,7 @@ class AddClassDialog:
         colors_layout = MDBoxLayout(
             orientation='horizontal',
             size_hint_y=None,
-            height=dp(40),  # 작은 높이
+            height=dp(25),  # 작은 높이
             spacing=dp(2)   # 좁은 간격
         )
 
@@ -1012,7 +1016,7 @@ class MainScreen(MDScreen):
         """부제목 편집 대화상자 표시"""
         self.subtitle_field = MDTextField(
             text=self.subtitle_text,
-            hint_text="부제목 입력",
+            hint_text="Subtitle Edit",
             font_name=FONT_NAME,
             size_hint_y=None,
             height=dp(50)
@@ -1021,8 +1025,8 @@ class MainScreen(MDScreen):
         content = MDBoxLayout(
             orientation="vertical",
             size_hint_y=None,
-            height=dp(100),
-            spacing=dp(10)
+            height=dp(60),
+            spacing=dp(5)
         )
         content.add_widget(self.subtitle_field)
         
