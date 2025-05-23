@@ -283,7 +283,7 @@ class AddClassDialog:
             self.start_time_dropdown = MDDropdownMenu(
                 caller=instance,  # 텍스트 필드를 기준으로 표시
                 items=time_options,
-                width=dp(400),  # width_mult 대신 직접 너비 설정
+                width_mult=6,  # width_mult
                 max_height=dp(250),  # 높이 제한
                 position="auto"  # 자동 위치
             )
@@ -320,7 +320,7 @@ class AddClassDialog:
             self.end_time_dropdown = MDDropdownMenu(
                 caller=instance,  # 텍스트 필드를 기준으로 표시
                 items=time_options,
-                width=dp(400),  # width_mult 대신 직접 너비 설정
+                width_mult=6,  # width_mult 대신 직접 너비 설정
                 max_height=dp(250),  # 높이 제한
                 position="auto"  # 자동 위치
             )
@@ -424,7 +424,7 @@ class AddClassDialog:
 
 
         
-    def create_dialog(self):
+    def create_dialog(self, edit_mode=False, class_id=None):
         """대화상자 생성"""
         # 대화상자 내용 레이아웃
         self.content = MDBoxLayout(
@@ -687,29 +687,51 @@ class AddClassDialog:
                             set_font_for_textfield(child)
             except Exception as e:
                 print(f"다이얼로그 폰트 설정 오류: {e}")
+                
+        # 버튼을 모드에 따라 다르게 설정
+        if edit_mode:
+            # 수정 모드: 취소, 삭제, 저장
+            buttons = [
+                MDFlatButton(
+                    text="취소",
+                    font_name=FONT_NAME,
+                    on_release=lambda x: self.dialog.dismiss()
+                ),
+                MDFlatButton(
+                    text="삭제", 
+                    font_name=FONT_NAME,
+                    theme_text_color="Custom",
+                    text_color=[1, 0.3, 0.3, 1],
+                    on_release=lambda x: self.confirm_delete_class(class_id)
+                ),
+                MDRaisedButton(
+                    text="저장",
+                    font_name=FONT_NAME,
+                    on_release=lambda x: self.save_edited_class(class_id)
+                )
+            ]
+        else:
+            # 추가 모드: 취소, 추가
+            buttons = [
+                MDFlatButton(
+                    text="취소",
+                    font_name=FONT_NAME,
+                    on_release=lambda x: self.dialog.dismiss()
+                ),
+                MDRaisedButton(
+                    text="추가",
+                    font_name=FONT_NAME,
+                    on_release=self.add_class
+                )
+            ]
         
         # 팝업 대화상자 생성
         self.dialog = MDDialog(
-            title="새 과목 추가",
+            title="새 과목 추가" if not edit_mode else "과목 수정",
             type="custom",
             content_cls=self.content,
             size_hint=(0.90, None),
-            buttons=[
-                MDFlatButton(
-                    text="취소",
-                    theme_text_color="Custom",
-                    text_color=self.screen.app.theme_cls.primary_color,
-                    font_name=FONT_NAME,
-                    on_release=self.dismiss_dialog
-                ),
-                MDFlatButton(
-                    text="추가",
-                    theme_text_color="Custom",
-                    text_color=self.screen.app.theme_cls.primary_color,
-                    font_name=FONT_NAME,
-                    on_release=self.add_class
-                ),
-            ],
+            buttons=buttons
         )
         
         # 다이얼로그가 열릴 때 한 번 더 글꼴 설정 시도
