@@ -431,12 +431,12 @@ class AddClassDialog:
             orientation="vertical",
             spacing=dp(5),
             size_hint_y=None,
-            height=dp(700),
+            height=dp(650),
             padding=(dp(20), dp(10), dp(20), dp(15))
         )
     
         # 🔥 제목과의 간격을 줄이는 음수 스페이서 추가
-        negative_spacer = Widget(size_hint_y=None, height=dp(-40))
+        negative_spacer = Widget(size_hint_y=None, height=dp(-150))
         self.content.add_widget(negative_spacer)
         
         # MDTextField의 폰트 속성을 직접 설정하기 위한 함수
@@ -485,7 +485,7 @@ class AddClassDialog:
             orientation='horizontal',
             size_hint_y=None,
             height=dp(10),
-            spacing=dp(4),
+            spacing=dp(2),
             padding=(0, 0, 0, 0)
         )
         
@@ -578,7 +578,7 @@ class AddClassDialog:
         colors_layout = MDBoxLayout(
             orientation='horizontal',
             size_hint_y=None,
-            height=dp(25),  # 작은 높이
+            height=dp(40),  # 작은 높이
             spacing=dp(2)   # 좁은 간격
         )
 
@@ -599,7 +599,7 @@ class AddClassDialog:
             from kivymd.uix.card import MDCard
             color_btn = MDCard(
                 size_hint=(None, None),
-                size=(dp(55), dp(40)),  # 작은 크기
+                size=(dp(40), dp(30)),  # 작은 크기
                 md_bg_color=color,
                 radius=[dp(2)],  # 약간의 모서리 둥글기
                 elevation=1 if i == 0 else 0  # 첫 번째 버튼은 선택된 상태로 표시
@@ -1016,7 +1016,7 @@ class MainScreen(MDScreen):
         """부제목 편집 대화상자 표시"""
         self.subtitle_field = MDTextField(
             text=self.subtitle_text,
-            hint_text="Subtitle Edit",
+            hint_text="Edit",
             font_name=FONT_NAME,
             size_hint_y=None,
             height=dp(50)
