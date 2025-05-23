@@ -437,7 +437,7 @@ class AddClassDialog:
         )
     
         # 🔥 제목과의 간격을 줄이는 음수 스페이서 추가
-        negative_spacer = Widget(size_hint_y=None, height=dp(-200))
+        negative_spacer = Widget(size_hint_y=None, height=dp(-150))
         self.content.add_widget(negative_spacer)
         
         # MDTextField의 폰트 속성을 직접 설정하기 위한 함수
@@ -591,8 +591,8 @@ class AddClassDialog:
             (0.2, 0.8, 0.2, 1),  # Green
             (0.8, 0.6, 0.2, 1),  # Orange
             (0.8, 0.2, 0.2, 1),  # Red
+            (1.0, 0.4, 0.8, 1),  # Pink
             (0.5, 0.5, 0.5, 1),  # Gray
-            [0.6, 0.4, 0.2, 1],  # 따뜻한 갈색
         ]
         self.selected_color = self.class_colors[0]  # 기본 색상
         self.color_buttons = []
@@ -1031,9 +1031,16 @@ class MainScreen(MDScreen):
         # 부제목 저장 (기본값)
         self.subtitle_text = "2025년 1학기 소재부품융합공학과"    
         
-        # 알람 관리자 초기화
-        from alarm_manager import AlarmManager
-        self.alarm_manager = AlarmManager(app)
+        # 알람 매니저 초기화 - 여기서 알람 매니저 로딩 과정을 로그로 출력
+        try:
+            from alarm_manager import AlarmManager
+            print("알람 매니저 클래스 가져오기 성공")
+            self.alarm_manager = AlarmManager(app)
+            print(f"알람 매니저 초기화 성공: {self.alarm_manager}")
+        except Exception as e:
+            print(f"❌ 알람 매니저 초기화 실패: {e}")
+            import traceback
+            traceback.print_exc()
         
         Clock.schedule_once(self.setup_layout, 0)
 
@@ -1102,39 +1109,61 @@ class MainScreen(MDScreen):
         except:
             self.subtitle_text = "2025년 1학기 소재부품융합공학과"  # 기본값
 
-        
+            
     def open_attendance_app(self, instance):
         """전자출결 앱 열기"""
         try:
             if platform == 'android':
                 from jnius import autoclass
                 Intent = autoclass('android.content.Intent')
+                PackageManager = autoclass('android.content.pm.PackageManager')
                 PythonActivity = autoclass('org.kivy.android.PythonActivity')
                 
                 # 성균관대학교 전자출결 정확한 패키지명
                 package_name = 'edu.skku.attend'
+                context = PythonActivity.mActivity
                 
-                intent = Intent()
-                intent.setAction(Intent.ACTION_MAIN)
-                intent.addCategory(Intent.CATEGORY_LAUNCHER)
-                intent.setPackage(package_name)
-                
-                PythonActivity.mActivity.startActivity(intent)
-                print(f"✅ 성균관대 전자출결 앱 실행 성공")
+                # 앱이 설치되어 있는지 확인
+                try:
+                    # getPackageInfo는 앱이 설치되어 있지 않으면 예외를 발생시킵니다
+                    context.getPackageManager().getPackageInfo(package_name, 0)
+                    app_installed = True
+                except:
+                    app_installed = False
+                    
+                if app_installed:
+                    # 앱이 설치되어 있으면 실행
+                    intent = Intent()
+                    intent.setAction(Intent.ACTION_MAIN)
+                    intent.addCategory(Intent.CATEGORY_LAUNCHER)
+                    
+                    # 패키지 관리자를 통해 앱의 런처 액티비티 찾기
+                    pm = context.getPackageManager()
+                    intent.setPackage(package_name)
+                    resolveInfos = pm.queryIntentActivities(intent, 0)
+                    
+                    if resolveInfos and resolveInfos.size() > 0:
+                        resolveInfo = resolveInfos.get(0)
+                        activityInfo = resolveInfo.activityInfo
+                        intent.setClassName(activityInfo.packageName, activityInfo.name)
+                        context.startActivity(intent)
+                        print(f"✅ 성균관대 전자출결 앱 실행 성공")
+                    else:
+                        # 앱은 설치되어 있지만 런처 액티비티를 찾을 수 없음
+                        self.open_store()
+                else:
+                    # 앱이 설치되어 있지 않으면 스토어로 이동
+                    self.open_store()
+                    
+            else:
+                # PC 환경에서는 웹브라우저로 안내
+                import webbrowser
+                webbrowser.open("https://play.google.com/store/apps/details?id=edu.skku.attend")
                 
         except Exception as e:
             print(f"❌ 전자출결 앱 실행 실패: {e}")
             # 실패 시 플레이스토어로 이동
-            try:
-                Intent = autoclass('android.content.Intent')
-                Uri = autoclass('android.net.Uri')
-                PythonActivity = autoclass('org.kivy.android.PythonActivity')
-                
-                market_intent = Intent(Intent.ACTION_VIEW, 
-                                     Uri.parse("market://details?id=edu.skku.attend"))
-                PythonActivity.mActivity.startActivity(market_intent)
-            except:
-                self.show_error_dialog("앱 실행 실패", "전자출결 앱을 찾을 수 없습니다.")
+            self.open_store()
         
     def show_attendance_error_dialog(self):
         """전자출결 앱 실행 오류 대화상자 표시"""
@@ -1622,33 +1651,59 @@ class MainScreen(MDScreen):
             import traceback
             traceback.print_exc()
             return False
-    
+            
     def test_notification(self):
         """알림 테스트"""
         try:
             if 'ANDROID_STORAGE' in os.environ:
-                # Android native 알림
-                from jnius import autoclass
-                PythonActivity = autoclass('org.kivy.android.PythonActivity')
-                Context = autoclass('android.content.Context')
-                NotificationCompat = autoclass('androidx.core.app.NotificationCompat')
-                NotificationManagerCompat = autoclass('androidx.core.app.NotificationManagerCompat')
-                
-                context = PythonActivity.mActivity
-                
-                # 알림 빌더
-                builder = NotificationCompat.Builder(context, "timetable_alarm_channel")
-                builder.setContentTitle("테스트 알림")
-                builder.setContentText("알림이 정상적으로 작동합니다!")
-                builder.setSmallIcon(17301624)  # 기본 안드로이드 아이콘
-                builder.setPriority(NotificationCompat.PRIORITY_HIGH)
-                builder.setAutoCancel(True)
-                
-                # 알림 표시
-                notification_manager = NotificationManagerCompat.from_(context)
-                notification_manager.notify(1, builder.build())
-                
-                print("✅ Android 네이티브 알림 전송 완료")
+                # 알람 매니저의 테스트 알림 기능 사용
+                if hasattr(self, 'alarm_manager'):
+                    # 현재 시간 기준으로 5초 뒤에 테스트 알람 발생
+                    from datetime import datetime, timedelta
+                    
+                    # 시스템 알림 직접 호출
+                    from jnius import autoclass
+                    PythonActivity = autoclass('org.kivy.android.PythonActivity')
+                    Context = autoclass('android.content.Context')
+                    NotificationCompat = autoclass('androidx.core.app.NotificationCompat')
+                    NotificationManagerCompat = autoclass('androidx.core.app.NotificationManagerCompat')
+                    Intent = autoclass('android.content.Intent')
+                    PendingIntent = autoclass('android.app.PendingIntent')
+                    
+                    # 컨텍스트 가져오기
+                    context = PythonActivity.mActivity
+                    
+                    # 알림 채널 ID
+                    channel_id = "timetable_alarm_channel"
+                    
+                    # 인텐트 생성 (앱 실행용)
+                    intent = Intent(context, PythonActivity)
+                    intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK)
+                    
+                    # PendingIntent 생성
+                    FLAG_IMMUTABLE = 67108864  # PendingIntent.FLAG_IMMUTABLE
+                    FLAG_UPDATE_CURRENT = 134217728  # PendingIntent.FLAG_UPDATE_CURRENT
+                    
+                    pending_intent = PendingIntent.getActivity(
+                        context, 0, intent, FLAG_UPDATE_CURRENT | FLAG_IMMUTABLE
+                    )
+                    
+                    # 알림 빌더
+                    builder = NotificationCompat.Builder(context, channel_id)
+                    builder.setSmallIcon(android.R.drawable.ic_dialog_info)
+                    builder.setContentTitle("테스트 알림")
+                    builder.setContentText("시간표 앱 알림이 정상적으로 작동합니다!")
+                    builder.setPriority(NotificationCompat.PRIORITY_HIGH)
+                    builder.setContentIntent(pending_intent)
+                    builder.setAutoCancel(True)
+                    
+                    # 알림 표시
+                    notification_manager = NotificationManagerCompat.from_(context)
+                    notification_manager.notify(9999, builder.build())
+                    
+                    print("✅ 테스트 알림 전송 완료")
+                else:
+                    print("❌ 알람 매니저가 초기화되지 않았습니다.")
             else:
                 # PC 환경에서는 플라이어 사용
                 from plyer import notification
@@ -1658,7 +1713,7 @@ class MainScreen(MDScreen):
                     timeout=5
                 )
                 print("✅ Plyer 알림 전송 완료")
-                
+                    
         except Exception as e:
             print(f"❌ 알림 테스트 실패: {e}")
             import traceback
