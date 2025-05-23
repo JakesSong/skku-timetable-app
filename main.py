@@ -431,12 +431,12 @@ class AddClassDialog:
             orientation="vertical",
             spacing=dp(5),
             size_hint_y=None,
-            height=dp(650),
+            height=dp(550),
             padding=(dp(20), dp(10), dp(20), dp(15))
         )
     
         # 🔥 제목과의 간격을 줄이는 음수 스페이서 추가
-        negative_spacer = Widget(size_hint_y=None, height=dp(-150))
+        negative_spacer = Widget(size_hint_y=None, height=dp(-200))
         self.content.add_widget(negative_spacer)
         
         # MDTextField의 폰트 속성을 직접 설정하기 위한 함수
@@ -486,7 +486,8 @@ class AddClassDialog:
             size_hint_y=None,
             height=dp(10),
             spacing=dp(2),
-            padding=(0, 0, 0, 0)
+            padding=(dp(20), 0, dp(20), 0),
+            adaptive_width=true
         )
         
         # 한글 요일 이름과 영어 요일 매핑 사용
@@ -503,7 +504,7 @@ class AddClassDialog:
                 text=day_kr,  # 한글 요일 표시
                 font_name=FONT_NAME,
                 on_release=lambda x, d=day, k=day_names[day]: self.set_day(d, k),
-                size_hint_x=0.2
+                size_hint_x=0.12
             )
             days_layout.add_widget(day_btn)
         
@@ -590,6 +591,7 @@ class AddClassDialog:
             (0.8, 0.6, 0.2, 1),  # Orange
             (0.8, 0.2, 0.2, 1),  # Red
             (0.5, 0.5, 0.5, 1),  # Gray
+            [0.6, 0.4, 0.2, 1],  # 따뜻한 갈색
         ]
         self.selected_color = self.class_colors[0]  # 기본 색상
         self.color_buttons = []
@@ -1076,32 +1078,40 @@ class MainScreen(MDScreen):
                 self.subtitle_text = f.read().strip()
         except:
             self.subtitle_text = "2025년 1학기 소재부품융합공학과"  # 기본값
+
         
     def open_attendance_app(self, instance):
-        """성균관대 전자출결 앱 실행"""
+        """전자출결 앱 열기"""
         try:
-            # 안드로이드 환경인지 확인
-            if 'ANDROID_STORAGE' in os.environ:
-                # 안드로이드 환경
+            if platform == 'android':
                 from jnius import autoclass
-                
                 Intent = autoclass('android.content.Intent')
                 PythonActivity = autoclass('org.kivy.android.PythonActivity')
                 
-                # 인텐트 생성
-                intent = Intent(Intent.ACTION_VIEW)
-                intent.setClassName("edu.skku.attend", "edu.skku.attend.MainActivity")
+                # 성균관대학교 전자출결 정확한 패키지명
+                package_name = 'edu.skku.attend'
                 
-                # 앱 실행
-                currentActivity = PythonActivity.mActivity
-                currentActivity.startActivity(intent)
-            else:
-                # 안드로이드가 아닌 환경 (개발 PC)
-                print("개발 환경에서는 전자출결 앱을 실행할 수 없습니다.")
-                self.show_attendance_error_dialog()
+                intent = Intent()
+                intent.setAction(Intent.ACTION_MAIN)
+                intent.addCategory(Intent.CATEGORY_LAUNCHER)
+                intent.setPackage(package_name)
+                
+                PythonActivity.mActivity.startActivity(intent)
+                print(f"✅ 성균관대 전자출결 앱 실행 성공")
+                
         except Exception as e:
-            print(f"전자출결 앱 실행 오류: {e}")
-            self.show_attendance_error_dialog()
+            print(f"❌ 전자출결 앱 실행 실패: {e}")
+            # 실패 시 플레이스토어로 이동
+            try:
+                Intent = autoclass('android.content.Intent')
+                Uri = autoclass('android.net.Uri')
+                PythonActivity = autoclass('org.kivy.android.PythonActivity')
+                
+                market_intent = Intent(Intent.ACTION_VIEW, 
+                                     Uri.parse("market://details?id=edu.skku.attend"))
+                PythonActivity.mActivity.startActivity(market_intent)
+            except:
+                self.show_error_dialog("앱 실행 실패", "전자출결 앱을 찾을 수 없습니다.")
         
     def show_attendance_error_dialog(self):
         """전자출결 앱 실행 오류 대화상자 표시"""
