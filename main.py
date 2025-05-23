@@ -419,7 +419,7 @@ class AddClassDialog:
     def show_dialog(self, *args):
         """과목 추가 대화상자 표시"""
         if not self.dialog:
-            self.create_dialog()
+            self.create_dialog(edit_mode=False)
         self.dialog.open()
 
 
@@ -1347,6 +1347,15 @@ class MainScreen(MDScreen):
         )
         self.add_widget(self.attendance_button)
 
+        # 기존 버튼들 뒤에 추가
+        self.test_button = MDFloatingActionButton(
+            icon="bell-ring",
+            pos_hint={"right": 0.98, "y": 0.22},  # 다른 버튼들 위에
+            md_bg_color=[1, 0.5, 0, 1],  # 주황색
+            on_release=lambda x: self.test_notification()
+        )
+        self.add_widget(self.test_button)
+
         # 메인 화면 초기화 후 샘플 카드 추가
         Clock.schedule_once(lambda dt: self.load_saved_timetable(), 0.5)
 
@@ -1388,6 +1397,109 @@ class MainScreen(MDScreen):
             print("✅ UI 새로고침 완료")
         except Exception as e:
             print(f"UI 새로고침 오류: {e}")
+
+    def on_class_touch(self, instance, touch, class_id):
+        """과목 카드 터치 시 수정 팝업 열기"""
+        if instance.collide_point(*touch.pos):
+            # 수정 모드로 팝업 열기
+            self.add_class_dialog.create_dialog(edit_mode=True, class_id=class_id)
+            # 기존 데이터로 필드 채우기
+            self.populate_edit_fields(class_id)
+            self.add_class_dialog.dialog.open()
+            return True
+        return False
+    
+    def populate_edit_fields(self, class_id):
+        """수정할 과목 데이터로 필드 채우기"""
+        if class_id in self.classes_data:
+            data = self.classes_data[class_id]
+            
+            # 필드에 기존 데이터 입력
+            self.add_class_dialog.name_field.text = data['name']
+            self.add_class_dialog.room_field.text = data['room']
+            self.add_class_dialog.professor_field.text = data['professor']
+            self.add_class_dialog.start_time_field.text = data['start_time']
+            self.add_class_dialog.end_time_field.text = data['end_time']
+            
+            # 요일 설정
+            day_kr_map = {"Monday": "월", "Tuesday": "화", "Wednesday": "수", "Thursday": "목", "Friday": "금"}
+            self.add_class_dialog.day_field.text = day_kr_map.get(data['day'], "월")
+            self.add_class_dialog.current_day = data['day']
+            
+            # 색상 설정
+            self.add_class_dialog.selected_color = data['color']
+            for i, color in enumerate(self.add_class_dialog.class_colors):
+                if color == data['color']:
+                    self.add_class_dialog.color_buttons[i].elevation = 3
+                    self.add_class_dialog.selected_button_index = i
+                else:
+                    self.add_class_dialog.color_buttons[i].elevation = 0
+    
+    def confirm_delete_class(self, class_id):
+        """과목 삭제 확인 다이얼로그"""
+        self.add_class_dialog.dialog.dismiss()
+        
+        confirm_dialog = MDDialog(
+            title="과목 삭제",
+            text="정말로 이 과목을 삭제하시겠습니까?",
+            buttons=[
+                MDFlatButton(
+                    text="취소",
+                    font_name=FONT_NAME,
+                    on_release=lambda x: confirm_dialog.dismiss()
+                ),
+                MDRaisedButton(
+                    text="삭제",
+                    font_name=FONT_NAME,
+                    theme_bg_color="Custom",
+                    md_bg_color=[1, 0.3, 0.3, 1],
+                    on_release=lambda x: self.delete_class_confirmed(class_id, confirm_dialog)
+                )
+            ]
+        )
+        confirm_dialog.open()
+    
+    def delete_class_confirmed(self, class_id, dialog):
+        """과목 삭제 실행"""
+        # 화면에서 카드 제거
+        for card in self.time_grid.children[:]:  # 복사본으로 순회
+            if hasattr(card, 'class_data') and card.class_data.get('id') == class_id:
+                self.time_grid.remove_widget(card)
+                break
+        
+        # 데이터에서 삭제
+        if class_id in self.classes_data:
+            del self.classes_data[class_id]
+        
+        # 저장
+        self.save_timetable()
+        dialog.dismiss()
+    
+    def save_edited_class(self, class_id):
+        """수정된 과목 저장"""
+        # 기존 카드 제거
+        for card in self.time_grid.children[:]:
+            if hasattr(card, 'class_data') and card.class_data.get('id') == class_id:
+                self.time_grid.remove_widget(card)
+                break
+        
+        # 새 데이터로 카드 다시 생성
+        name = self.add_class_dialog.name_field.text.strip()
+        day = self.add_class_dialog.current_day
+        start_time = self.add_class_dialog.start_time_field.text.strip()
+        end_time = self.add_class_dialog.end_time_field.text.strip()
+        room = self.add_class_dialog.room_field.text.strip()
+        professor = self.add_class_dialog.professor_field.text.strip()
+        
+        if not all([name, day, start_time, end_time, room, professor]):
+            return
+        
+        color_str = f"{self.add_class_dialog.selected_color[0]},{self.add_class_dialog.selected_color[1]},{self.add_class_dialog.selected_color[2]},{self.add_class_dialog.selected_color[3]}"
+        
+        # 카드 다시 추가
+        self.add_class_to_grid(class_id, name, day, start_time, end_time, room, professor, color_str)
+        
+        self.add_class_dialog.dialog.dismiss()
     
     def add_class_to_grid(self, class_id, name, day, start_time, end_time, room, professor, color_str):
         
@@ -1449,7 +1561,9 @@ class MainScreen(MDScreen):
                 radius=[dp(5)],
                 ripple_behavior=True
             )
-            
+
+            # 터치 이벤트 추가
+            card.bind(on_touch_down=lambda instance, touch: self.on_class_touch(instance, touch, class_id))
             print(f"카드 생성: 크기=({card_width}, {duration_height}), 위치=({x}, {y})")
             
             # 카드에 클래스 데이터 저장
@@ -1467,7 +1581,7 @@ class MainScreen(MDScreen):
             # 클래스 데이터 저장소에 추가
             self.classes_data[class_id] = card.class_data.copy()
             
-            # 카드 내용 추가 (이 부분이 빠져있었습니다!)
+            # 카드 내용 추가
             card.add_widget(MDLabel(
                 text=f"{name}\n{room}",
                 halign="center",
@@ -1507,7 +1621,47 @@ class MainScreen(MDScreen):
             import traceback
             traceback.print_exc()
             return False
-
+    
+    def test_notification(self):
+        """알림 테스트"""
+        try:
+            if 'ANDROID_STORAGE' in os.environ:
+                # Android native 알림
+                from jnius import autoclass
+                PythonActivity = autoclass('org.kivy.android.PythonActivity')
+                Context = autoclass('android.content.Context')
+                NotificationCompat = autoclass('androidx.core.app.NotificationCompat')
+                NotificationManagerCompat = autoclass('androidx.core.app.NotificationManagerCompat')
+                
+                context = PythonActivity.mActivity
+                
+                # 알림 빌더
+                builder = NotificationCompat.Builder(context, "timetable_alarm_channel")
+                builder.setContentTitle("테스트 알림")
+                builder.setContentText("알림이 정상적으로 작동합니다!")
+                builder.setSmallIcon(17301624)  # 기본 안드로이드 아이콘
+                builder.setPriority(NotificationCompat.PRIORITY_HIGH)
+                builder.setAutoCancel(True)
+                
+                # 알림 표시
+                notification_manager = NotificationManagerCompat.from_(context)
+                notification_manager.notify(1, builder.build())
+                
+                print("✅ Android 네이티브 알림 전송 완료")
+            else:
+                # PC 환경에서는 플라이어 사용
+                from plyer import notification
+                notification.notify(
+                    title="테스트 알림",
+                    message="알림이 정상적으로 작동합니다!",
+                    timeout=5
+                )
+                print("✅ Plyer 알림 전송 완료")
+                
+        except Exception as e:
+            print(f"❌ 알림 테스트 실패: {e}")
+            import traceback
+            traceback.print_exc()
 
 class TimeTableApp(MDApp):
     def build(self):
