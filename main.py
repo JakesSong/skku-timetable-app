@@ -1342,6 +1342,21 @@ class MainScreen(MDScreen):
         if success:
             print("시간표 저장 완료")
 
+    def refresh_ui(self):
+        """UI 새로고침"""
+        try:
+            # 레이아웃이 없으면 다시 생성
+            if not hasattr(self, 'layout') or not self.layout:
+                self.setup_layout(0)
+            
+            # 시간표 다시 로드
+            if hasattr(self, 'time_grid'):
+                self.load_saved_timetable()
+                
+            print("✅ UI 새로고침 완료")
+        except Exception as e:
+            print(f"UI 새로고침 오류: {e}")
+    
     def add_class_to_grid(self, class_id, name, day, start_time, end_time, room, professor, color_str):
         
         # 시간 문자열을 숫자로 변환
@@ -1538,6 +1553,25 @@ class TimeTableApp(MDApp):
 
         return self.main_screen
 
+    def on_start(self):
+        """앱 시작 시 호출"""
+        print("✅ 앱 시작됨")
+        
+    def on_resume(self):
+        """백그라운드에서 돌아올 때 호출"""
+        print("✅ 앱 재개됨")
+        try:
+            # UI 다시 초기화
+            if hasattr(self, 'main_screen'):
+                Clock.schedule_once(lambda dt: self.main_screen.refresh_ui(), 0.1)
+        except Exception as e:
+            print(f"앱 재개 오류: {e}")
+            
+    def on_pause(self):
+        """백그라운드로 갈 때 호출"""
+        print("📱 앱 일시정지됨")
+        return True  # True 반환해야 앱이 종료되지 않음
+    
     def show_alarm_notification(self, class_name, class_room, class_time, class_professor):
         try:
             from plyer import notification
