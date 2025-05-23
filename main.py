@@ -1490,13 +1490,13 @@ class MainScreen(MDScreen):
         self.add_class_to_grid(class_id, name, day, start_time, end_time, room, professor, color_str)
         
         self.add_class_dialog.dialog.dismiss()
-    
+        
     def add_class_to_grid(self, class_id, name, day, start_time, end_time, room, professor, color_str):
         
         # 시간 문자열을 숫자로 변환
         start_time_float = parse_time_string(start_time)
         end_time_float = parse_time_string(end_time)
-
+    
         # 시간 값 검증
         if start_time_float is None or end_time_float is None:
             print(f"[스킵] 잘못된 시간 값: start={start_time}, end={end_time}")
@@ -1551,55 +1551,7 @@ class MainScreen(MDScreen):
                 radius=[dp(5)],
                 ripple_behavior=True
             )
-
-            print(f"카드 생성: 크기=({card_width}, {duration_height}), 위치=({x}, {y})")
-            
-            # 카드에 클래스 데이터 저장
-            card.class_data = {
-                'id': class_id,
-                'name': name,
-                'day': day,
-                'start_time': start_time,
-                'end_time': end_time,
-                'room': room,
-                'professor': professor,
-                'color': color
-            }
-            
-            # 클래스 데이터 저장소에 추가
-            self.classes_data[class_id] = card.class_data.copy()
-            
-            # 카드 내용 추가
-            card.add_widget(MDLabel(
-                text=f"{name}\n{room}",
-                halign="center",
-                valign="center",
-                font_name=FONT_NAME,
-                font_size="4sp",
-                theme_text_color="Custom",
-                text_color=(1, 1, 1, 1)
-            ))
-            
-            # 시간표 그리드에 카드 추가
-            self.time_grid.add_widget(card)
-            
-        except Exception as e:
-            print(f"카드 생성 중 오류 발생: {e}")
-            import traceback
-            traceback.print_exc()
-            return False
-
-        # try-except 블록 밖에서 터치 핸들러 정의
-        def make_touch_handler(card_instance, class_id):
-            def handle_touch(instance, touch):
-                if instance.collide_point(*touch.pos):
-                    self.edit_class_dialog.show_edit_dialog(card_instance)
-                    return True
-                return False
-            return handle_touch
-
-        card.bind(on_touch_down=make_touch_handler(card, class_id))
-        
+    
             print(f"카드 생성: 크기=({card_width}, {duration_height}), 위치=({x}, {y})")
             
             # 카드에 클래스 데이터 저장
@@ -1630,6 +1582,19 @@ class MainScreen(MDScreen):
             
             # 시간표 그리드에 카드 추가
             self.time_grid.add_widget(card)
+            
+            # try-except 블록 밖에서 터치 핸들러 정의
+            def make_touch_handler(card_instance, class_id):
+                def handle_touch(instance, touch):
+                    if instance.collide_point(*touch.pos):
+                        self.edit_class_dialog.show_edit_dialog(card_instance)
+                        return True
+                    return False
+                return handle_touch
+    
+            card.bind(on_touch_down=make_touch_handler(card, class_id))
+            
+            print(f"카드 생성: 크기=({card_width}, {duration_height}), 위치=({x}, {y})")
             
             # 클릭 이벤트 연결
             card.on_release_callback = lambda card: self.edit_class_dialog.show_edit_dialog(card)
