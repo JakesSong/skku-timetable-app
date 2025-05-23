@@ -284,7 +284,7 @@ class AddClassDialog:
             self.start_time_dropdown = MDDropdownMenu(
                 caller=instance,  # 텍스트 필드를 기준으로 표시
                 items=time_options,
-                width_mult=6,  # width_mult
+                width_mult=4,  # width_mult
                 max_height=dp(250),  # 높이 제한
                 position="auto"  # 자동 위치
             )
@@ -321,7 +321,7 @@ class AddClassDialog:
             self.end_time_dropdown = MDDropdownMenu(
                 caller=instance,  # 텍스트 필드를 기준으로 표시
                 items=time_options,
-                width_mult=6,  # width_mult 대신 직접 너비 설정
+                width_mult=4,  # width_mult 대신 직접 너비 설정
                 max_height=dp(250),  # 높이 제한
                 position="auto"  # 자동 위치
             )
@@ -437,7 +437,7 @@ class AddClassDialog:
         )
     
         # 🔥 제목과의 간격을 줄이는 음수 스페이서 추가
-        negative_spacer = Widget(size_hint_y=None, height=dp(-150))
+        negative_spacer = Widget(size_hint_y=None, height=dp(-100))
         self.content.add_widget(negative_spacer)
         
         # MDTextField의 폰트 속성을 직접 설정하기 위한 함수
@@ -487,7 +487,7 @@ class AddClassDialog:
             size_hint_y=None,
             height=dp(10),
             spacing=dp(2),
-            padding=(dp(20), 0, dp(20), 0),
+            padding=(0, 0, 0, 0),
             adaptive_width=True
         )
         
@@ -731,6 +731,7 @@ class AddClassDialog:
             title="새 과목 추가" if not edit_mode else "과목 수정",
             type="custom",
             content_cls=self.content,
+            halign="center",  # 수평 중앙 정렬
             size_hint=(0.90, None),
             buttons=buttons
         )
