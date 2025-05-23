@@ -1552,7 +1552,44 @@ class MainScreen(MDScreen):
                 ripple_behavior=True
             )
 
-            # 터치 이벤트 추가
+            print(f"카드 생성: 크기=({card_width}, {duration_height}), 위치=({x}, {y})")
+            
+            # 카드에 클래스 데이터 저장
+            card.class_data = {
+                'id': class_id,
+                'name': name,
+                'day': day,
+                'start_time': start_time,
+                'end_time': end_time,
+                'room': room,
+                'professor': professor,
+                'color': color
+            }
+            
+            # 클래스 데이터 저장소에 추가
+            self.classes_data[class_id] = card.class_data.copy()
+            
+            # 카드 내용 추가
+            card.add_widget(MDLabel(
+                text=f"{name}\n{room}",
+                halign="center",
+                valign="center",
+                font_name=FONT_NAME,
+                font_size="4sp",
+                theme_text_color="Custom",
+                text_color=(1, 1, 1, 1)
+            ))
+            
+            # 시간표 그리드에 카드 추가
+            self.time_grid.add_widget(card)
+            
+        except Exception as e:
+            print(f"카드 생성 중 오류 발생: {e}")
+            import traceback
+            traceback.print_exc()
+            return False
+
+        # try-except 블록 밖에서 터치 핸들러 정의
         def make_touch_handler(card_instance, class_id):
             def handle_touch(instance, touch):
                 if instance.collide_point(*touch.pos):
@@ -1560,7 +1597,7 @@ class MainScreen(MDScreen):
                     return True
                 return False
             return handle_touch
-    
+
         card.bind(on_touch_down=make_touch_handler(card, class_id))
         
             print(f"카드 생성: 크기=({card_width}, {duration_height}), 위치=({x}, {y})")
