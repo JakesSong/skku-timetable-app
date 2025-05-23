@@ -67,6 +67,7 @@ from kivymd.uix.spinner import MDSpinner
 from kivymd.uix.menu import MDDropdownMenu
 from db_handler import TimeTableStorage
 from kivy.logger import Logger
+from kivy.utils import platform 
 
 from kivy.metrics import dp
 from kivy.clock import Clock
@@ -702,12 +703,12 @@ class AddClassDialog:
                     font_name=FONT_NAME,
                     theme_text_color="Custom",
                     text_color=[1, 0.3, 0.3, 1],
-                    on_release=lambda x: self.confirm_delete_class(class_id)
+                    on_release=lambda x: self.screen.confirm_delete_class(class_id)
                 ),
                 MDRaisedButton(
                     text="저장",
                     font_name=FONT_NAME,
-                    on_release=lambda x: self.save_edited_class(class_id)
+                    on_release=lambda x: self.screen.save_edited_class(class_id)
                 )
             ]
         else:
