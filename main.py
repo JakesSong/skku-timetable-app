@@ -432,12 +432,12 @@ class AddClassDialog:
             orientation="vertical",
             spacing=dp(5),
             size_hint_y=None,
-            height=dp(550),
+            height=dp(580),
             padding=(dp(20), dp(10), dp(20), dp(15))
         )
     
         # 🔥 제목과의 간격을 줄이는 음수 스페이서 추가
-        negative_spacer = Widget(size_hint_y=None, height=dp(-100))
+        negative_spacer = Widget(size_hint_y=None, height=dp(-50))
         self.content.add_widget(negative_spacer)
         
         # MDTextField의 폰트 속성을 직접 설정하기 위한 함수
@@ -797,85 +797,455 @@ class AddClassDialog:
         self.dismiss_dialog()
 
 
-class EditClassDialog(AddClassDialog):
-    """과목 수정 대화상자 클래스"""
+class EditClassDialog:
+    """과목 수정 대화상자 클래스 - 완전히 독립적인 구현"""
     def __init__(self, screen):
-        super().__init__(screen)
-        self.editing_card = None  # 현재 편집 중인 카드 참조 저장
+        self.screen = screen
+        self.dialog = None
+        self.editing_card = None
+        self.day_dropdown = None
+        self.current_day = "Monday"  # 기본값
         
+        # 시간 드롭다운 변수 초기화
+        self.start_time_dropdown = None
+        self.end_time_dropdown = None
+        self.selected_color = None
+        self.color_buttons = []
+        
+        # 색상 정의 (AddClassDialog와 동일하게 유지)
+        self.class_colors = [
+            (0.6, 0.2, 0.8, 1),  # Purple
+            (0.2, 0.6, 0.8, 1),  # Blue
+            (0.2, 0.8, 0.2, 1),  # Green
+            (0.8, 0.6, 0.2, 1),  # Orange
+            (0.8, 0.2, 0.2, 1),  # Red
+            (1.0, 0.4, 0.8, 1),  # Pink
+            (0.5, 0.5, 0.5, 1),  # Gray
+        ]
+        self.selected_button_index = 0
+    
+    def show_start_time_dropdown(self, instance, value):
+        """시작 시간 드롭다운 메뉴 표시"""
+        if value:  # 텍스트 필드가 포커스를 얻으면
+            # 시간 옵션 생성 (09:00부터 18:45까지 15분 간격)
+            time_options = []
+            for hour in range(9, 19):  # 9시부터 18시까지
+                for minute in [0, 15, 30, 45]:  # 15분 간격
+                    time_str = f"{hour:02d}:{minute:02d}"
+                    time_options.append({
+                        "text": time_str,
+                        "viewclass": "OneLineListItem",
+                        "on_release": lambda x=time_str: self.set_start_time(x),
+                    })
+            
+            # 드롭다운 메뉴 생성 (높이 제한 및 스크롤 가능)
+            self.start_time_dropdown = MDDropdownMenu(
+                caller=instance,  # 텍스트 필드를 기준으로 표시
+                items=time_options,
+                width_mult=4,  # width_mult
+                max_height=dp(250),  # 높이 제한
+                position="auto"  # 자동 위치
+            )
+            self.start_time_dropdown.open()
+
+    def show_end_time_dropdown(self, instance, value):
+        """종료 시간 드롭다운 메뉴 표시"""
+        if value:  # 텍스트 필드가 포커스를 얻으면
+            # 시간 옵션 생성 (09:15부터 19:00까지 15분 간격)
+            time_options = []
+            
+            # 시작 시간이 선택되지 않았으면 모든 시간 표시
+            if not self.start_time_field.text:
+                start_hour = 9
+                start_minute = 0
+            else:
+                # 시작 시간이 선택되었으면 그 이후 시간만 표시
+                start_time = self.start_time_field.text
+                start_hour, start_minute = map(int, start_time.split(':'))
+            
+            # 시작 시간 이후의 옵션만 생성
+            for hour in range(9, 20):  # 9시부터 19시까지
+                for minute in [0, 15, 30, 45]:  # 15분 간격
+                    # 시작 시간보다 늦은 시간만 포함
+                    if (hour > start_hour) or (hour == start_hour and minute > start_minute):
+                        time_str = f"{hour:02d}:{minute:02d}"
+                        time_options.append({
+                            "text": time_str,
+                            "viewclass": "OneLineListItem",
+                            "on_release": lambda x=time_str: self.set_end_time(x),
+                        })
+            
+            # 드롭다운 메뉴 생성 (높이 제한 및 스크롤 가능)
+            self.end_time_dropdown = MDDropdownMenu(
+                caller=instance,  # 텍스트 필드를 기준으로 표시
+                items=time_options,
+                width_mult=4,  # width_mult 대신 직접 너비 설정
+                max_height=dp(250),  # 높이 제한
+                position="auto"  # 자동 위치
+            )
+            self.end_time_dropdown.open()
+            
+    def set_start_time(self, time_str):
+        """시작 시간 설정"""
+        self.start_time_field.text = time_str
+        self.start_time_field.focus = False  # 포커스 해제
+        
+        if hasattr(self, 'start_time_dropdown'):
+            self.start_time_dropdown.dismiss()  # 드롭다운 닫기
+        
+        # 종료 시간이 설정되어 있고 시작 시간보다 빠르다면 초기화
+        if self.end_time_field.text and self.end_time_field.text <= time_str:
+            self.end_time_field.text = ""
+
+    def set_end_time(self, time_str):
+        """종료 시간 설정"""
+        self.end_time_field.text = time_str
+        self.end_time_field.focus = False  # 포커스 해제
+        
+        if hasattr(self, 'end_time_dropdown'):
+            self.end_time_dropdown.dismiss()  # 드롭다운 닫기
+    
+    def on_start_time_touch(self, instance, touch):
+        """시작 시간 필드 터치 이벤트"""
+        if instance.collide_point(*touch.pos):
+            self.show_start_time_dropdown(instance, True)
+            return True
+        return False
+
+    def on_end_time_touch(self, instance, touch):
+        """종료 시간 필드 터치 이벤트"""
+        if instance.collide_point(*touch.pos):
+            self.show_end_time_dropdown(instance, True)
+            return True
+        return False
+    
+    def set_day(self, english_day, korean_day):
+        """요일 설정"""
+        self.current_day = english_day
+        self.day_field.text = korean_day
+        # 포커스 해제
+        self.day_field.focus = False
+    
+    def set_color(self, color, index):
+        """선택된 색상 설정"""
+        self.selected_color = color
+        # 버튼 높이를 업데이트하여 선택 표시
+        for i, btn in enumerate(self.color_buttons):
+            btn.elevation = 3 if i == index else 0
+        self.selected_button_index = index
+        
+    def apply_fonts_to_dialog(self, instance):
+        """다이얼로그 내 모든 위젯에 폰트 설정"""
+        try:
+            # 다이얼로그 타이틀에 폰트 설정
+            if hasattr(self.dialog, '_title'):
+                self.dialog._title.font_name = FONT_NAME
+            
+            # content_cls 내부의 모든 위젯에 폰트 설정
+            if hasattr(self.dialog, 'content_cls'):
+                # 모든 텍스트 필드에 폰트 적용
+                for child in self.dialog.content_cls.children:
+                    if isinstance(child, MDTextField):
+                        self.set_font_for_textfield(child)
+                    elif isinstance(child, MDLabel):
+                        child.font_name = FONT_NAME
+                        # 레이블 폰트 크기 증가
+                        child.font_size = "16sp"
+                    elif isinstance(child, MDBoxLayout):
+                        # 중첩된 레이아웃 내부의 버튼에도 폰트 적용
+                        for grandchild in child.children:
+                            if hasattr(grandchild, 'font_name'):
+                                grandchild.font_name = FONT_NAME
+
+            # 버튼에 폰트 설정
+            if hasattr(self.dialog, 'buttons'):
+                for button in self.dialog.buttons:
+                    button.font_name = FONT_NAME
+        except Exception as e:
+            print(f"다이얼로그 폰트 설정 오류: {e}")
+
+    def set_font_for_textfield(self, textfield):
+        """MDTextField의 폰트 속성을 직접 설정하기 위한 함수"""
+        # TextField의 모든 하위 위젯에 폰트 설정 시도
+        try:
+            textfield.font_name = FONT_NAME
+            # 힌트 텍스트와 헬퍼 텍스트도 함께 설정
+            if hasattr(textfield, '_hint_lbl'):
+                textfield._hint_lbl.font_name = FONT_NAME
+            if hasattr(textfield, '_helper_text'):
+                textfield._helper_text.font_name = FONT_NAME
+            # 메인 텍스트 레이블 설정
+            if hasattr(textfield, '_line_lbl'):
+                textfield._line_lbl.font_name = FONT_NAME
+        except Exception as e:
+            print(f"텍스트 필드 폰트 설정 오류: {e}")
+    
     def show_edit_dialog(self, card):
         """과목 수정 대화상자 표시"""
         self.editing_card = card  # 편집할 카드 참조 저장
         class_data = card.class_data
         
-        # 다이얼로그가 이미 있다면 닫기
-        if hasattr(self, 'dialog') and self.dialog:
-            self.dialog.dismiss()
-            self.dialog = None
-            
-        # 기본 다이얼로그 생성 (AddClassDialog의 create_dialog 메서드 활용)
-        self.create_dialog()
+        # 대화상자 내용 레이아웃
+        self.content = MDBoxLayout(
+            orientation="vertical",
+            spacing=dp(5),
+            size_hint_y=None,
+            height=dp(550),
+            padding=(dp(20), dp(10), dp(20), dp(15))
+        )
+    
+        # 🔥 제목과의 간격을 줄이는 음수 스페이서 추가
+        negative_spacer = Widget(size_hint_y=None, height=dp(-100))
+        self.content.add_widget(negative_spacer)
         
-        # 기존 데이터로 필드 채우기
-        self.name_field.text = class_data['name']
-        self.day_field.text = korean_day_map.get(class_data['day'], "월")
+        # 과목명 입력
+        self.name_field = MDTextField(
+            hint_text="Class Name",
+            helper_text="Ex: Physics1",
+            helper_text_mode="on_focus",
+            height=dp(20),
+            font_name=FONT_NAME,
+            text=class_data['name']
+        )
+        self.set_font_for_textfield(self.name_field)
+        self.content.add_widget(self.name_field)
+        
+        # 요일 선택 필드
+        self.day_field = MDTextField(
+            hint_text="Day of the week",
+            helper_text_mode="on_focus",
+            font_name=FONT_NAME,
+            height=dp(20),
+            readonly=True,
+            text=korean_day_map.get(class_data['day'], "월")
+        )
         self.current_day = class_data['day']
-        self.start_time_field.text = class_data['start_time']
-        self.end_time_field.text = class_data['end_time']
-        self.room_field.text = class_data['room']
-        self.professor_field.text = class_data['professor']
+        self.day_field.font_size = "15.5sp" 
+        self.set_font_for_textfield(self.day_field)
+        self.content.add_widget(self.day_field)
         
-        # 기존 색상 설정
-        self.selected_color = class_data['color']
+        # 요일 버튼 레이아웃 추가
+        days_layout = MDBoxLayout(
+            orientation='horizontal',
+            size_hint_y=None,
+            height=dp(10),
+            spacing=dp(2),
+            padding=(0, 0, 0, 0),
+            adaptive_width=True
+        )
         
-        # 색상 버튼 선택 상태 업데이트
-        for i, color in enumerate(self.class_colors):
-            if color == class_data['color']:
-                self.color_buttons[i].elevation = 3
-                self.selected_button_index = i
-            else:
-                self.color_buttons[i].elevation = 0
+        # 한글 요일 이름과 영어 요일 매핑 사용
+        day_names = {
+            "Monday": "월",
+            "Tuesday": "화",
+            "Wednesday": "수",
+            "Thursday": "목", 
+            "Friday": "금"
+        }
         
-        # 알림 시간 설정 (기본값 5분)
-        if 'notify_before' in class_data:
-            self.notify_input.text = str(class_data['notify_before'])
-        else:
-            self.notify_input.text = "5"
-        
-        # 기존 다이얼로그 재설정
-        self.dialog.title = "과목 수정"
-        
-        # 버튼 교체 (추가, 취소 -> 삭제, 취소, 저장)
-        self.dialog.buttons = [
-            MDFlatButton(
-                text="삭제",
-                theme_text_color="Custom",
-                text_color=(0.8, 0.2, 0.2, 1),  # 빨간색
+        for day, day_kr in day_names.items():
+            day_btn = MDFlatButton(
+                text=day_kr,  # 한글 요일 표시
                 font_name=FONT_NAME,
-                on_release=self.delete_class
-            ),
+                on_release=lambda x, d=day, k=day_names[day]: self.set_day(d, k),
+                size_hint_x=0.12
+            )
+            days_layout.add_widget(day_btn)
+        
+        self.content.add_widget(days_layout)
+
+        # 시작 시간
+        self.start_time_field = MDTextField(
+            hint_text="Start Time",
+            helper_text="Click to select time",
+            helper_text_mode="on_focus",
+            height=dp(20),
+            font_name=FONT_NAME,
+            readonly=True,
+            text=class_data['start_time']
+        )
+        self.start_time_field.bind(on_touch_down=self.on_start_time_touch)
+        self.set_font_for_textfield(self.start_time_field)
+        self.content.add_widget(self.start_time_field)
+        
+        # 종료 시간
+        self.end_time_field = MDTextField(
+            hint_text="End Time",
+            helper_text="Click to select time",
+            helper_text_mode="on_focus",
+            height=dp(20),
+            font_name=FONT_NAME,
+            readonly=True,
+            text=class_data['end_time']
+        )
+        self.end_time_field.bind(on_touch_down=self.on_end_time_touch)
+        self.set_font_for_textfield(self.end_time_field)
+        self.content.add_widget(self.end_time_field)
+        
+        # 강의실
+        self.room_field = MDTextField(
+            hint_text="Class Room",
+            helper_text="Ex: 61304A",
+            helper_text_mode="on_focus",
+            height=dp(20),
+            font_name=FONT_NAME,
+            text=class_data['room']
+        )
+        self.set_font_for_textfield(self.room_field)
+        self.content.add_widget(self.room_field)
+        
+        # 교수명
+        self.professor_field = MDTextField(
+            hint_text="Professor",
+            helper_text="Ex: Kim Bumjun",
+            helper_text_mode="on_focus",
+            height=dp(20),
+            font_name=FONT_NAME,
+            text=class_data['professor']
+        )
+        self.set_font_for_textfield(self.professor_field)
+        self.content.add_widget(self.professor_field)
+
+        # 작은 간격 위젯 추가
+        spacer = Widget(size_hint_y=None, height=dp(10))
+        self.content.add_widget(spacer)
+
+        # 색상 선택 라벨
+        self.color_label = MDLabel(
+            text="Color Selection", 
+            theme_text_color="Secondary",
+            font_style="Body2",
+            font_name=FONT_NAME,
+            size_hint_y=None,
+            height=dp(16)
+        )
+        self.color_label.font_size = "15.5sp" 
+        self.content.add_widget(self.color_label)
+
+        # 색상 선택 버튼들
+        colors_layout = MDBoxLayout(
+            orientation='horizontal',
+            size_hint_y=None,
+            height=dp(40),
+            spacing=dp(2)
+        )
+
+        # 현재 색상 정보
+        self.selected_color = class_data['color']
+        self.color_buttons = []
+
+        for i, color in enumerate(self.class_colors):
+            from kivymd.uix.card import MDCard
+            color_btn = MDCard(
+                size_hint=(None, None),
+                size=(dp(40), dp(30)),
+                md_bg_color=color,
+                radius=[dp(2)],
+                # 현재 색상과 일치하면 강조 표시
+                elevation=3 if color == self.selected_color else 0
+            )
+            # 터치 이벤트 추가
+            color_btn.bind(on_touch_down=lambda instance, touch, c=color, i=i: 
+                        self.set_color(c, i) if instance.collide_point(*touch.pos) else None)
+            
+            self.color_buttons.append(color_btn)
+            colors_layout.add_widget(color_btn)
+        
+        # 선택된 버튼 인덱스 설정
+        for i, color in enumerate(self.class_colors):
+            if color == self.selected_color:
+                self.selected_button_index = i
+                break
+                
+        self.content.add_widget(colors_layout)
+
+        # 작은 간격 위젯 추가
+        spacer = Widget(size_hint_y=None, height=dp(10))
+        self.content.add_widget(spacer)
+
+        # 알림 설정 레이블
+        self.notify_label = MDLabel(
+            text="Set Alarm (Before)",
+            theme_text_color="Secondary",
+            font_style="Body2",
+            font_name=FONT_NAME,
+            size_hint_y=None,
+            height=dp(20)
+        )
+        self.notify_label.font_size = "15.5sp" 
+        self.content.add_widget(self.notify_label)
+
+        # 알림 시간 입력 레이아웃
+        notify_layout = MDBoxLayout(
+            orientation="horizontal",
+            size_hint_y=None,
+            height=dp(45),
+            spacing=dp(5),
+            padding=[0, 0, 0, 0]
+        )
+
+        # 알림 시간 입력 필드
+        self.notify_input = MDTextField(
+            hint_text="",
+            input_filter="int",
+            # 기존 알림 시간 표시 (기본값: 5분)
+            text=str(class_data.get('notify_before', 5)),
+            font_name=FONT_NAME,
+            size_hint_x=0.2,
+        )
+        self.set_font_for_textfield(self.notify_input)
+
+        # "Minute" 레이블
+        minute_label = MDLabel(
+            text="Minute",
+            theme_text_color="Secondary",
+            font_name=FONT_NAME,
+            size_hint_x=0.8,
+            halign="left",
+            valign="center"
+        )
+
+        # 레이아웃에 위젯 추가
+        notify_layout.add_widget(self.notify_input)
+        notify_layout.add_widget(minute_label)
+        self.content.add_widget(notify_layout)
+
+        # 버튼 생성 (취소, 삭제, 저장)
+        buttons = [
             MDFlatButton(
                 text="취소",
-                theme_text_color="Custom",
-                text_color=self.screen.app.theme_cls.primary_color,
                 font_name=FONT_NAME,
-                on_release=self.dismiss_dialog
+                on_release=lambda x: self.dialog.dismiss()
             ),
             MDFlatButton(
-                text="저장",
-                theme_text_color="Custom",
-                text_color=self.screen.app.theme_cls.primary_color,
+                text="삭제",
                 font_name=FONT_NAME,
-                on_release=self.update_class
+                theme_text_color="Custom",
+                text_color=[1, 0.3, 0.3, 1],
+                on_release=lambda x: self.delete_class()
             ),
+            MDRaisedButton(
+                text="저장",
+                font_name=FONT_NAME,
+                on_release=lambda x: self.update_class()
+            )
         ]
+        
+        # 팝업 대화상자 생성 - halign 속성 없음!
+        self.dialog = MDDialog(
+            title="과목 수정",
+            type="custom",
+            content_cls=self.content,
+            size_hint=(0.90, None),
+            buttons=buttons
+        )
         
         # 다이얼로그 열기
         self.dialog.open()
         
         # 폰트 설정 적용
         self.apply_fonts_to_dialog(self.dialog)
-    
+
     def update_class(self, *args):
         """과목 정보 업데이트"""
         if not self.editing_card:
@@ -933,9 +1303,6 @@ class EditClassDialog(AddClassDialog):
             class_id, name, day, start_time, end_time, room, professor, color_str
         )
         
-        # 대화상자 닫기
-        self.dismiss_dialog()
-        
         # 알림 설정 업데이트 (데이터만 저장)
         if class_id in self.screen.classes_data:
             self.screen.classes_data[class_id]['notify_before'] = notify_before
@@ -953,7 +1320,7 @@ class EditClassDialog(AddClassDialog):
         self.screen.save_timetable()
         
         # 대화상자 닫기
-        self.dismiss_dialog()
+        self.dialog.dismiss()
         
     def delete_class(self, *args):
         """과목 삭제"""
@@ -1005,7 +1372,7 @@ class EditClassDialog(AddClassDialog):
             self.screen.save_timetable()  # 저장
         
         # 수정 대화상자 닫기
-        self.dismiss_dialog()
+        self.dialog.dismiss()
 
 # 영어-한글 요일 매핑
 korean_day_map = {
@@ -1021,7 +1388,7 @@ class MainScreen(MDScreen):
         super().__init__(**kwargs)
         self.app = app
         self.add_class_dialog = AddClassDialog(self)
-        self.edit_class_dialog = EditClassDialog(self)  # 수정 대화상자 추가
+        self.edit_class_dialog = EditClassDialog(self)  # 완전히 분리된 수정 대화상자 사용
         # 저장된 수업 데이터를 저장할 딕셔너리
         self.classes_data = {}
         
@@ -1031,16 +1398,17 @@ class MainScreen(MDScreen):
         # 부제목 저장 (기본값)
         self.subtitle_text = "2025년 1학기 소재부품융합공학과"    
         
-        # 알람 매니저 초기화 - 여기서 알람 매니저 로딩 과정을 로그로 출력
-        try:
-            from alarm_manager import AlarmManager
-            print("알람 매니저 클래스 가져오기 성공")
-            self.alarm_manager = AlarmManager(app)
-            print(f"알람 매니저 초기화 성공: {self.alarm_manager}")
-        except Exception as e:
-            print(f"❌ 알람 매니저 초기화 실패: {e}")
-            import traceback
-            traceback.print_exc()
+    # 알람 매니저 초기화 - 여기서 알람 매니저 로딩 과정을 로그로 출력
+    try:
+        from alarm_manager import AlarmManager
+        print("알람 매니저 클래스 가져오기 성공")
+        # 앱 객체와 알람 파일 경로 전달
+        self.alarm_manager = AlarmManager(app, app.alarm_file_path)
+        print(f"알람 매니저 초기화 성공: {self.alarm_manager}")
+    except Exception as e:
+        print(f"❌ 알람 매니저 초기화 실패: {e}")
+        import traceback
+        traceback.print_exc()
         
         Clock.schedule_once(self.setup_layout, 0)
 
@@ -1395,18 +1763,18 @@ class MainScreen(MDScreen):
             self.show_subtitle_edit_dialog(instance)
             return True
         return False
-    
+        
     def save_timetable(self):
         """현재 시간표 저장"""
         success = self.storage.save_classes(self.classes_data)
         # 알람 데이터도 함께 저장 (Android용)
-        if 'ANDROID_STORAGE' in os.environ and hasattr(self, 'alarm_manager'):
+        if hasattr(self, 'alarm_manager'):
             try:
                 import pickle
-                alarms_file = os.path.join(os.getenv('ANDROID_STORAGE', ''), 'alarms.pkl')
-                with open(alarms_file, 'wb') as f:
+                # 앱의 내부 저장소에 저장 (app.alarm_file_path 사용)
+                with open(self.app.alarm_file_path, 'wb') as f:
                     pickle.dump(self.alarm_manager.alarms, f)
-                print("알람 데이터 저장 완료")
+                print("✅ Android 알람 시스템 초기화 완료")
             except Exception as e:
                 print(f"알람 데이터 저장 오류: {e}")
         
@@ -1651,59 +2019,57 @@ class MainScreen(MDScreen):
             import traceback
             traceback.print_exc()
             return False
-            
+                
     def test_notification(self):
         """알림 테스트"""
         try:
             if 'ANDROID_STORAGE' in os.environ:
-                # 알람 매니저의 테스트 알림 기능 사용
-                if hasattr(self, 'alarm_manager'):
-                    # 현재 시간 기준으로 5초 뒤에 테스트 알람 발생
-                    from datetime import datetime, timedelta
-                    
-                    # 시스템 알림 직접 호출
-                    from jnius import autoclass
-                    PythonActivity = autoclass('org.kivy.android.PythonActivity')
-                    Context = autoclass('android.content.Context')
-                    NotificationCompat = autoclass('androidx.core.app.NotificationCompat')
-                    NotificationManagerCompat = autoclass('androidx.core.app.NotificationManagerCompat')
-                    Intent = autoclass('android.content.Intent')
-                    PendingIntent = autoclass('android.app.PendingIntent')
-                    
-                    # 컨텍스트 가져오기
-                    context = PythonActivity.mActivity
-                    
-                    # 알림 채널 ID
-                    channel_id = "timetable_alarm_channel"
-                    
-                    # 인텐트 생성 (앱 실행용)
-                    intent = Intent(context, PythonActivity)
-                    intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK)
-                    
-                    # PendingIntent 생성
-                    FLAG_IMMUTABLE = 67108864  # PendingIntent.FLAG_IMMUTABLE
-                    FLAG_UPDATE_CURRENT = 134217728  # PendingIntent.FLAG_UPDATE_CURRENT
-                    
-                    pending_intent = PendingIntent.getActivity(
-                        context, 0, intent, FLAG_UPDATE_CURRENT | FLAG_IMMUTABLE
-                    )
-                    
-                    # 알림 빌더
-                    builder = NotificationCompat.Builder(context, channel_id)
-                    builder.setSmallIcon(android.R.drawable.ic_dialog_info)
-                    builder.setContentTitle("테스트 알림")
-                    builder.setContentText("시간표 앱 알림이 정상적으로 작동합니다!")
-                    builder.setPriority(NotificationCompat.PRIORITY_HIGH)
-                    builder.setContentIntent(pending_intent)
-                    builder.setAutoCancel(True)
-                    
-                    # 알림 표시
-                    notification_manager = NotificationManagerCompat.from_(context)
-                    notification_manager.notify(9999, builder.build())
-                    
-                    print("✅ 테스트 알림 전송 완료")
-                else:
-                    print("❌ 알람 매니저가 초기화되지 않았습니다.")
+                # 시스템 알림 직접 호출
+                from jnius import autoclass
+                PythonActivity = autoclass('org.kivy.android.PythonActivity')
+                Context = autoclass('android.content.Context')
+                
+                # 더 이상 직접 NotificationCompat 클래스를 가져오지 않음
+                # 대신 Android의 기본 Notification 클래스 사용
+                Notification = autoclass('android.app.Notification')
+                NotificationManager = autoclass('android.app.NotificationManager')
+                Builder = autoclass('android.app.Notification$Builder')
+                
+                Intent = autoclass('android.content.Intent')
+                PendingIntent = autoclass('android.app.PendingIntent')
+                
+                # 컨텍스트 가져오기
+                context = PythonActivity.mActivity
+                
+                # 알림 채널 ID
+                channel_id = "timetable_alarm_channel"
+                
+                # 인텐트 생성 (앱 실행용)
+                intent = Intent(context, PythonActivity)
+                intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK)
+                
+                # PendingIntent 생성
+                FLAG_IMMUTABLE = 67108864  # PendingIntent.FLAG_IMMUTABLE
+                FLAG_UPDATE_CURRENT = 134217728  # PendingIntent.FLAG_UPDATE_CURRENT
+                
+                pending_intent = PendingIntent.getActivity(
+                    context, 0, intent, FLAG_UPDATE_CURRENT | FLAG_IMMUTABLE
+                )
+                
+                # 알림 빌더 (Android 기본 API 사용)
+                builder = Builder(context, channel_id)
+                builder.setSmallIcon(context.getApplicationInfo().icon)
+                builder.setContentTitle("테스트 알림")
+                builder.setContentText("시간표 앱 알림이 정상적으로 작동합니다!")
+                builder.setPriority(Notification.PRIORITY_HIGH)
+                builder.setContentIntent(pending_intent)
+                builder.setAutoCancel(True)
+                
+                # 알림 표시
+                notification_manager = context.getSystemService(Context.NOTIFICATION_SERVICE)
+                notification_manager.notify(9999, builder.build())
+                
+                print("✅ 테스트 알림 전송 완료")
             else:
                 # PC 환경에서는 플라이어 사용
                 from plyer import notification
@@ -1729,6 +2095,28 @@ class TimeTableApp(MDApp):
                 f.write("✅ build() 진입\n")
         except:
             pass  # PC에서는 이 경로가 없으므로 무시
+
+        # 데이터 디렉토리 설정
+        if 'ANDROID_STORAGE' in os.environ:
+            # Android 환경에서 데이터 디렉토리 생성
+            data_dir = os.path.join(
+                os.path.dirname(os.path.abspath(__file__)), 
+                "timetable_data"
+            )
+            if not os.path.exists(data_dir):
+                os.makedirs(data_dir)
+            print(f"Android 환경: 데이터 디렉토리 = {data_dir}")
+            print(f"✅ 데이터 디렉토리 확인/생성 완료: {data_dir}")
+            
+            # 알람 파일 경로 설정 - 중요!
+            self.alarm_file_path = os.path.join(
+                os.path.dirname(os.path.abspath(__file__)), 
+                "alarms.pkl"
+            )
+            print(f"Android 알람 파일 경로: {self.alarm_file_path}")
+        else:
+            # PC 환경에서 기본 경로 설정
+            self.alarm_file_path = "alarms.pkl"
 
 
         # 안드로이드에서는 윈도우 크기 설정하지 않음
