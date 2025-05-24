@@ -485,8 +485,8 @@ class AddClassDialog:
         days_layout = MDBoxLayout(
             orientation='horizontal',
             size_hint_y=None,
-            height=dp(10),
-            spacing=dp(2),
+            height=dp(8),
+            spacing=dp(1),
             padding=(0, 0, 0, 0),
             adaptive_width=True
         )
@@ -990,12 +990,12 @@ class EditClassDialog:
             orientation="vertical",
             spacing=dp(5),
             size_hint_y=None,
-            height=dp(550),
+            height=dp(580),
             padding=(dp(20), dp(10), dp(20), dp(15))
         )
     
         # 🔥 제목과의 간격을 줄이는 음수 스페이서 추가
-        negative_spacer = Widget(size_hint_y=None, height=dp(-100))
+        negative_spacer = Widget(size_hint_y=None, height=dp(-50))
         self.content.add_widget(negative_spacer)
         
         # 과목명 입력
@@ -1028,8 +1028,8 @@ class EditClassDialog:
         days_layout = MDBoxLayout(
             orientation='horizontal',
             size_hint_y=None,
-            height=dp(10),
-            spacing=dp(2),
+            height=dp(8),
+            spacing=dp(1),
             padding=(0, 0, 0, 0),
             adaptive_width=True
         )
