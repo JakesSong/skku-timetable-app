@@ -1308,7 +1308,7 @@ class EditClassDialog:
             self.screen.classes_data[class_id]['notify_before'] = notify_before
             
             # 알람 관리자에 알람 갱신 (있을 경우)
-            if hasattr(self.screen, 'alarm_manager'):
+            if hasattr(self.screen, 'alarm_manager') and self.screen.alarm_manager is not None:
                 try:
                     self.screen.alarm_manager.schedule_class_alarm(
                         class_id, name, day, start_time, room, professor, notify_before
@@ -1350,7 +1350,7 @@ class EditClassDialog:
         )
         confirm_dialog.text_font_name = FONT_NAME
         confirm_dialog.open()
-    
+        
     def confirm_delete(self, confirm_dialog):
         """삭제 확인 후 처리"""
         # 확인 대화상자 닫기
@@ -1365,8 +1365,11 @@ class EditClassDialog:
         # 스토리지에서 해당 클래스 정보 삭제
         if class_id in self.screen.classes_data:
             # 알람 취소 (Android 환경인 경우)
-            if 'ANDROID_STORAGE' in os.environ and hasattr(self.screen, 'alarm_manager'):
-                self.screen.alarm_manager.cancel_alarm(class_id)
+            if 'ANDROID_STORAGE' in os.environ and hasattr(self.screen, 'alarm_manager') and self.screen.alarm_manager is not None:
+                try:
+                    self.screen.alarm_manager.cancel_alarm(class_id)
+                except Exception as e:
+                    print(f"알람 취소 오류: {e}")
             
             del self.screen.classes_data[class_id]
             self.screen.save_timetable()  # 저장
@@ -1403,13 +1406,15 @@ class MainScreen(MDScreen):
         from alarm_manager import AlarmManager
         print("알람 매니저 클래스 가져오기 성공")
         # 앱 객체와 알람 파일 경로 전달
-        self.alarm_manager = AlarmManager(app, app.alarm_file_path)
+        self.alarm_manager = AlarmManager(self.app, self.app.alarm_file_path)
         print(f"알람 매니저 초기화 성공: {self.alarm_manager}")
     except Exception as e:
         print(f"❌ 알람 매니저 초기화 실패: {e}")
         import traceback
         traceback.print_exc()
-        
+        # 알람 매니저 초기화 실패 시에도 앱이 계속 실행되도록 None으로 설정
+        self.alarm_manager = None
+    
         Clock.schedule_once(self.setup_layout, 0)
 
     def show_subtitle_edit_dialog(self, instance):
@@ -1764,11 +1769,11 @@ class MainScreen(MDScreen):
             return True
         return False
         
-    def save_timetable(self):
+    def save_timetable(self):  
         """현재 시간표 저장"""
         success = self.storage.save_classes(self.classes_data)
         # 알람 데이터도 함께 저장 (Android용)
-        if hasattr(self, 'alarm_manager'):
+        if hasattr(self, 'alarm_manager') and self.alarm_manager is not None:
             try:
                 import pickle
                 # 앱의 내부 저장소에 저장 (app.alarm_file_path 사용)
@@ -1998,9 +2003,9 @@ class MainScreen(MDScreen):
             
             # 시간표 저장 - 카드가 성공적으로 추가된 후에 저장
             self.save_timetable()
-            
+                        
             # 알람 설정 (Android인 경우에만)
-            if 'ANDROID_STORAGE' in os.environ and hasattr(self, 'alarm_manager'):
+            if 'ANDROID_STORAGE' in os.environ and hasattr(self, 'alarm_manager') and self.alarm_manager is not None:
                 # 알람 시간 (기본값: 5분 전)
                 minutes_before = 5
                 if hasattr(self.add_class_dialog, 'notify_input'):
@@ -2010,10 +2015,13 @@ class MainScreen(MDScreen):
                         minutes_before = 5
                 
                 # 알람 예약
-                self.alarm_manager.schedule_alarm(class_id, card.class_data, minutes_before)
-                            
+                try:
+                    self.alarm_manager.schedule_alarm(class_id, card.class_data, minutes_before)
+                except Exception as e:
+                    print(f"알람 스케줄링 오류: {e}")
+                                    
             return True
-            
+                        
         except Exception as e:
             print(f"카드 생성 중 오류 발생: {e}")
             import traceback
