@@ -284,7 +284,7 @@ class AddClassDialog:
             self.start_time_dropdown = MDDropdownMenu(
                 caller=instance,  # 텍스트 필드를 기준으로 표시
                 items=time_options,
-                width_mult=4,  # width_mult
+                width_mult=3,  # width_mult
                 max_height=dp(250),  # 높이 제한
                 position="auto"  # 자동 위치
             )
@@ -321,7 +321,7 @@ class AddClassDialog:
             self.end_time_dropdown = MDDropdownMenu(
                 caller=instance,  # 텍스트 필드를 기준으로 표시
                 items=time_options,
-                width_mult=4,  # width_mult 대신 직접 너비 설정
+                width_mult=3,  # width_mult 대신 직접 너비 설정
                 max_height=dp(250),  # 높이 제한
                 position="auto"  # 자동 위치
             )
@@ -485,10 +485,10 @@ class AddClassDialog:
         days_layout = MDBoxLayout(
             orientation='horizontal',
             size_hint_y=None,
-            height=dp(8),
-            spacing=dp(1),
+            height=dp(20),
+            spacing=dp(5),
             padding=(0, 0, 0, 0),
-            adaptive_width=True
+            adaptive_width=False
         )
         
         # 한글 요일 이름과 영어 요일 매핑 사용
@@ -505,7 +505,8 @@ class AddClassDialog:
                 text=day_kr,  # 한글 요일 표시
                 font_name=FONT_NAME,
                 on_release=lambda x, d=day, k=day_names[day]: self.set_day(d, k),
-                size_hint_x=0.12
+                size_hint_x=None,
+                width=dp(30)
             )
             days_layout.add_widget(day_btn)
         
@@ -842,7 +843,7 @@ class EditClassDialog:
             self.start_time_dropdown = MDDropdownMenu(
                 caller=instance,  # 텍스트 필드를 기준으로 표시
                 items=time_options,
-                width_mult=4,  # width_mult
+                width_mult=3,  # width_mult
                 max_height=dp(250),  # 높이 제한
                 position="auto"  # 자동 위치
             )
@@ -879,7 +880,7 @@ class EditClassDialog:
             self.end_time_dropdown = MDDropdownMenu(
                 caller=instance,  # 텍스트 필드를 기준으로 표시
                 items=time_options,
-                width_mult=4,  # width_mult 대신 직접 너비 설정
+                width_mult=3,  # width_mult 대신 직접 너비 설정
                 max_height=dp(250),  # 높이 제한
                 position="auto"  # 자동 위치
             )
@@ -1028,10 +1029,10 @@ class EditClassDialog:
         days_layout = MDBoxLayout(
             orientation='horizontal',
             size_hint_y=None,
-            height=dp(8),
-            spacing=dp(1),
+            height=dp(20),
+            spacing=dp(5),
             padding=(0, 0, 0, 0),
-            adaptive_width=True
+            adaptive_width=False
         )
         
         # 한글 요일 이름과 영어 요일 매핑 사용
@@ -1048,7 +1049,8 @@ class EditClassDialog:
                 text=day_kr,  # 한글 요일 표시
                 font_name=FONT_NAME,
                 on_release=lambda x, d=day, k=day_names[day]: self.set_day(d, k),
-                size_hint_x=0.12
+                size_hint_x=None,
+                width=dp(30)
             )
             days_layout.add_widget(day_btn)
         
@@ -1391,15 +1393,17 @@ class MainScreen(MDScreen):
         super().__init__(**kwargs)
         self.app = app
         self.add_class_dialog = AddClassDialog(self)
-        self.edit_class_dialog = EditClassDialog(self)  # 완전히 분리된 수정 대화상자 사용
-        # 저장된 수업 데이터를 저장할 딕셔너리
+        self.edit_class_dialog = EditClassDialog(self)
         self.classes_data = {}
-        
-        # 저장 시스템 초기화
         self.storage = TimeTableStorage()
-
-        # 부제목 저장 (기본값)
-        self.subtitle_text = "2025년 1학기 소재부품융합공학과"    
+        self.subtitle_text = "2025년 1학기 소재부품융합공학과"
+        
+        # 🔥 초기화 상태 플래그 추가
+        self.is_initialized = False
+        self.layout_created = False
+        
+        # 🔥 즉시 레이아웃 설정 시도 (Window가 준비되었을 때)
+        Clock.schedule_once(self.setup_layout, 0)
 
     def show_subtitle_edit_dialog(self, instance):
         """부제목 편집 대화상자 표시"""
@@ -1600,133 +1604,161 @@ class MainScreen(MDScreen):
             self.add_class_dialog.next_class_id = max_id + 1
                 
     def setup_layout(self, dt):
-        self.load_subtitle()
-        self.layout_data = LayoutConfig.calculate(Window.width)
-        self.layout = MDBoxLayout(orientation="vertical")
-        self.add_widget(self.layout)
+        # 🔥 중복 초기화 방지
+        if self.layout_created:
+            return
+            
+        try:
+            self.load_subtitle()
+            
+            # 🔥 Window 크기가 준비되지 않았으면 다시 스케줄링
+            if Window.width <= 100 or Window.height <= 100:
+                print(f"Window 크기가 아직 준비되지 않음: {Window.width}x{Window.height}")
+                Clock.schedule_once(self.setup_layout, 0.1)
+                return
+                
+            self.layout_data = LayoutConfig.calculate(Window.width)
+            
+            # 🔥 기존 레이아웃이 있으면 제거
+            if hasattr(self, 'layout') and self.layout:
+                self.remove_widget(self.layout)
+                
+            self.layout = MDBoxLayout(orientation="vertical")
+            self.add_widget(self.layout)
 
-        self.layout.add_widget(MDLabel(
-            text="성균관대학교 시간표",
-            halign="center",
-            theme_text_color="Primary",
-            font_style="H5",
-            font_name=FONT_NAME,  # FONT_NAME 변수 사용
-            size_hint_y=None,
-            height=dp(50)
-        ))
-    
-        # 편집 가능한 부제목
-        self.subtitle_label = MDLabel(
-            text=self.subtitle_text,  # 저장된 텍스트 사용
-            halign="center",
-            theme_text_color="Secondary",
-            font_style="Subtitle1",
-            font_name=FONT_NAME,
-            size_hint_y=None,
-            height=dp(30)
-        )
-    
-        # 부제목 클릭 시 편집 가능하도록
-        self.subtitle_label.bind(on_touch_down=self.on_subtitle_touch)
-        self.layout.add_widget(self.subtitle_label)
-        
-        # 스크롤뷰 설정 - 전체 화면 너비 사용
-        self.scroll_view = ScrollView(
-            do_scroll_x=True,
-            do_scroll_y=True,
-            size_hint=(1, 1),
-            height=dp(600),
-            bar_width=dp(10),
-            scroll_type=['bars', 'content'],
-            bar_color=self.app.theme_cls.primary_color,
-            bar_inactive_color=(0.7, 0.7, 0.7, 0.5)
-        )
-        self.layout.add_widget(self.scroll_view)
-
-        # 그리드 컨테이너 설정 - 그리드 너비로 설정 (전체 화면의 90%)
-        self.grid_container = MDBoxLayout(
-            orientation="vertical",
-            size_hint_y=None,
-            height=dp(660),
-            size_hint_x=None,
-            width=self.layout_data['grid_width']  # 그리드 너비 (전체의 90%)
-        )
-        self.scroll_view.add_widget(self.grid_container)
-
-        # 헤더 추가
-        self.headers = create_headers(self.layout_data)
-        self.grid_container.add_widget(self.headers)
-
-        # 시간표 레이아웃 설정
-        self.time_grid_layout = MDBoxLayout(
-            orientation="horizontal",
-            size_hint_y=None,
-            height=dp(600),
-            spacing=self.layout_data['spacing'],
-            size_hint_x=None,
-            width=self.layout_data['grid_width']  # 그리드 너비와 동일
-        )
-
-        # 시간 열 설정
-        self.time_column = MDBoxLayout(
-            orientation="vertical",
-            size_hint_x=None,
-            width=self.layout_data['time_col_width'],
-            spacing=0
-        )
-
-        # 시간 열에 시간 레이블 추가
-        hours_count = self.layout_data['end_hour'] - self.layout_data['start_hour']
-        hour_height = dp(600) / hours_count  # 전체 높이를 시간대 수로 나눔
-        
-        # 시간을 위에서 아래로 순서대로 표시 (09:00부터 18:00까지)
-        for hour in range(self.layout_data['start_hour'], self.layout_data['end_hour']):
-            self.time_column.add_widget(MDLabel(
-                text=f"{hour:02d}:00",
+            self.layout.add_widget(MDLabel(
+                text="성균관대학교 시간표",
                 halign="center",
-                valign="top",
+                theme_text_color="Primary",
+                font_style="H5",
+                font_name=FONT_NAME,  # FONT_NAME 변수 사용
                 size_hint_y=None,
-                height=hour_height,
-                theme_text_color="Secondary",
-                font_name=FONT_NAME  # FONT_NAME 변수 사용
+                height=dp(50)
             ))
-
-        self.time_grid_layout.add_widget(self.time_column)
-
-        # 시간표 그리드 추가
-        self.time_grid = TimeGridWidget(layout_data=self.layout_data)
-        self.time_grid_layout.add_widget(self.time_grid)
-        self.grid_container.add_widget(self.time_grid_layout)
         
-        # 플로팅 액션 버튼 (과목 추가)
-        self.add_class_button = MDFloatingActionButton(
-            icon="plus",
-            pos_hint={"right": 0.98, "y": 0.02},
-            md_bg_color=self.app.theme_cls.primary_color,
-            on_release=self.add_class_dialog.show_dialog
-        )
-        self.add_widget(self.add_class_button)
+            # 편집 가능한 부제목
+            self.subtitle_label = MDLabel(
+                text=self.subtitle_text,  # 저장된 텍스트 사용
+                halign="center",
+                theme_text_color="Secondary",
+                font_style="Subtitle1",
+                font_name=FONT_NAME,
+                size_hint_y=None,
+                height=dp(30)
+            )
+        
+            # 부제목 클릭 시 편집 가능하도록
+            self.subtitle_label.bind(on_touch_down=self.on_subtitle_touch)
+            self.layout.add_widget(self.subtitle_label)
+            
+            # 스크롤뷰 설정 - 전체 화면 너비 사용
+            self.scroll_view = ScrollView(
+                do_scroll_x=True,
+                do_scroll_y=True,
+                size_hint=(1, 1),
+                height=dp(600),
+                bar_width=dp(10),
+                scroll_type=['bars', 'content'],
+                bar_color=self.app.theme_cls.primary_color,
+                bar_inactive_color=(0.7, 0.7, 0.7, 0.5)
+            )
+            self.layout.add_widget(self.scroll_view)
 
-        # 전자출결 앱 실행 버튼
-        self.attendance_button = MDFloatingActionButton(
-            icon="qrcode-scan",  # QR 코드 아이콘
-            pos_hint={"right": 0.98, "y": 0.12},  # add_class_button보다 위에 위치
-            md_bg_color=self.app.theme_cls.accent_color,  # 다른 색상으로 구분
-            on_release=self.open_attendance_app
-        )
-        self.add_widget(self.attendance_button)
+            # 그리드 컨테이너 설정 - 그리드 너비로 설정 (전체 화면의 90%)
+            self.grid_container = MDBoxLayout(
+                orientation="vertical",
+                size_hint_y=None,
+                height=dp(660),
+                size_hint_x=None,
+                width=self.layout_data['grid_width']  # 그리드 너비 (전체의 90%)
+            )
+            self.scroll_view.add_widget(self.grid_container)
 
-        # 기존 버튼들 뒤에 추가
-        self.test_button = MDFloatingActionButton(
-            icon="bell-ring",
-            pos_hint={"right": 0.98, "y": 0.22},  # 다른 버튼들 위에
-            md_bg_color=[1, 0.5, 0, 1],  # 주황색
-            on_release=lambda x: self.test_notification()
-        )
-        self.add_widget(self.test_button)
+            # 헤더 추가
+            self.headers = create_headers(self.layout_data)
+            self.grid_container.add_widget(self.headers)
 
-        # 메인 화면 초기화 후 샘플 카드 추가
-        Clock.schedule_once(lambda dt: self.load_saved_timetable(), 0.5)
+            # 시간표 레이아웃 설정
+            self.time_grid_layout = MDBoxLayout(
+                orientation="horizontal",
+                size_hint_y=None,
+                height=dp(600),
+                spacing=self.layout_data['spacing'],
+                size_hint_x=None,
+                width=self.layout_data['grid_width']  # 그리드 너비와 동일
+            )
+
+            # 시간 열 설정
+            self.time_column = MDBoxLayout(
+                orientation="vertical",
+                size_hint_x=None,
+                width=self.layout_data['time_col_width'],
+                spacing=0
+            )
+
+            # 시간 열에 시간 레이블 추가
+            hours_count = self.layout_data['end_hour'] - self.layout_data['start_hour']
+            hour_height = dp(600) / hours_count  # 전체 높이를 시간대 수로 나눔
+            
+            # 시간을 위에서 아래로 순서대로 표시 (09:00부터 18:00까지)
+            for hour in range(self.layout_data['start_hour'], self.layout_data['end_hour']):
+                self.time_column.add_widget(MDLabel(
+                    text=f"{hour:02d}:00",
+                    halign="center",
+                    valign="top",
+                    size_hint_y=None,
+                    height=hour_height,
+                    theme_text_color="Secondary",
+                    font_name=FONT_NAME  # FONT_NAME 변수 사용
+                ))
+
+            self.time_grid_layout.add_widget(self.time_column)
+
+            # 시간표 그리드 추가
+            self.time_grid = TimeGridWidget(layout_data=self.layout_data)
+            self.time_grid_layout.add_widget(self.time_grid)
+            self.grid_container.add_widget(self.time_grid_layout)
+            
+            # 플로팅 액션 버튼 (과목 추가)
+            self.add_class_button = MDFloatingActionButton(
+                icon="plus",
+                pos_hint={"right": 0.98, "y": 0.02},
+                md_bg_color=self.app.theme_cls.primary_color,
+                on_release=self.add_class_dialog.show_dialog
+            )
+            self.add_widget(self.add_class_button)
+
+            # 전자출결 앱 실행 버튼
+            self.attendance_button = MDFloatingActionButton(
+                icon="qrcode-scan",  # QR 코드 아이콘
+                pos_hint={"right": 0.98, "y": 0.12},  # add_class_button보다 위에 위치
+                md_bg_color=self.app.theme_cls.accent_color,  # 다른 색상으로 구분
+                on_release=self.open_attendance_app
+            )
+            self.add_widget(self.attendance_button)
+
+            # 기존 버튼들 뒤에 추가
+            self.test_button = MDFloatingActionButton(
+                icon="bell-ring",
+                pos_hint={"right": 0.98, "y": 0.22},  # 다른 버튼들 위에
+                md_bg_color=[1, 0.5, 0, 1],  # 주황색
+                on_release=lambda x: self.test_notification()
+            )
+            self.add_widget(self.test_button)
+
+            # 🔥 초기화 완료 플래그 설정
+            self.layout_created = True
+            print("✅ 레이아웃 설정 완료")
+            
+            # 🔥 시간표 로드를 좀 더 늦게 실행
+            Clock.schedule_once(lambda dt: self.load_saved_timetable(), 0.8)
+            
+        except Exception as e:
+            print(f"레이아웃 설정 오류: {e}")
+            import traceback
+            traceback.print_exc()
+            # 오류 발생 시 다시 시도
+            Clock.schedule_once(self.setup_layout, 0.5)
 
     def on_subtitle_touch(self, instance, touch):
         """부제목 터치 이벤트"""
@@ -1755,14 +1787,20 @@ class MainScreen(MDScreen):
     def refresh_ui(self):
         """UI 새로고침"""
         try:
-            # 레이아웃이 없으면 다시 생성
-            if not hasattr(self, 'layout') or not self.layout:
-                self.setup_layout(0)
+            print("🔄 UI 새로고침 시작")
             
-            # 시간표 다시 로드
-            if hasattr(self, 'time_grid'):
+            # 🔥 이미 초기화되었으면 다시 초기화하지 않음
+            if self.layout_created and hasattr(self, 'time_grid'):
+                print("✅ 이미 초기화됨 - 시간표만 새로고침")
                 self.load_saved_timetable()
+                return
                 
+            # 🔥 초기화되지 않았으면 레이아웃부터 다시 생성
+            if not self.layout_created:
+                print("🔧 레이아웃 재생성 필요")
+                self.layout_created = False
+                Clock.schedule_once(self.setup_layout, 0.1)
+            
             print("✅ UI 새로고침 완료")
         except Exception as e:
             print(f"UI 새로고침 오류: {e}")
@@ -2261,12 +2299,23 @@ class TimeTableApp(MDApp):
             # PC 환경에서 기본 경로 설정
             self.alarm_file_path = "alarms.pkl"
 
-
         # 안드로이드에서는 윈도우 크기 설정하지 않음
         if 'ANDROID_STORAGE' not in os.environ:
             # PC 개발환경에서만 윈도우 크기 설정
             Window.size = (480, 800)
             
+        # 🔥 Window 준비 대기
+        def wait_for_window():
+            if Window.width > 100 and Window.height > 100:
+                print(f"✅ Window 준비됨: {Window.width}x{Window.height}")
+                return False  # 스케줄링 중단
+            else:
+                print(f"⏳ Window 대기 중: {Window.width}x{Window.height}")
+                return True  # 계속 대기
+        
+        # Window가 준비될 때까지 대기
+        Clock.schedule_interval(wait_for_window, 0.1)
+        
         # 한글 폰트 설정
         self.theme_cls.font_styles.update({
             "H5": [FONT_NAME, 24, False, 0.15],
@@ -2284,9 +2333,6 @@ class TimeTableApp(MDApp):
         self.theme_cls.primary_palette = "DeepPurple"
         self.theme_cls.accent_palette = "Teal"
         self.theme_cls.theme_style = "Light"
-
-        # 메인화면 구성
-        self.main_screen = MainScreen(name="main", app=self)
 
         # Android에서 알림 채널 생성
         if 'ANDROID_STORAGE' in os.environ:
@@ -2324,8 +2370,46 @@ class TimeTableApp(MDApp):
                 except:
                     Logger.error(f"MetaCheck: 알림 채널 예외 - {e}")
 
-        return self.main_screen
+        # 🔥 메인 스크린 생성을 약간 지연
+        Clock.schedule_once(self.create_main_screen, 0.2)
+        
+        # 🔥 임시 로딩 화면 반환
+        loading_screen = MDScreen()
+        loading_layout = MDBoxLayout(
+            orientation="vertical",
+            padding=dp(50),
+            spacing=dp(20)
+        )
+        loading_layout.add_widget(MDLabel(
+            text="성균관대학교 시간표",
+            halign="center",
+            font_name=FONT_NAME,
+            font_style="H5",
+            theme_text_color="Primary"
+        ))
+        loading_layout.add_widget(MDLabel(
+            text="로딩 중...",
+            halign="center",
+            font_name=FONT_NAME,
+            theme_text_color="Secondary"
+        ))
+        loading_screen.add_widget(loading_layout)
+        return loading_screen
 
+    def create_main_screen(self, dt):
+        """메인 스크린 생성 및 교체"""
+        try:
+            print("🔧 메인 스크린 생성 시작")
+            self.main_screen = MainScreen(name="main", app=self)
+            self.root = self.main_screen  # 🔥 루트 위젯 교체
+            print("✅ 메인 스크린 생성 완료")
+        except Exception as e:
+            print(f"메인 스크린 생성 오류: {e}")
+            import traceback
+            traceback.print_exc()
+            # 오류 시 다시 시도
+            Clock.schedule_once(self.create_main_screen, 0.5)
+    
     def on_start(self):
         """앱 시작 시 호출"""
         print("✅ 앱 시작됨")
@@ -2335,7 +2419,7 @@ class TimeTableApp(MDApp):
         print("✅ 앱 재개됨")
         try:
             # UI 다시 초기화
-            if hasattr(self, 'main_screen'):
+            if hasattr(self, 'main_screen') and self.main_screen:
                 Clock.schedule_once(lambda dt: self.main_screen.refresh_ui(), 0.1)
         except Exception as e:
             print(f"앱 재개 오류: {e}")
