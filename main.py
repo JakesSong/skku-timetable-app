@@ -2305,7 +2305,7 @@ class TimeTableApp(MDApp):
             Window.size = (480, 800)
             
         # 🔥 Window 준비 대기
-        def wait_for_window():
+        def wait_for_window(dt):  # ← dt 인자 추가!
             if Window.width > 100 and Window.height > 100:
                 print(f"✅ Window 준비됨: {Window.width}x{Window.height}")
                 return False  # 스케줄링 중단
