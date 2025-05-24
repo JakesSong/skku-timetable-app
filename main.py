@@ -1400,22 +1400,6 @@ class MainScreen(MDScreen):
 
         # 부제목 저장 (기본값)
         self.subtitle_text = "2025년 1학기 소재부품융합공학과"    
-        
-    # 알람 매니저 초기화 - 여기서 알람 매니저 로딩 과정을 로그로 출력
-    try:
-        from alarm_manager import AlarmManager
-        print("알람 매니저 클래스 가져오기 성공")
-        # 앱 객체와 알람 파일 경로 전달
-        self.alarm_manager = AlarmManager(self.app, self.app.alarm_file_path)
-        print(f"알람 매니저 초기화 성공: {self.alarm_manager}")
-    except Exception as e:
-        print(f"❌ 알람 매니저 초기화 실패: {e}")
-        import traceback
-        traceback.print_exc()
-        # 알람 매니저 초기화 실패 시에도 앱이 계속 실행되도록 None으로 설정
-        self.alarm_manager = None
-    
-        Clock.schedule_once(self.setup_layout, 0)
 
     def show_subtitle_edit_dialog(self, instance):
         """부제목 편집 대화상자 표시"""
