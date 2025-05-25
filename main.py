@@ -1998,7 +1998,7 @@ class MainScreen(MDScreen):
             )
             
             # 강제로 작은 폰트 크기 적용
-            Clock.schedule_once(lambda dt: setattr(card_label, 'font_size', 4), 0.1)
+            Clock.schedule_once(lambda dt: setattr(card_label, 'font_size', 12), 0.1)
             card.add_widget(card_label)
             
             # 시간표 그리드에 카드 추가
