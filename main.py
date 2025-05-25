@@ -485,7 +485,7 @@ class AddClassDialog:
         days_layout = MDBoxLayout(
             orientation='horizontal',
             size_hint_y=None,
-            height=dp(20),
+            height=dp(10),
             spacing=dp(0),
             padding=(-30, 0, 0, 0),
             adaptive_width=False
@@ -506,7 +506,7 @@ class AddClassDialog:
                 font_name=FONT_NAME,
                 on_release=lambda x, d=day, k=day_names[day]: self.set_day(d, k),
                 size_hint_x=None,
-                width=dp(20)
+                width=dp(10)
             )
             days_layout.add_widget(day_btn)
         
