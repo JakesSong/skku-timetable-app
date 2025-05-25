@@ -3,7 +3,6 @@
 # Required libraries:
 # pip install kivy kivymd
 
-# 기존 폰트 설정 코드를 모두 삭제하고 다음으로 교체
 
 # 한글 지원을 위한 설정
 import os
