@@ -487,7 +487,7 @@ class AddClassDialog:
             size_hint_y=None,
             height=dp(20),
             spacing=dp(0),
-            padding=(-20, 0, 0, 0),
+            padding=(-30, 0, 0, 0),
             adaptive_width=False
         )
         
@@ -1031,7 +1031,7 @@ class EditClassDialog:
             size_hint_y=None,
             height=dp(20),
             spacing=dp(0),
-            padding=(-20, 0, 0, 0),
+            padding=(-30, 0, 0, 0),
             adaptive_width=False
         )
         
