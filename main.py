@@ -2304,7 +2304,7 @@ class TimeTableApp(MDApp):
             # PC 개발환경에서만 윈도우 크기 설정
             Window.size = (480, 800)
             
-        # 🔥 Window 준비 대기
+        # 🔥 Window 준비 대기 - 인자 수정!
         def wait_for_window(dt):  # ← dt 인자 추가!
             if Window.width > 100 and Window.height > 100:
                 print(f"✅ Window 준비됨: {Window.width}x{Window.height}")
@@ -2370,45 +2370,10 @@ class TimeTableApp(MDApp):
                 except:
                     Logger.error(f"MetaCheck: 알림 채널 예외 - {e}")
 
-        # 🔥 메인 스크린 생성을 약간 지연
-        Clock.schedule_once(self.create_main_screen, 0.2)
-        
-        # 🔥 임시 로딩 화면 반환
-        loading_screen = MDScreen()
-        loading_layout = MDBoxLayout(
-            orientation="vertical",
-            padding=dp(50),
-            spacing=dp(20)
-        )
-        loading_layout.add_widget(MDLabel(
-            text="성균관대학교 시간표",
-            halign="center",
-            font_name=FONT_NAME,
-            font_style="H5",
-            theme_text_color="Primary"
-        ))
-        loading_layout.add_widget(MDLabel(
-            text="로딩 중...",
-            halign="center",
-            font_name=FONT_NAME,
-            theme_text_color="Secondary"
-        ))
-        loading_screen.add_widget(loading_layout)
-        return loading_screen
-
-    def create_main_screen(self, dt):
-        """메인 스크린 생성 및 교체"""
-        try:
-            print("🔧 메인 스크린 생성 시작")
-            self.main_screen = MainScreen(name="main", app=self)
-            self.root = self.main_screen  # 🔥 루트 위젯 교체
-            print("✅ 메인 스크린 생성 완료")
-        except Exception as e:
-            print(f"메인 스크린 생성 오류: {e}")
-            import traceback
-            traceback.print_exc()
-            # 오류 시 다시 시도
-            Clock.schedule_once(self.create_main_screen, 0.5)
+        # 🔥 바로 메인 스크린 반환 (로딩 화면 완전 삭제)
+        print("🔧 메인 스크린 바로 생성")
+        self.main_screen = MainScreen(name="main", app=self)
+        return self.main_screen  # 🔥 바로 메인 스크린 반환
     
     def on_start(self):
         """앱 시작 시 호출"""
