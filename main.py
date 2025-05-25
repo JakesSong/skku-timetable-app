@@ -1986,17 +1986,20 @@ class MainScreen(MDScreen):
             
             # 클래스 데이터 저장소에 추가
             self.classes_data[class_id] = card.class_data.copy()
-            
-            # 카드 내용 추가
-            card.add_widget(MDLabel(
+                        
+            # 카드 내용 추가 - 이 부분만 교체!
+            card_label = MDLabel(
                 text=f"{name}\n{room}",
                 halign="center",
                 valign="center",
                 font_name=FONT_NAME,
-                font_size="4sp",
                 theme_text_color="Custom",
                 text_color=(1, 1, 1, 1)  # 흰색으로 설정
-            ))
+            )
+            
+            # 강제로 작은 폰트 크기 적용
+            Clock.schedule_once(lambda dt: setattr(card_label, 'font_size', 4), 0.1)
+            card.add_widget(card_label)
             
             # 시간표 그리드에 카드 추가
             self.time_grid.add_widget(card)
