@@ -2130,10 +2130,10 @@ class MainScreen(MDScreen):
                     
                     # 📚 샘플 과목 정보 (실제로는 현재 시간에 해당하는 과목 정보 사용)
                     sample_class = {
-                        'name': '소재부품융합공학',
-                        'room': '61304A',
-                        'professor': '김범준',
-                        'time': '14:00',
+                        'name': '공학컴퓨터프로그래밍',
+                        'room': '61352',
+                        'professor': '황숙희',
+                        'time': '15:00',
                         'day': '월요일'
                     }
                     
