@@ -487,7 +487,7 @@ class AddClassDialog:
             size_hint_y=None,
             height=dp(10),
             spacing=dp(0),
-            padding=(-30, 0, 0, 0),
+            padding=(-35, 0, 0, 0),
             adaptive_width=False
         )
         
@@ -587,13 +587,13 @@ class AddClassDialog:
 
         # 과목 색상 정의
         self.class_colors = [
-            (0.6, 0.2, 0.8, 1),  # Purple
-            (0.2, 0.6, 0.8, 1),  # Blue
-            (0.2, 0.8, 0.2, 1),  # Green
-            (0.8, 0.6, 0.2, 1),  # Orange
-            (0.8, 0.2, 0.2, 1),  # Red
-            (1.0, 0.4, 0.8, 1),  # Pink
-            (0.5, 0.5, 0.5, 1),  # Gray
+            (1.0, 0.9, 0.3, 1),   # 밝은 노랑 (Bright Yellow)
+            (0.3, 0.9, 0.5, 1),   # 민트 그린 (Mint Green)  
+            (0.4, 0.8, 1.0, 1),   # 하늘색 (Sky Blue)
+            (0.9, 0.5, 0.2, 1),   # 주황색 (Orange)
+            (0.8, 0.3, 0.6, 1),   # 분홍색 (Pink)
+            (0.5, 0.4, 0.8, 1),   # 보라색 (Purple)
+            (0.4, 0.4, 0.4, 1),   # 진한 회색 (Dark Gray)
         ]
         self.selected_color = self.class_colors[0]  # 기본 색상
         self.color_buttons = []
@@ -626,7 +626,7 @@ class AddClassDialog:
         self.content.add_widget(spacer)
 
         self.notify_label = MDLabel(
-            text="Set Alarm (Before)",
+            text="Set Alarm",
             theme_text_color="Secondary",
             font_style="Body2",
             font_name=FONT_NAME,
@@ -659,7 +659,7 @@ class AddClassDialog:
 
         # "Minute" 레이블
         minute_label = MDLabel(
-            text="Minute",
+            text="Minutes Before",
             theme_text_color="Secondary",
             font_name=FONT_NAME,
             size_hint_x=0.8,  # 나머지 70% 차지
@@ -815,13 +815,13 @@ class EditClassDialog:
         
         # 색상 정의 (AddClassDialog와 동일하게 유지)
         self.class_colors = [
-            (0.6, 0.2, 0.8, 1),  # Purple
-            (0.2, 0.6, 0.8, 1),  # Blue
-            (0.2, 0.8, 0.2, 1),  # Green
-            (0.8, 0.6, 0.2, 1),  # Orange
-            (0.8, 0.2, 0.2, 1),  # Red
-            (1.0, 0.4, 0.8, 1),  # Pink
-            (0.5, 0.5, 0.5, 1),  # Gray
+            (1.0, 0.9, 0.3, 1),   # 밝은 노랑 (Bright Yellow)
+            (0.3, 0.9, 0.5, 1),   # 민트 그린 (Mint Green)  
+            (0.4, 0.8, 1.0, 1),   # 하늘색 (Sky Blue)
+            (0.9, 0.5, 0.2, 1),   # 주황색 (Orange)
+            (0.8, 0.3, 0.6, 1),   # 분홍색 (Pink)
+            (0.5, 0.4, 0.8, 1),   # 보라색 (Purple)
+            (0.4, 0.4, 0.4, 1),   # 진한 회색 (Dark Gray)
         ]
         self.selected_button_index = 0
     
@@ -1031,7 +1031,7 @@ class EditClassDialog:
             size_hint_y=None,
             height=dp(20),
             spacing=dp(0),
-            padding=(-30, 0, 0, 0),
+            padding=(-35, 0, 0, 0),
             adaptive_width=False
         )
         
@@ -1167,7 +1167,7 @@ class EditClassDialog:
 
         # 알림 설정 레이블
         self.notify_label = MDLabel(
-            text="Set Alarm (Before)",
+            text="Set Alarm",
             theme_text_color="Secondary",
             font_style="Body2",
             font_name=FONT_NAME,
@@ -1199,7 +1199,7 @@ class EditClassDialog:
 
         # "Minute" 레이블
         minute_label = MDLabel(
-            text="Minute",
+            text="Minutes Before",
             theme_text_color="Secondary",
             font_name=FONT_NAME,
             size_hint_x=0.8,
