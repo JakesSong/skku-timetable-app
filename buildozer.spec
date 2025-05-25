@@ -1,7 +1,7 @@
 [app]
-title = MetaCheck
+title = DoubleCheck
 icon.filename = icon.png
-package.name = MetaCheck
+package.name = DoubleCheck
 package.domain = org.kivy.skkutimetable
 source.dir = .
 source.filename = main.py
