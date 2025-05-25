@@ -592,6 +592,7 @@ class AddClassDialog:
             (0.9, 0.5, 0.2, 1),    # 주황색 (Orange)
             (0.8, 0.3, 0.6, 1),    # 분홍색 (Pink)
             (0.5, 0.4, 0.8, 1),    # 보라색 (Purple)
+            (0.6, 0.2, 0.2, 1),    # 진한 빨간색 (Dark Red) ← 여기 추가!
             (0.4, 0.4, 0.4, 1),    # 진한 회색 (Dark Gray)
         ]
         self.selected_color = self.class_colors[0]  # 기본 색상
@@ -602,7 +603,7 @@ class AddClassDialog:
             from kivymd.uix.card import MDCard
             color_btn = MDCard(
                 size_hint=(None, None),
-                size=(dp(40), dp(30)),  # 작은 크기
+                size=(dp(30), dp(23)),  # 작은 크기
                 md_bg_color=color,
                 radius=[dp(2)],  # 약간의 모서리 둥글기
                 elevation=1 if i == 0 else 0  # 첫 번째 버튼은 선택된 상태로 표시
