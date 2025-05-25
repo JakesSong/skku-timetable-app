@@ -2294,10 +2294,10 @@ class MainScreen(MDScreen):
 class TimeTableApp(MDApp):
     def build(self):
         print("✅ build() 실행됨")
-        Logger.info("MetaCheck: build 시작됨")
+        Logger.info("DoubleCheck: build 시작됨")
     
         try:
-            with open("/sdcard/metacheck_log.txt", "a") as f:
+            with open("/sdcard/doublecheck_log.txt", "a") as f:
                 f.write("✅ build() 진입\n")
         except:
             pass  # PC에서는 이 경로가 없으므로 무시
@@ -2385,15 +2385,15 @@ class TimeTableApp(MDApp):
                     notification_manager.createNotificationChannel(channel)
 
                     print("✅ 알림 채널 생성 완료")
-                    Logger.info("MetaCheck: 알림 채널 생성 성공")
+                    Logger.info("DoubleCheck: 알림 채널 생성 성공")
 
             except Exception as e:
                 import traceback
                 try:
-                    with open("/sdcard/metacheck_error.txt", "w") as f:
+                    with open("/sdcard/doublecheck_error.txt", "w") as f:
                         f.write(traceback.format_exc())
                 except:
-                    Logger.error(f"MetaCheck: 알림 채널 예외 - {e}")
+                    Logger.error(f"DoubleCheck: 알림 채널 예외 - {e}")
 
         # 🔥 바로 메인 스크린 반환 (로딩 화면 완전 삭제)
         print("🔧 메인 스크린 바로 생성")
@@ -2445,7 +2445,7 @@ if __name__ == "__main__":
     except Exception as e:
         import traceback
         try:
-            with open("/sdcard/metacheck_error.txt", "w") as f:
+            with open("/sdcard/doublecheck_error.txt", "w") as f:
                 f.write(traceback.format_exc())
         except:
             print(traceback.format_exc())
