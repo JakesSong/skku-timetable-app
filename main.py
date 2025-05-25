@@ -1397,6 +1397,19 @@ class MainScreen(MDScreen):
         self.classes_data = {}
         self.storage = TimeTableStorage()
         self.subtitle_text = "2025년 1학기 소재부품융합공학과"
+
+        # 🔥 AlarmManager 초기화 추가!
+        if 'ANDROID_STORAGE' in os.environ:
+            try:
+                from alarm_manager import AlarmManager
+                self.alarm_manager = AlarmManager(app)
+                print("✅ Android 알람 매니저 초기화 완료")
+            except Exception as e:
+                print(f"❌ 알람 매니저 초기화 실패: {e}")
+                self.alarm_manager = None
+        else:
+            self.alarm_manager = None
+            print("💻 PC 환경 - 알람 매니저 비활성화")
         
         # 🔥 초기화 상태 플래그 추가
         self.is_initialized = False
@@ -2008,22 +2021,34 @@ class MainScreen(MDScreen):
             # 시간표 저장 - 카드가 성공적으로 추가된 후에 저장
             self.save_timetable()
                         
-            # 알람 설정 (Android인 경우에만)
+            # 🔥 알람 설정 (Android인 경우에만) - 수정된 버전
             if 'ANDROID_STORAGE' in os.environ and hasattr(self, 'alarm_manager') and self.alarm_manager is not None:
-                # 알람 시간 (기본값: 5분 전)
-                minutes_before = 5
-                if hasattr(self.add_class_dialog, 'notify_input'):
+                # 알람 시간 가져오기
+                minutes_before = 5  # 기본값
+                
+                # AddClassDialog에서 설정한 알람 시간 가져오기
+                if hasattr(self.add_class_dialog, 'notify_input') and self.add_class_dialog.notify_input.text.strip():
                     try:
-                        minutes_before = int(self.add_class_dialog.notify_input.text)
+                        minutes_before = int(self.add_class_dialog.notify_input.text.strip())
                     except:
                         minutes_before = 5
                 
+                print(f"🔔 알람 설정 시도: {name} - {minutes_before}분 전")
+                
                 # 알람 예약
                 try:
-                    self.alarm_manager.schedule_alarm(class_id, card.class_data, minutes_before)
+                    success = self.alarm_manager.schedule_alarm(class_id, card.class_data, minutes_before)
+                    if success:
+                        print(f"✅ 알람 예약 성공: {name}")
+                    else:
+                        print(f"❌ 알람 예약 실패: {name}")
                 except Exception as e:
-                    print(f"알람 스케줄링 오류: {e}")
-                                    
+                    print(f"❌ 알람 스케줄링 오류: {e}")
+                    import traceback
+                    traceback.print_exc()
+            else:
+                print("💻 PC 환경 또는 알람 매니저 없음 - 알람 스킵")
+            
             return True
                         
         except Exception as e:
