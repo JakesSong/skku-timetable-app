@@ -432,7 +432,7 @@ class AddClassDialog:
             orientation="vertical",
             spacing=dp(5),
             size_hint_y=None,
-            height=dp(580),
+            height=dp(590),
             padding=(dp(20), dp(10), dp(20), dp(15))
         )
     
@@ -481,12 +481,12 @@ class AddClassDialog:
         set_font_for_textfield(self.day_field)
         self.content.add_widget(self.day_field)
         
-        # 요일 버튼 레이아웃 추가 - test4.py 스타일
+        # 요일 버튼 레이아웃 추가
         days_layout = MDBoxLayout(
             orientation='horizontal',
             size_hint_y=None,
-            height=dp(20),
-            spacing=dp(5),
+            height=dp(30),
+            spacing=dp(0),
             padding=(0, 0, 0, 0),
             adaptive_width=False
         )
@@ -506,7 +506,7 @@ class AddClassDialog:
                 font_name=FONT_NAME,
                 on_release=lambda x, d=day, k=day_names[day]: self.set_day(d, k),
                 size_hint_x=None,
-                width=dp(30)
+                width=dp(20)
             )
             days_layout.add_widget(day_btn)
         
@@ -991,7 +991,7 @@ class EditClassDialog:
             orientation="vertical",
             spacing=dp(5),
             size_hint_y=None,
-            height=dp(580),
+            height=dp(590),
             padding=(dp(20), dp(10), dp(20), dp(15))
         )
     
@@ -1029,8 +1029,8 @@ class EditClassDialog:
         days_layout = MDBoxLayout(
             orientation='horizontal',
             size_hint_y=None,
-            height=dp(20),
-            spacing=dp(5),
+            height=dp(30),
+            spacing=dp(0),
             padding=(0, 0, 0, 0),
             adaptive_width=False
         )
@@ -1050,7 +1050,7 @@ class EditClassDialog:
                 font_name=FONT_NAME,
                 on_release=lambda x, d=day, k=day_names[day]: self.set_day(d, k),
                 size_hint_x=None,
-                width=dp(30)
+                width=dp(20)
             )
             days_layout.add_widget(day_btn)
         
