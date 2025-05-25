@@ -437,7 +437,7 @@ class AddClassDialog:
         )
     
         # 🔥 제목과의 간격을 줄이는 음수 스페이서 추가
-        negative_spacer = Widget(size_hint_y=None, height=dp(-50))
+        negative_spacer = Widget(size_hint_y=None, height=dp(-20))
         self.content.add_widget(negative_spacer)
         
         # MDTextField의 폰트 속성을 직접 설정하기 위한 함수
@@ -485,9 +485,9 @@ class AddClassDialog:
         days_layout = MDBoxLayout(
             orientation='horizontal',
             size_hint_y=None,
-            height=dp(30),
+            height=dp(20),
             spacing=dp(0),
-            padding=(0, 0, 0, 0),
+            padding=(-20, 0, 0, 0),
             adaptive_width=False
         )
         
@@ -996,7 +996,7 @@ class EditClassDialog:
         )
     
         # 🔥 제목과의 간격을 줄이는 음수 스페이서 추가
-        negative_spacer = Widget(size_hint_y=None, height=dp(-50))
+        negative_spacer = Widget(size_hint_y=None, height=dp(-20))
         self.content.add_widget(negative_spacer)
         
         # 과목명 입력
@@ -1029,9 +1029,9 @@ class EditClassDialog:
         days_layout = MDBoxLayout(
             orientation='horizontal',
             size_hint_y=None,
-            height=dp(30),
+            height=dp(20),
             spacing=dp(0),
-            padding=(0, 0, 0, 0),
+            padding=(-20, 0, 0, 0),
             adaptive_width=False
         )
         
