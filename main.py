@@ -762,6 +762,16 @@ class AddClassDialog:
         room = self.room_field.text.strip()
         professor = self.professor_field.text.strip()
         
+        # 🔥 알람 시간 가져오기 추가
+        notify_before = 5  # 기본값
+        if hasattr(self, 'notify_input') and self.notify_input.text.strip():
+            try:
+                notify_before = int(self.notify_input.text.strip())
+                print(f"🔔 사용자 설정 알람: {notify_before}분")
+            except ValueError:
+                notify_before = 5  # 잘못된 입력시 기본값
+                print(f"⚠️ 잘못된 알람 시간 입력, 기본값 사용: {notify_before}분")
+        
         # 입력 검증
         if not all([name, day, start_time, end_time, room, professor]):
             # 경고 대화상자 표시 (한글 처리 개선)
@@ -786,16 +796,18 @@ class AddClassDialog:
         # 색상 정보 준비
         color_str = f"{self.selected_color[0]},{self.selected_color[1]},{self.selected_color[2]},{self.selected_color[3]}"
         
-        # 시간표에 과목 추가
-        self.screen.add_class_to_grid(
-            self.next_class_id, name, day, start_time, end_time, room, professor, color_str
+        # 🔥 시간표에 과목 추가 (알람 시간도 함께 전달)
+        success = self.screen.add_class_to_grid(
+            self.next_class_id, name, day, start_time, end_time, room, professor, color_str, notify_before
         )
-            # 디버깅 로그 추가
-        print(f"과목 추가 후 ID: {self.next_class_id}")
-        self.next_class_id += 1
         
-        # 대화상자 닫기
-        self.dismiss_dialog()
+        if success:
+            print(f"✅ 과목 추가 완료: {name} (ID: {self.next_class_id}, 알람: {notify_before}분)")
+            self.next_class_id += 1
+            # 대화상자 닫기
+            self.dismiss_dialog()
+        else:
+            print(f"❌ 과목 추가 실패: {name}")
 
 
 class EditClassDialog:
@@ -1639,7 +1651,8 @@ class MainScreen(MDScreen):
                 else:
                     color_str = ','.join(map(str, color))
                 
-                # 🔥 과목 카드 생성 및 추가 (중복 체크는 add_class_to_grid에서 처리)
+                # 🔥 과목 카드 생성 및 추가 (알람 시간 포함)
+                notify_before = class_data.get('notify_before', 5)  # 저장된 알람 시간 또는 기본값 5분
                 success = self.add_class_to_grid(
                     class_data['id'], 
                     class_data['name'], 
@@ -1648,7 +1661,8 @@ class MainScreen(MDScreen):
                     class_data['end_time'], 
                     class_data['room'], 
                     class_data['professor'], 
-                    color_str
+                    color_str,
+                    notify_before  # 🔥 알람 시간 전달
                 )
                 
                 if success:
@@ -2178,9 +2192,8 @@ class MainScreen(MDScreen):
         
         self.add_class_dialog.dialog.dismiss()
         
-    def add_class_to_grid(self, class_id, name, day, start_time, end_time, room, professor, color_str):
-
-           # 🔥 맨 앞에 추가: 중복 확인
+    def add_class_to_grid(self, class_id, name, day, start_time, end_time, room, professor, color_str, notify_before=5):
+        # 🔥 맨 앞에 추가: 중복 확인
         for existing_card in self.time_grid.children[:]:
             if hasattr(existing_card, 'class_data') and existing_card.class_data.get('id') == class_id:
                 print(f"🔄 기존 카드 발견 - 제거 중: {class_id}")
@@ -2194,7 +2207,7 @@ class MainScreen(MDScreen):
         # 시간 값 검증
         if start_time_float is None or end_time_float is None:
             print(f"[스킵] 잘못된 시간 값: start={start_time}, end={end_time}")
-            return
+            return False
         
         layout_data = self.layout_data
         
@@ -2214,7 +2227,6 @@ class MainScreen(MDScreen):
         
         x = day_column_left + (layout_data['spacing'] * 1)
         
-        
         # 시간대별 높이 계산
         hours_count = layout_data['end_hour'] - layout_data['start_hour']
         hour_height = self.time_grid.height / hours_count
@@ -2226,14 +2238,13 @@ class MainScreen(MDScreen):
         duration_height = (end_time_float - start_time_float) * hour_height
         y = self.time_grid.y + self.time_grid.height - start_offset_from_top - duration_height
         
-        
         # 색상 문자열을 튜플로 변환
         try:
             color = tuple(map(float, color_str.split(',')))
         except Exception as e:
             print(f"색상 변환 오류: {e}, 기본색 사용")
             color = (0.6, 0.2, 0.8, 1)  # 기본 보라색
-        
+    
         try:
             # 카드 생성 및 위치 조정
             card = ClassCard(
@@ -2248,7 +2259,7 @@ class MainScreen(MDScreen):
     
             print(f"카드 생성: 크기=({card_width}, {duration_height}), 위치=({x}, {y})")
             
-            # 카드에 클래스 데이터 저장
+            # 🔥 카드에 클래스 데이터 저장 (알람 시간 포함)
             card.class_data = {
                 'id': class_id,
                 'name': name,
@@ -2257,11 +2268,13 @@ class MainScreen(MDScreen):
                 'end_time': end_time,
                 'room': room,
                 'professor': professor,
-                'color': color
+                'color': color,
+                'notify_before': notify_before  # 🔥 알람 시간 저장
             }
             
-            # 클래스 데이터 저장소에 추가
+            # 🔥 클래스 데이터 저장소에 추가 (알람 시간 포함)
             self.classes_data[class_id] = card.class_data.copy()
+            print(f"💾 클래스 데이터 저장: {name} (알람: {notify_before}분)")
                         
             # 카드 내용 추가 - 이 부분만 교체!
             card_label = MDLabel(
@@ -2296,27 +2309,9 @@ class MainScreen(MDScreen):
             # 클릭 이벤트 연결
             card.on_release_callback = lambda card: self.edit_class_dialog.show_edit_dialog(card)
             
-            # 시간표 저장 - 카드가 성공적으로 추가된 후에 저장
-            self.save_timetable()
-                        
             # 🔥 알람 설정 (Android인 경우에만) - 수정된 버전
             if 'ANDROID_STORAGE' in os.environ:
-                # 알람 시간 가져오기
-                minutes_before = 5  # 기본값
-                
-                # 저장된 데이터에서 알람 시간 확인
-                if class_id in self.classes_data and 'notify_before' in self.classes_data[class_id]:
-                    minutes_before = self.classes_data[class_id]['notify_before']
-                    print(f"🔔 저장된 알람 시간 사용: {minutes_before}분")
-                # AddClassDialog에서 설정한 알람 시간 확인
-                elif hasattr(self.add_class_dialog, 'notify_input') and self.add_class_dialog.notify_input.text.strip():
-                    try:
-                        minutes_before = int(self.add_class_dialog.notify_input.text.strip())
-                        print(f"🔔 새로 설정된 알람 시간: {minutes_before}분")
-                    except:
-                        minutes_before = 5
-                
-                print(f"🔔 백그라운드 알람 설정 시도: {name} - {minutes_before}분 전")
+                print(f"🔔 백그라운드 알람 설정 시도: {name} - {notify_before}분 전")
                 
                 # 새로운 통합 시스템 알람 설정 함수 사용
                 class_data_for_alarm = {
@@ -2329,11 +2324,9 @@ class MainScreen(MDScreen):
                 }
                 
                 try:
-                    success = self.schedule_system_alarm(class_data_for_alarm, minutes_before)
+                    success = self.schedule_system_alarm(class_data_for_alarm, notify_before)
                     if success:
-                        print(f"✅ 백그라운드 시스템 알람 설정 성공: {name} - {minutes_before}분 전")
-                        # notify_before 데이터 저장
-                        self.classes_data[class_id]['notify_before'] = minutes_before
+                        print(f"✅ 백그라운드 시스템 알람 설정 성공: {name} - {notify_before}분 전")
                     else:
                         print(f"❌ 백그라운드 시스템 알람 설정 실패: {name}")
                 except Exception as e:
