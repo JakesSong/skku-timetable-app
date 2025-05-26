@@ -425,7 +425,18 @@ class AddClassDialog:
 
         
     def create_dialog(self, edit_mode=False, class_id=None):
-        """대화상자 생성"""
+        """대화상자 생성 - 스크롤 가능하게 개선"""
+        
+        # 🔥 ScrollView로 감싸기 (키보드 가림 방지)
+        scroll_view = ScrollView(
+            size_hint_y=None,
+            height=dp(500),  # 전체 높이를 줄여서 키보드 공간 확보
+            do_scroll_x=False,
+            do_scroll_y=True,
+            bar_width=dp(4),
+            scroll_type=['bars', 'content']
+        )
+        
         # 대화상자 내용 레이아웃
         self.content = MDBoxLayout(
             orientation="vertical",
@@ -475,7 +486,7 @@ class AddClassDialog:
             height=dp(20),
             readonly=True
         )
-
+    
         self.day_field.font_size = "15.5sp" 
         set_font_for_textfield(self.day_field)
         self.content.add_widget(self.day_field)
@@ -510,7 +521,7 @@ class AddClassDialog:
             days_layout.add_widget(day_btn)
         
         self.content.add_widget(days_layout)
-
+    
         # 시작 시간 - 텍스트 필드를 드롭다운 선택으로 변경
         self.start_time_field = MDTextField(
             hint_text="Start Time",
@@ -558,12 +569,12 @@ class AddClassDialog:
         )
         set_font_for_textfield(self.professor_field)
         self.content.add_widget(self.professor_field)
-
+    
         
         # 시작 시간 필드와 days_layout 사이에 작은 간격 위젯 추가
         #spacer = Widget(size_hint_y=None, height=dp(10))  # 아주 작은 간격
         #self.content.add_widget(spacer)
-
+    
         # 색상 선택 라벨
         self.color_label = MDLabel(
             text="Color Selection", 
@@ -575,7 +586,7 @@ class AddClassDialog:
         )
         self.color_label.font_size = "15.5sp" 
         self.content.add_widget(self.color_label)
-
+    
         # 색상 선택 버튼들
         colors_layout = MDBoxLayout(
             orientation='horizontal',
@@ -583,7 +594,7 @@ class AddClassDialog:
             height=dp(40),  # 작은 높이
             spacing=dp(2)   # 좁은 간격
         )
-
+    
         # 과목 색상 정의
         self.class_colors = [
             (0.3, 0.55, 0.96, 1),   # 진한 파란색 (Deep Blue)
@@ -597,7 +608,7 @@ class AddClassDialog:
         ]
         self.selected_color = self.class_colors[0]  # 기본 색상
         self.color_buttons = []
-
+    
         for i, color in enumerate(self.class_colors):
             # MDRectangleFlatButton 대신 MDCard 사용
             from kivymd.uix.card import MDCard
@@ -619,12 +630,12 @@ class AddClassDialog:
         self.selected_button_index = 0
         self.color_buttons[0].elevation = 3
         self.content.add_widget(colors_layout)
-
-
+    
+    
         # 시작 시간 필드와 days_layout 사이에 작은 간격 위젯 추가
         spacer = Widget(size_hint_y=None, height=dp(10))  # 아주 작은 간격
         self.content.add_widget(spacer)
-
+    
         self.notify_label = MDLabel(
             text="Set Alarm",
             theme_text_color="Secondary",
@@ -633,10 +644,10 @@ class AddClassDialog:
             size_hint_y=None,
             height=dp(20)
         )
-
+    
         self.notify_label.font_size = "15.5sp" 
         self.content.add_widget(self.notify_label)
-
+    
         # 입력창과 "Minute" 텍스트를 함께 표시할 수평 레이아웃
         notify_layout = MDBoxLayout(
             orientation="horizontal",
@@ -645,7 +656,7 @@ class AddClassDialog:
             spacing=dp(5),
             padding=[0, 0, 0, 0]
         )
-
+    
         # 숫자 입력 필드 (더 좁게 설정)
         self.notify_input = MDTextField(
             hint_text="",  # 힌트 텍스트 제거
@@ -654,9 +665,9 @@ class AddClassDialog:
             font_name=FONT_NAME,
             size_hint_x=0.2,  # 너비 30%로 제한
         )
-
+    
         set_font_for_textfield(self.notify_input)
-
+    
         # "Minute" 레이블
         minute_label = MDLabel(
             text="Minutes Before",
@@ -666,15 +677,22 @@ class AddClassDialog:
             halign="left",
             valign="center"
         )
-
-
+    
+    
         # 레이아웃에 위젯 추가
         notify_layout.add_widget(self.notify_input)
         notify_layout.add_widget(minute_label)
-
+    
         # 메인 컨텐트에 레이아웃 추가
         self.content.add_widget(notify_layout)
-
+        
+        # 🔥 키보드 가림 방지용 여분 공간 추가
+        extra_spacer = Widget(size_hint_y=None, height=dp(50))
+        self.content.add_widget(extra_spacer)
+    
+        # 🔥 ScrollView에 콘텐츠 추가
+        scroll_view.add_widget(self.content)
+    
         # 다이얼로그 생성 후 글꼴 설정을 위한 함수
         def post_dialog_open(dialog):
             try:
@@ -727,18 +745,17 @@ class AddClassDialog:
                 )
             ]
         
-        # 팝업 대화상자 생성
+        # 🔥 팝업 대화상자 생성 - ScrollView를 content로 사용
         self.dialog = MDDialog(
             title="새 과목 추가" if not edit_mode else "과목 수정",
             type="custom",
-            content_cls=self.content,
-            size_hint=(0.90, None),
+            content_cls=scroll_view,  # ScrollView를 content로 사용
+            size_hint=(0.90, 0.8),   # 높이를 80%로 조정하여 키보드 공간 확보
             buttons=buttons
         )
         
         # 다이얼로그가 열릴 때 한 번 더 글꼴 설정 시도
         self.dialog.bind(on_open=lambda *args: post_dialog_open(self.dialog))
-
     
     def set_day(self, english_day, korean_day):
         """요일 설정"""
@@ -1013,23 +1030,24 @@ class EditClassDialog:
         self.dialog.open()
         
     def create_edit_dialog(self):
-        """수정 다이얼로그 생성 - AddClassDialog.create_dialog()와 유사한 구조"""
-        # 🔥 ScrollView로 감싸기
+        """수정 다이얼로그 생성 - 스크롤 가능하게 개선"""
+        
+        # 🔥 ScrollView로 감싸기 (키보드 가림 방지)
         scroll_view = ScrollView(
             size_hint_y=None,
-            height=dp(500),  # 전체 높이를 줄임
+            height=dp(500),  # 전체 높이를 줄여서 키보드 공간 확보
             do_scroll_x=False,
             do_scroll_y=True,
             bar_width=dp(4),
             scroll_type=['bars', 'content']
         )
         
-        # 대화상자 내용 레이아웃
+        # 대화상자 내용 레이아웃 (기존과 동일)
         self.content = MDBoxLayout(
             orientation="vertical",
             spacing=dp(5),
             size_hint_y=None,
-            height=dp(590),
+            height=dp(590),  # 실제 콘텐츠 높이는 그대로
             padding=(dp(20), dp(10), dp(20), dp(15))
         )
     
@@ -1229,6 +1247,59 @@ class EditClassDialog:
         notify_layout.add_widget(self.notify_input)
         notify_layout.add_widget(minute_label)
         self.content.add_widget(notify_layout)
+        
+        # 🔥 키보드 가림 방지용 여분 공간 추가
+        extra_spacer = Widget(size_hint_y=None, height=dp(50))
+        self.content.add_widget(extra_spacer)
+    
+        # 🔥 ScrollView에 콘텐츠 추가
+        scroll_view.add_widget(self.content)
+    
+        # 폰트 설정 함수
+        def post_dialog_open(dialog):
+            try:
+                if hasattr(dialog, '_title'):
+                    dialog._title.font_name = FONT_NAME
+                
+                if hasattr(dialog, 'content_cls'):
+                    for child in dialog.content_cls.children:
+                        if isinstance(child, MDTextField):
+                            self.set_font_for_textfield(child)
+            except Exception as e:
+                print(f"다이얼로그 폰트 설정 오류: {e}")
+    
+        # 버튼 생성
+        buttons = [
+            MDFlatButton(
+                text="취소",
+                font_name=FONT_NAME,
+                on_release=lambda x: self.dialog.dismiss()
+            ),
+            MDFlatButton(
+                text="삭제",
+                font_name=FONT_NAME,
+                theme_text_color="Custom",
+                text_color=[1, 0.3, 0.3, 1],
+                on_release=lambda x: self.delete_class()
+            ),
+            MDRaisedButton(
+                text="저장",
+                font_name=FONT_NAME,
+                on_release=lambda x: self.update_class()
+            )
+        ]
+        
+        # 🔥 다이얼로그 생성 - ScrollView를 content로 사용
+        self.dialog = MDDialog(
+            title="과목 수정",
+            type="custom",
+            content_cls=scroll_view,  # ScrollView를 content로 사용
+            size_hint=(0.90, 0.8),   # 높이를 80%로 조정하여 키보드 공간 확보
+            buttons=buttons
+        )
+        
+        # 다이얼로그가 열릴 때 폰트 설정 (AddClassDialog와 동일한 방식)
+        self.dialog.bind(on_open=lambda *args: post_dialog_open(self.dialog))
     
         # 폰트 설정 함수
         def post_dialog_open(dialog):
