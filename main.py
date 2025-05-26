@@ -446,7 +446,7 @@ class AddClassDialog:
             orientation="vertical",
             spacing=dp(5),
             size_hint_y=None,
-            height=dp(640),  # 높이를 조금 늘려서 충분한 스크롤 공간 확보
+            height=dp(800),  # 높이를 조금 늘려서 충분한 스크롤 공간 확보
             padding=(dp(20), dp(10), dp(20), dp(15))
         )
     
@@ -618,7 +618,7 @@ class AddClassDialog:
             from kivymd.uix.card import MDCard
             color_btn = MDCard(
                 size_hint=(None, None),
-                size=(dp(39), dp(35)),  # 작은 크기
+                size=(dp(35), dp(35)),  # 작은 크기
                 md_bg_color=color,
                 radius=[dp(2)],  # 약간의 모서리 둥글기
                 elevation=1 if i == 0 else 0  # 첫 번째 버튼은 선택된 상태로 표시
@@ -691,7 +691,7 @@ class AddClassDialog:
         self.content.add_widget(notify_layout)
         
         # 🔥 키보드 가림 방지용 여분 공간 추가 (더 넉넉하게)
-        extra_spacer = Widget(size_hint_y=None, height=dp(100))
+        extra_spacer = Widget(size_hint_y=None, height=dp(300))
         self.content.add_widget(extra_spacer)
     
         # 🔥 ScrollView에 콘텐츠 추가
@@ -1144,7 +1144,7 @@ class EditClassDialog:
             orientation="vertical",
             spacing=dp(5),
             size_hint_y=None,
-            height=dp(640),  # 높이를 조금 늘려서 충분한 스크롤 공간 확보
+            height=dp(800),  # 높이를 조금 늘려서 충분한 스크롤 공간 확보
             padding=(dp(20), dp(10), dp(20), dp(15))
         )
     
@@ -1283,7 +1283,7 @@ class EditClassDialog:
             from kivymd.uix.card import MDCard
             color_btn = MDCard(
                 size_hint=(None, None),
-                size=(dp(39), dp(35)),
+                size=(dp(35), dp(35)),
                 md_bg_color=color,
                 radius=[dp(2)],
                 elevation=0  # 기본값
@@ -1346,7 +1346,7 @@ class EditClassDialog:
         self.content.add_widget(notify_layout)
         
         # 🔥 키보드 가림 방지용 여분 공간 추가 (더 넉넉하게)
-        extra_spacer = Widget(size_hint_y=None, height=dp(100))
+        extra_spacer = Widget(size_hint_y=None, height=dp(300))
         self.content.add_widget(extra_spacer)
     
         # 🔥 ScrollView에 콘텐츠 추가
