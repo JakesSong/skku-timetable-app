@@ -27,7 +27,7 @@ android.release_artifact = apk
 android.gradle_dependencies = androidx.core:core:1.6.0, androidx.core:core-ktx:1.6.0
 android.enable_androidx = True
 
-# ✅ 정적 splash 이미지 지정
+# ✅ splash 이미지 지정
 presplash.filename = presplash.png
 
 [buildozer]
