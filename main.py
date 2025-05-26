@@ -603,7 +603,7 @@ class AddClassDialog:
             from kivymd.uix.card import MDCard
             color_btn = MDCard(
                 size_hint=(None, None),
-                size=(dp(35), dp(26)),  # 작은 크기
+                size=(dp(40), dp(26)),  # 작은 크기
                 md_bg_color=color,
                 radius=[dp(2)],  # 약간의 모서리 둥글기
                 elevation=1 if i == 0 else 0  # 첫 번째 버튼은 선택된 상태로 표시
@@ -825,15 +825,16 @@ class EditClassDialog:
         self.selected_color = None
         self.color_buttons = []
         
-        # 색상 정의 (AddClassDialog와 동일하게 유지)
+        # 과목 색상 정의 (AddClassDialog와 동일하게 유지)
         self.class_colors = [
-            (1.0, 0.9, 0.3, 1),   # 밝은 노랑 (Bright Yellow)
-            (0.3, 0.9, 0.5, 1),   # 민트 그린 (Mint Green)  
-            (0.4, 0.8, 1.0, 1),   # 하늘색 (Sky Blue)
-            (0.9, 0.5, 0.2, 1),   # 주황색 (Orange)
-            (0.8, 0.3, 0.6, 1),   # 분홍색 (Pink)
-            (0.5, 0.4, 0.8, 1),   # 보라색 (Purple)
-            (0.4, 0.4, 0.4, 1),   # 진한 회색 (Dark Gray)
+            (0.3, 0.55, 0.96, 1),   # 진한 파란색 (Deep Blue)
+            (0.3, 0.9, 0.5, 1),    # 민트 그린 (Mint Green)  
+            (0.4, 0.8, 1.0, 1),    # 하늘색 (Sky Blue)
+            (0.9, 0.5, 0.2, 1),    # 주황색 (Orange)
+            (0.8, 0.3, 0.6, 1),    # 분홍색 (Pink)
+            (0.6, 0.2, 0.2, 1),    # 진한 빨간색 (Dark Red)
+            (0.5, 0.4, 0.8, 1),    # 보라색 (Purple)
+            (0.4, 0.4, 0.4, 1),    # 진한 회색 (Dark Gray)
         ]
         self.selected_button_index = 0
     
@@ -1152,7 +1153,7 @@ class EditClassDialog:
             from kivymd.uix.card import MDCard
             color_btn = MDCard(
                 size_hint=(None, None),
-                size=(dp(40), dp(30)),
+                size=(dp(40), dp(26)),
                 md_bg_color=color,
                 radius=[dp(2)],
                 # 현재 색상과 일치하면 강조 표시
@@ -1318,40 +1319,16 @@ class EditClassDialog:
         # 4단계: 색상 정보 준비
         color_str = f"{self.selected_color[0]},{self.selected_color[1]},{self.selected_color[2]},{self.selected_color[3]}"
         
-        # 5단계: 알림 시간 가져오기
+        # 🔥 5단계: 알림 시간 가져오기 (여기가 핵심!)
         notify_before = int(self.notify_input.text) if self.notify_input.text.strip() else 5
+        print(f"🔔 수정된 알람 시간: {notify_before}분")
         
-        # 6단계: 새로운 카드 생성 (동일한 ID로)
+        # 🔥 6단계: 새로운 카드 생성 (동일한 ID로, 알람 시간 포함!)
         success = self.screen.add_class_to_grid(
-            class_id, name, day, start_time, end_time, room, professor, color_str
+            class_id, name, day, start_time, end_time, room, professor, color_str, notify_before
         )
         
         if success:
-            # 7단계: 알림 설정 업데이트
-            if class_id in self.screen.classes_data:
-                self.screen.classes_data[class_id]['notify_before'] = notify_before
-                
-                # 새로운 시스템 알람 설정 (수정된 시간으로)
-                class_data = {
-                    'id': class_id,
-                    'name': name,
-                    'day': day,
-                    'start_time': start_time,
-                    'room': room,
-                    'professor': professor
-                }
-                
-                # 수정된 알람 시간으로 다시 설정
-                if hasattr(self.screen, 'schedule_system_alarm'):
-                    try:
-                        alarm_success = self.screen.schedule_system_alarm(class_data, notify_before)
-                        if alarm_success:
-                            print(f"✅ 알람 재설정 완료: {notify_before}분 전")
-                        else:
-                            print(f"⚠️ 알람 재설정 실패")
-                    except Exception as e:
-                        print(f"❌ 알람 재설정 오류: {e}")
-            
             print(f"✅ 과목 수정 완료: {name} (ID: {class_id}, 알람: {notify_before}분 전)")
             
             # 대화상자 닫기
