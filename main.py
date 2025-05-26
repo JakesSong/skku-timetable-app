@@ -2286,32 +2286,57 @@ class MainScreen(MDScreen):
             # 클릭 이벤트 연결
             card.on_release_callback = lambda card: self.edit_class_dialog.show_edit_dialog(card)
             
-            # 🔥 백그라운드 서비스용 알람 설정 (Android인 경우에만)
+            # 🔥 백그라운드 알람 설정 (Android인 경우에만)
             if 'ANDROID_STORAGE' in os.environ:
                 print(f"🔔 백그라운드 알람 설정 시도: {name} - {notify_before}분 전")
                 
-                # 서비스용 알람 데이터 저장
-                class_data_for_alarm = {
-                    'id': class_id,
-                    'name': name,
-                    'day': day,
-                    'start_time': start_time,
-                    'room': room,
-                    'professor': professor
-                }
+                real_alarm_success = False  # 진짜 알람 성공 플래그
                 
                 try:
-                    success = self.app.save_alarm_for_service(class_data_for_alarm, notify_before)
-                    if success:
-                        print(f"✅ 백그라운드 서비스 알람 설정 성공: {name} - {notify_before}분 전")
+                    # App을 통해 alarm_manager 접근
+                    app = App.get_running_app()
+                    print(f"📱 App 확인: {type(app).__name__}")
+                    
+                    if hasattr(app, 'alarm_manager'):
+                        print(f"🔧 AlarmManager 존재: {app.alarm_manager}")
+                        if app.alarm_manager:
+                            print(f"🎯 AlarmManager.schedule_alarm() 호출 중...")
+                            
+                            # 진짜 알람 설정 호출
+                            real_alarm_success = app.alarm_manager.schedule_alarm(
+                                class_id, 
+                                class_data_for_alarm, 
+                                notify_before
+                            )
+                            
+                            if real_alarm_success:
+                                print(f"✅ 진짜 AlarmManager 알람 설정 성공: {name}")
+                            else:
+                                print(f"❌ 진짜 AlarmManager 알람 설정 실패: {name}")
+                        else:
+                            print(f"❌ app.alarm_manager가 None")
                     else:
-                        print(f"❌ 백그라운드 서비스 알람 설정 실패: {name}")
+                        print(f"❌ app에 alarm_manager 속성 없음")
+                
+                    # 서비스용 파일 저장 (별개)
+                    file_save_success = app.save_alarm_for_service(class_data_for_alarm, notify_before)
+                    if file_save_success:
+                        print(f"✅ 서비스용 파일 저장 성공: {name}")
+                    else:
+                        print(f"❌ 서비스용 파일 저장 실패: {name}")
+                        
+                    # 정직한 결과 보고
+                    if real_alarm_success:
+                        print(f"🎉 최종 결과: 진짜 알람 설정 완료!")
+                    else:
+                        print(f"💥 최종 결과: 알람 설정 실패! (파일 저장만 됨)")
+                        
                 except Exception as e:
-                    print(f"❌ 백그라운드 서비스 알람 설정 오류: {e}")
+                    print(f"❌ 알람 설정 중 오류: {e}")
                     import traceback
                     traceback.print_exc()
             else:
-                print("💻 PC 환경 - 백그라운드 서비스 알람 스킵")
+                print("💻 PC 환경 - 백그라운드 알람 스킵")
             
             # 시간표 저장 - 수정 중이 아닐 때만 저장
             if not hasattr(self, '_updating_class'):
