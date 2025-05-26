@@ -1578,17 +1578,37 @@ class MainScreen(MDScreen):
                 print(f"웹브라우저 열기 오류: {web_e}")
 
     def load_saved_timetable(self):
-        """저장된 시간표 불러오기"""
-        self.classes_data = self.storage.load_classes()
+        """저장된 시간표 불러오기 - 중복 생성 방지"""
         
-        if not self.classes_data:
+        # 🔥 1단계: 기존 카드들 모두 제거 (중복 방지)
+        if hasattr(self, 'time_grid') and self.time_grid:
+            print("🧹 기존 카드들 정리 중...")
+            # 기존 카드들을 모두 제거
+            for card in self.time_grid.children[:]:  # 복사본으로 순회
+                if hasattr(card, 'class_data'):
+                    self.time_grid.remove_widget(card)
+                    print(f"🗑️ 기존 카드 제거: {card.class_data.get('name', '알 수 없음')}")
+            
+            # 메모리 정리
+            self.classes_data.clear()
+            print("✅ 기존 카드 및 데이터 정리 완료")
+        
+        # 🔥 2단계: 저장된 데이터 로드
+        saved_classes = self.storage.load_classes()
+        
+        if not saved_classes:
             # 저장된 시간표가 없으면 빈 시간표로 시작
-            print("저장된 시간표가 없습니다. 새 시간표를 만드세요.")
+            print("📄 저장된 시간표가 없습니다. 새 시간표를 만드세요.")
             self.add_class_dialog.next_class_id = 1  # ID는 1부터 시작
-        else:
-            # 저장된 시간표 표시
-            max_id = 0
-            for class_id, class_data in self.classes_data.items():
+            return
+        
+        # 🔥 3단계: 저장된 시간표 복원
+        print(f"📚 저장된 과목 {len(saved_classes)}개 불러오는 중...")
+        max_id = 0
+        success_count = 0
+        
+        for class_id, class_data in saved_classes.items():
+            try:
                 # 색상 처리
                 color = class_data['color']
                 if isinstance(color, str) and ',' in color:
@@ -1596,25 +1616,65 @@ class MainScreen(MDScreen):
                 else:
                     color_str = ','.join(map(str, color))
                 
-                # 과목 카드 생성 및 추가
-                try:
-                    self.add_class_to_grid(
-                        class_data['id'], 
-                        class_data['name'], 
-                        class_data['day'], 
-                        class_data['start_time'], 
-                        class_data['end_time'], 
-                        class_data['room'], 
-                        class_data['professor'], 
-                        color_str
-                    )
-                    # 최대 ID 갱신
-                    max_id = max(max_id, int(class_data['id']))
-                except Exception as e:
-                    print(f"과목 카드 생성 오류 ({class_data['name']}): {e}")
+                # 🔥 과목 카드 생성 및 추가 (중복 체크는 add_class_to_grid에서 처리)
+                success = self.add_class_to_grid(
+                    class_data['id'], 
+                    class_data['name'], 
+                    class_data['day'], 
+                    class_data['start_time'], 
+                    class_data['end_time'], 
+                    class_data['room'], 
+                    class_data['professor'], 
+                    color_str
+                )
+                
+                if success:
+                    success_count += 1
+                    # 알람 시간 데이터 복원
+                    if 'notify_before' in class_data:
+                        self.classes_data[class_data['id']]['notify_before'] = class_data['notify_before']
+                    
+                    print(f"✅ 과목 복원: {class_data['name']} (ID: {class_data['id']})")
+                else:
+                    print(f"❌ 과목 복원 실패: {class_data['name']}")
+                
+                # 최대 ID 갱신
+                max_id = max(max_id, int(class_data['id']))
+                
+            except Exception as e:
+                print(f"❌ 과목 카드 생성 오류 ({class_data.get('name', '알 수 없음')}): {e}")
+                import traceback
+                traceback.print_exc()
+        
+        # 🔥 4단계: 다음 ID 설정
+        self.add_class_dialog.next_class_id = max_id + 1
+        
+        print(f"🎉 시간표 불러오기 완료: {success_count}/{len(saved_classes)}개 성공")
+        print(f"🆔 다음 과목 ID: {self.add_class_dialog.next_class_id}")
+
+    def safe_load_timetable(self):
+        """안전한 시간표 로드 - 중복 방지"""
+        try:
+            # time_grid가 준비되었는지 확인
+            if not hasattr(self, 'time_grid') or not self.time_grid:
+                print("⏳ time_grid가 아직 준비되지 않음 - 재시도")
+                Clock.schedule_once(lambda dt: self.safe_load_timetable(), 0.5)
+                return
             
-            # 다음 ID 설정
-            self.add_class_dialog.next_class_id = max_id + 1
+            # 이미 카드가 있으면 중복 로드 방지
+            existing_cards = [child for child in self.time_grid.children if hasattr(child, 'class_data')]
+            if existing_cards:
+                print(f"⚠️ 이미 {len(existing_cards)}개 카드가 있음 - 로드 스킵")
+                return
+            
+            print("🔄 안전한 시간표 로드 시작")
+            self.load_saved_timetable()
+            
+        except Exception as e:
+            print(f"❌ 안전한 시간표 로드 실패: {e}")
+            import traceback
+            traceback.print_exc()
+            
                 
     def setup_layout(self, dt):
         # 🔥 중복 초기화 방지
@@ -1763,9 +1823,12 @@ class MainScreen(MDScreen):
             self.layout_created = True
             print("✅ 레이아웃 설정 완료")
             
-            # 🔥 시간표 로드를 좀 더 늦게 실행
-            Clock.schedule_once(lambda dt: self.load_saved_timetable(), 0.8)
-            
+            # 🔥 시간표 로드를 더 안전하게 실행 (한 번만!)
+            if not hasattr(self, '_timetable_loaded'):  # 중복 로드 방지 플래그
+                Clock.schedule_once(lambda dt: self.safe_load_timetable(), 1.0)  # 1초 후 실행
+                self._timetable_loaded = True
+                print("📅 시간표 로드 예약됨")
+                        
         except Exception as e:
             print(f"레이아웃 설정 오류: {e}")
             import traceback
@@ -1796,22 +1859,25 @@ class MainScreen(MDScreen):
         
         if success:
             print("시간표 저장 완료")
+    
 
     def refresh_ui(self):
-        """UI 새로고침"""
+        """UI 새로고침 - 중복 방지"""
         try:
             print("🔄 UI 새로고침 시작")
             
-            # 🔥 이미 초기화되었으면 다시 초기화하지 않음
+            # 🔥 이미 초기화되었으면 시간표만 안전하게 새로고침
             if self.layout_created and hasattr(self, 'time_grid'):
-                print("✅ 이미 초기화됨 - 시간표만 새로고침")
-                self.load_saved_timetable()
+                print("✅ 이미 초기화됨 - 안전한 시간표 새로고침")
+                # 중복 로드 방지를 위해 safe_load_timetable 사용
+                Clock.schedule_once(lambda dt: self.safe_load_timetable(), 0.1)
                 return
                 
             # 🔥 초기화되지 않았으면 레이아웃부터 다시 생성
             if not self.layout_created:
                 print("🔧 레이아웃 재생성 필요")
                 self.layout_created = False
+                self._timetable_loaded = False  # 로드 플래그도 초기화
                 Clock.schedule_once(self.setup_layout, 0.1)
             
             print("✅ UI 새로고침 완료")
