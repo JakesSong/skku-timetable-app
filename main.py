@@ -2710,18 +2710,16 @@ class MainScreen(MDScreen):
             # 클릭 이벤트 연결
             card.on_release_callback = lambda card: self.edit_class_dialog.show_edit_dialog(card)
             
-             # 🔥 백그라운드 알람 설정 (Android인 경우에만)
+        # 🔥 백그라운드 알람 설정 (Android인 경우에만) - 수정된 부분
             if 'ANDROID_STORAGE' in os.environ:
                 print(f"🔔 백그라운드 알람 설정 시도: {name} - {notify_before}분 전")
                 
-                real_alarm_success = False  # 진짜 알람 성공 플래그
-                
                 try:
                     # App을 통해 alarm_manager 접근
-                    app = self.app  # 🔥 수정: App.get_running_app() → self.app
+                    app = self.app
                     print(f"📱 App 확인: {type(app).__name__}")
                     
-                    # 🔥 누락된 부분: class_data_for_alarm 정의
+                    # class_data_for_alarm 정의
                     class_data_for_alarm = {
                         'id': class_id,
                         'name': name,
@@ -2730,11 +2728,11 @@ class MainScreen(MDScreen):
                         'end_time': end_time,
                         'room': room,
                         'professor': professor,
-                        'color': color,  # 이미 위에서 튜플로 변환됨
+                        'color': color,
                         'notify_before': notify_before
                     }
                     
-                    # 🔥 디버그: 알람 데이터 출력
+                    # 디버그: 알람 데이터 출력
                     print(f"🎯 알람 데이터 확인:")
                     print(f"   - 과목: {class_data_for_alarm['name']}")
                     print(f"   - 요일: {class_data_for_alarm['day']}")
@@ -2742,12 +2740,14 @@ class MainScreen(MDScreen):
                     print(f"   - 강의실: {class_data_for_alarm['room']}")
                     print(f"   - 알람: {class_data_for_alarm['notify_before']}분 전")
                     
+                    real_alarm_success = False  # 진짜 알람 성공 플래그
+                    
                     if hasattr(app, 'alarm_manager'):
                         print(f"🔧 AlarmManager 존재: {app.alarm_manager}")
                         if app.alarm_manager:
                             print(f"🎯 AlarmManager.schedule_alarm() 호출 중...")
                             
-                            # 🔥 디버그: 알람 시간 계산 과정 출력
+                            # 디버그: 알람 시간 계산 과정 출력
                             try:
                                 from datetime import datetime, timedelta
                                 
@@ -2761,7 +2761,7 @@ class MainScreen(MDScreen):
                                 
                                 # 이번 주 해당 요일 계산
                                 days_ahead = target_weekday - now.weekday()
-                                if days_ahead <= 0:  # 이미 지났으면 다음 주
+                                if days_ahead <= 0:
                                     days_ahead += 7
                                     
                                 target_date = now + timedelta(days=days_ahead)
@@ -2786,7 +2786,7 @@ class MainScreen(MDScreen):
                                 # 과거 시간인지 확인
                                 if alarm_time <= now:
                                     print(f"⚠️ 경고: 알람 시간이 과거입니다!")
-                                    alarm_time += timedelta(days=7)  # 다음 주로
+                                    alarm_time += timedelta(days=7)
                                     print(f"🔄 다음 주로 조정: {alarm_time.strftime('%Y-%m-%d %H:%M:%S (%A)')}")
                                 
                             except Exception as time_error:
@@ -2821,21 +2821,21 @@ class MainScreen(MDScreen):
                     if real_alarm_success:
                         print(f"🎉 최종 결과: 진짜 알람 설정 완료!")
                     else:
-                print(f"💥 최종 결과: 알람 설정 실패! (파일 저장만 됨)")
+                        print(f"💥 최종 결과: 알람 설정 실패! (파일 저장만 됨)")
                 
-        except Exception as e:
-            print(f"❌ 알람 설정 중 오류: {e}")
-            import traceback
-            traceback.print_exc()
-    else:
-        print("💻 PC 환경 - 백그라운드 알람 스킵")
-    
-    # 시간표 저장 - 수정 중이 아닐 때만 저장
-    if not hasattr(self, '_updating_class'):
-        self.save_timetable()
-    
-    return True
-                        
+                except Exception as e:
+                    print(f"❌ 알람 설정 중 오류: {e}")
+                    import traceback
+                    traceback.print_exc()
+            else:
+                print("💻 PC 환경 - 백그라운드 알람 스킵")
+        
+            # 시간표 저장 - 수정 중이 아닐 때만 저장
+            if not hasattr(self, '_updating_class'):
+                self.save_timetable()
+        
+            return True
+                            
         except Exception as e:
             print(f"카드 생성 중 오류 발생: {e}")
             import traceback
