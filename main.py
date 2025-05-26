@@ -54,6 +54,7 @@ def setup_korean_font():
 FONT_NAME = setup_korean_font()
 
 from kivymd.app import MDApp
+from kivy.app import App 
 from kivymd.uix.screen import MDScreen
 from kivymd.uix.button import MDFloatingActionButton, MDFlatButton, MDRaisedButton
 from kivymd.uix.boxlayout import MDBoxLayout
@@ -451,7 +452,7 @@ class AddClassDialog:
         )
         
         # 🔥 제목과의 간격을 주는 양수 스페이서 추가 (음수 대신 양수!)
-        positive_spacer = Widget(size_hint_y=None, height=dp(20))  # 🔥 20dp 간격 추가
+        positive_spacer = Widget(size_hint_y=None, height=dp(60))  # 🔥 20dp 간격 추가
         self.content.add_widget(positive_spacer)
         
         
@@ -766,7 +767,7 @@ class AddClassDialog:
         self.dialog.bind(on_open=lambda *args: post_dialog_open(self.dialog))
 
     def setup_keyboard_scroll(self):
-        """키보드 올라올 때 자동 스크롤 설정"""
+        """키보드 올라올 때 자동 스크롤 설정 - 개선된 버전"""
         # 각 텍스트 필드에 포커스 이벤트 바인딩
         fields = [
             self.name_field, 
@@ -775,7 +776,10 @@ class AddClassDialog:
             self.notify_input
         ]
         
-        for field in fields:
+        print(f"🔧 자동 스크롤 설정: {len(fields)}개 필드")
+        
+        for i, field in enumerate(fields):
+            print(f"   {i+1}. {field.hint_text}")
             field.bind(focus=self.on_field_focus)
             # 터치 이벤트도 추가로 바인딩
             field.bind(on_touch_down=lambda instance, touch: self.on_field_touch(instance, touch))
@@ -784,60 +788,130 @@ class AddClassDialog:
         """텍스트 필드에 포커스가 갈 때 호출"""
         if value and self.scroll_view:  # 포커스를 얻었을 때
             print(f"🎯 필드 포커스: {instance.hint_text}")
-            # 키보드가 올라올 시간을 고려해서 0.5초 후 스크롤
-            Clock.schedule_once(lambda dt: self.scroll_to_widget(instance), 0.5)
+            
+            # 🔥 하단 필드들(알람 설정)인 경우 최하단으로 스크롤
+            if hasattr(self, 'notify_input') and instance == self.notify_input:
+                print("🔽 알람 설정 필드 - 최하단으로 스크롤")
+                Clock.schedule_once(lambda dt: self.smart_scroll_to_bottom(), 0.5)
+            else:
+                # 일반 필드는 정확한 위치로 스크롤
+                Clock.schedule_once(lambda dt: self.scroll_to_widget(instance), 0.6)
     
     def on_field_touch(self, instance, touch):
         """텍스트 필드 터치 시 호출"""
         if instance.collide_point(*touch.pos):
             print(f"👆 필드 터치: {instance.hint_text}")
-            # 터치 시에도 스크롤 (포커스보다 빠르게)
-            Clock.schedule_once(lambda dt: self.scroll_to_widget(instance), 0.3)
+            
+            # 🔥 하단 필드들(알람 설정)인 경우 최하단으로 스크롤
+            if hasattr(self, 'notify_input') and instance == self.notify_input:
+                print("🔽 알람 설정 필드 터치 - 최하단으로 스크롤")
+                Clock.schedule_once(lambda dt: self.smart_scroll_to_bottom(), 0.3)
+            else:
+                # 일반 필드는 정확한 위치로 스크롤
+                Clock.schedule_once(lambda dt: self.scroll_to_widget(instance), 0.3)
             return False  # 이벤트 전파 계속
+
     
     def scroll_to_widget(self, widget):
-        """특정 위젯이 보이도록 부드럽게 스크롤"""
+        """특정 위젯이 보이도록 부드럽게 스크롤 - 개선된 버전"""
         if not self.scroll_view or not widget:
             return
             
         try:
-            # 위젯의 전체 높이에서의 상대적 위치 계산
-            widget_bottom = widget.y
-            widget_top = widget.y + widget.height
-            content_height = self.content.height
+            print(f"🎯 스크롤 대상: {widget.hint_text}")
+            
+            # 현재 ScrollView와 Content 정보
             scroll_height = self.scroll_view.height
+            content_height = self.content.height
+            current_scroll = self.scroll_view.scroll_y
             
-            # 키보드 높이를 고려한 가시 영역 계산 (대략 키보드 높이의 60% 정도)
-            keyboard_height = dp(250)  # 일반적인 키보드 높이
-            visible_height = scroll_height - keyboard_height * 0.6
+            print(f"📏 ScrollView 높이: {scroll_height}")
+            print(f"📏 Content 높이: {content_height}")
+            print(f"📏 현재 스크롤: {current_scroll:.2f}")
             
-            # 위젯이 가시 영역에 완전히 들어오도록 스크롤 위치 계산
-            # ScrollView의 scroll_y는 0(하단)에서 1(상단) 범위
-            target_scroll = 1 - (widget_top + dp(50)) / content_height
+            # 위젯의 절대 위치 (content 기준)
+            widget_y_in_content = widget.y
+            widget_height = widget.height
+            widget_top = widget_y_in_content + widget_height
+            widget_bottom = widget_y_in_content
+            
+            print(f"📍 위젯 위치 (content 기준): y={widget_y_in_content}, 높이={widget_height}")
+            print(f"📍 위젯 상단: {widget_top}, 하단: {widget_bottom}")
+            
+            # 키보드 높이 고려 (실제 가시 영역 계산)
+            keyboard_height = dp(280)  # 일반적인 안드로이드 키보드 높이
+            visible_height = scroll_height - keyboard_height * 0.7  # 키보드가 70% 가림
+            
+            print(f"⌨️ 키보드 높이: {keyboard_height}")
+            print(f"👁️ 실제 가시 높이: {visible_height}")
+            
+            # 현재 보이는 영역 계산 (content 좌표계)
+            # scroll_y = 0 (최하단), scroll_y = 1 (최상단)
+            current_view_bottom = (1 - current_scroll) * content_height
+            current_view_top = current_view_bottom + visible_height
+            
+            print(f"👀 현재 보이는 영역: 하단={current_view_bottom:.1f}, 상단={current_view_top:.1f}")
+            
+            # 위젯이 가시 영역에 완전히 들어와야 하는 목표 위치 계산
+            margin = dp(50)  # 위젯 주변 여백
+            
+            # 위젯이 가시 영역 하단에 가려져 있는 경우
+            if widget_bottom < current_view_bottom + margin:
+                # 위젯 하단이 가시 영역 하단 근처에 오도록 스크롤
+                target_view_bottom = widget_bottom - margin
+                target_scroll_y = 1 - (target_view_bottom / content_height)
+                action = "하단 가림 해결"
+                
+            # 위젯이 가시 영역 상단에 가려져 있는 경우  
+            elif widget_top > current_view_top - margin:
+                # 위젯 상단이 가시 영역 상단 근처에 오도록 스크롤
+                target_view_top = widget_top + margin
+                target_view_bottom = target_view_top - visible_height
+                target_scroll_y = 1 - (target_view_bottom / content_height)
+                action = "상단 가림 해결"
+                
+            else:
+                # 위젯이 이미 보이는 상태
+                print("✅ 위젯이 이미 가시 영역에 있음 - 스크롤 불필요")
+                return
             
             # 스크롤 범위 제한 (0~1)
-            target_scroll = max(0, min(1, target_scroll))
+            target_scroll_y = max(0.0, min(1.0, target_scroll_y))
             
-            print(f"📱 스크롤 이동: {self.scroll_view.scroll_y:.2f} → {target_scroll:.2f}")
+            print(f"🎯 {action}: {current_scroll:.2f} → {target_scroll_y:.2f}")
+            
+            # 스크롤 변화량이 너무 작으면 스킵
+            if abs(target_scroll_y - current_scroll) < 0.05:
+                print("📏 스크롤 변화량이 너무 작음 - 스킵")
+                return
             
             # 부드러운 스크롤 애니메이션
             from kivy.animation import Animation
             anim = Animation(
-                scroll_y=target_scroll, 
-                duration=0.3, 
-                transition='out_cubic'
+                scroll_y=target_scroll_y, 
+                duration=0.4,  # 조금 더 느리게
+                transition='out_quart'  # 더 부드러운 전환
             )
             anim.start(self.scroll_view)
             
+            print(f"🚀 스크롤 애니메이션 시작: {target_scroll_y:.2f}")
+            
         except Exception as e:
-            print(f"❌ 스크롤 오류: {e}")
+            print(f"❌ 스크롤 계산 오류: {e}")
+            import traceback
+            traceback.print_exc()
     
-    def smart_scroll_to_bottom(self):
-        """하단 필드 편집 시 자동으로 최하단으로 스크롤"""
+       def smart_scroll_to_bottom(self):
+        """하단 필드 편집 시 자동으로 최하단으로 스크롤 - 개선된 버전"""
         if not self.scroll_view:
+            print("❌ scroll_view가 없음")
             return
             
         try:
+            print(f"🔽 최하단 스크롤 시작")
+            print(f"   현재 scroll_y: {self.scroll_view.scroll_y:.2f}")
+            print(f"   목표 scroll_y: 0.0 (최하단)")
+            
             # 부드럽게 최하단으로 스크롤
             from kivy.animation import Animation
             anim = Animation(
@@ -845,11 +919,20 @@ class AddClassDialog:
                 duration=0.4, 
                 transition='out_cubic'
             )
+            
+            # 애니메이션 완료 시 콜백
+            def on_complete(animation, widget):
+                print(f"✅ 최하단 스크롤 완료: {widget.scroll_y:.2f}")
+            
+            anim.bind(on_complete=on_complete)
             anim.start(self.scroll_view)
-            print("🔽 최하단으로 스크롤")
+            
+            print("🚀 최하단 스크롤 애니메이션 시작")
             
         except Exception as e:
             print(f"❌ 하단 스크롤 오류: {e}")
+            import traceback
+            traceback.print_exc()
     
     def set_day(self, english_day, korean_day):
         """요일 설정"""
@@ -1150,7 +1233,7 @@ class EditClassDialog:
         )
         
         # 🔥 제목과의 간격을 주는 양수 스페이서 추가 (음수 대신 양수!)
-        positive_spacer = Widget(size_hint_y=None, height=dp(20))  # 🔥 20dp 간격 추가
+        positive_spacer = Widget(size_hint_y=None, height=dp(60))  # 🔥 20dp 간격 추가
         self.content.add_widget(positive_spacer)
             
         # 과목명 입력
@@ -1403,7 +1486,7 @@ class EditClassDialog:
         self.dialog.bind(on_open=lambda *args: post_dialog_open(self.dialog))
 
     def setup_keyboard_scroll(self):
-        """키보드 올라올 때 자동 스크롤 설정"""
+        """키보드 올라올 때 자동 스크롤 설정 - 개선된 버전"""
         # 각 텍스트 필드에 포커스 이벤트 바인딩
         fields = [
             self.name_field, 
@@ -1412,7 +1495,10 @@ class EditClassDialog:
             self.notify_input
         ]
         
-        for field in fields:
+        print(f"🔧 자동 스크롤 설정: {len(fields)}개 필드")
+        
+        for i, field in enumerate(fields):
+            print(f"   {i+1}. {field.hint_text}")
             field.bind(focus=self.on_field_focus)
             # 터치 이벤트도 추가로 바인딩
             field.bind(on_touch_down=lambda instance, touch: self.on_field_touch(instance, touch))
@@ -1421,60 +1507,129 @@ class EditClassDialog:
         """텍스트 필드에 포커스가 갈 때 호출"""
         if value and self.scroll_view:  # 포커스를 얻었을 때
             print(f"🎯 필드 포커스: {instance.hint_text}")
-            # 키보드가 올라올 시간을 고려해서 0.5초 후 스크롤
-            Clock.schedule_once(lambda dt: self.scroll_to_widget(instance), 0.5)
+            
+            # 🔥 하단 필드들(알람 설정)인 경우 최하단으로 스크롤
+            if hasattr(self, 'notify_input') and instance == self.notify_input:
+                print("🔽 알람 설정 필드 - 최하단으로 스크롤")
+                Clock.schedule_once(lambda dt: self.smart_scroll_to_bottom(), 0.5)
+            else:
+                # 일반 필드는 정확한 위치로 스크롤
+                Clock.schedule_once(lambda dt: self.scroll_to_widget(instance), 0.6)
     
     def on_field_touch(self, instance, touch):
         """텍스트 필드 터치 시 호출"""
         if instance.collide_point(*touch.pos):
             print(f"👆 필드 터치: {instance.hint_text}")
-            # 터치 시에도 스크롤 (포커스보다 빠르게)
-            Clock.schedule_once(lambda dt: self.scroll_to_widget(instance), 0.3)
+            
+            # 🔥 하단 필드들(알람 설정)인 경우 최하단으로 스크롤
+            if hasattr(self, 'notify_input') and instance == self.notify_input:
+                print("🔽 알람 설정 필드 터치 - 최하단으로 스크롤")
+                Clock.schedule_once(lambda dt: self.smart_scroll_to_bottom(), 0.3)
+            else:
+                # 일반 필드는 정확한 위치로 스크롤
+                Clock.schedule_once(lambda dt: self.scroll_to_widget(instance), 0.3)
             return False  # 이벤트 전파 계속
     
     def scroll_to_widget(self, widget):
-        """특정 위젯이 보이도록 부드럽게 스크롤"""
+        """특정 위젯이 보이도록 부드럽게 스크롤 - 개선된 버전"""
         if not self.scroll_view or not widget:
             return
             
         try:
-            # 위젯의 전체 높이에서의 상대적 위치 계산
-            widget_bottom = widget.y
-            widget_top = widget.y + widget.height
-            content_height = self.content.height
+            print(f"🎯 스크롤 대상: {widget.hint_text}")
+            
+            # 현재 ScrollView와 Content 정보
             scroll_height = self.scroll_view.height
+            content_height = self.content.height
+            current_scroll = self.scroll_view.scroll_y
             
-            # 키보드 높이를 고려한 가시 영역 계산 (대략 키보드 높이의 60% 정도)
-            keyboard_height = dp(250)  # 일반적인 키보드 높이
-            visible_height = scroll_height - keyboard_height * 0.6
+            print(f"📏 ScrollView 높이: {scroll_height}")
+            print(f"📏 Content 높이: {content_height}")
+            print(f"📏 현재 스크롤: {current_scroll:.2f}")
             
-            # 위젯이 가시 영역에 완전히 들어오도록 스크롤 위치 계산
-            # ScrollView의 scroll_y는 0(하단)에서 1(상단) 범위
-            target_scroll = 1 - (widget_top + dp(50)) / content_height
+            # 위젯의 절대 위치 (content 기준)
+            widget_y_in_content = widget.y
+            widget_height = widget.height
+            widget_top = widget_y_in_content + widget_height
+            widget_bottom = widget_y_in_content
+            
+            print(f"📍 위젯 위치 (content 기준): y={widget_y_in_content}, 높이={widget_height}")
+            print(f"📍 위젯 상단: {widget_top}, 하단: {widget_bottom}")
+            
+            # 키보드 높이 고려 (실제 가시 영역 계산)
+            keyboard_height = dp(280)  # 일반적인 안드로이드 키보드 높이
+            visible_height = scroll_height - keyboard_height * 0.7  # 키보드가 70% 가림
+            
+            print(f"⌨️ 키보드 높이: {keyboard_height}")
+            print(f"👁️ 실제 가시 높이: {visible_height}")
+            
+            # 현재 보이는 영역 계산 (content 좌표계)
+            # scroll_y = 0 (최하단), scroll_y = 1 (최상단)
+            current_view_bottom = (1 - current_scroll) * content_height
+            current_view_top = current_view_bottom + visible_height
+            
+            print(f"👀 현재 보이는 영역: 하단={current_view_bottom:.1f}, 상단={current_view_top:.1f}")
+            
+            # 위젯이 가시 영역에 완전히 들어와야 하는 목표 위치 계산
+            margin = dp(50)  # 위젯 주변 여백
+            
+            # 위젯이 가시 영역 하단에 가려져 있는 경우
+            if widget_bottom < current_view_bottom + margin:
+                # 위젯 하단이 가시 영역 하단 근처에 오도록 스크롤
+                target_view_bottom = widget_bottom - margin
+                target_scroll_y = 1 - (target_view_bottom / content_height)
+                action = "하단 가림 해결"
+                
+            # 위젯이 가시 영역 상단에 가려져 있는 경우  
+            elif widget_top > current_view_top - margin:
+                # 위젯 상단이 가시 영역 상단 근처에 오도록 스크롤
+                target_view_top = widget_top + margin
+                target_view_bottom = target_view_top - visible_height
+                target_scroll_y = 1 - (target_view_bottom / content_height)
+                action = "상단 가림 해결"
+                
+            else:
+                # 위젯이 이미 보이는 상태
+                print("✅ 위젯이 이미 가시 영역에 있음 - 스크롤 불필요")
+                return
             
             # 스크롤 범위 제한 (0~1)
-            target_scroll = max(0, min(1, target_scroll))
+            target_scroll_y = max(0.0, min(1.0, target_scroll_y))
             
-            print(f"📱 스크롤 이동: {self.scroll_view.scroll_y:.2f} → {target_scroll:.2f}")
+            print(f"🎯 {action}: {current_scroll:.2f} → {target_scroll_y:.2f}")
+            
+            # 스크롤 변화량이 너무 작으면 스킵
+            if abs(target_scroll_y - current_scroll) < 0.05:
+                print("📏 스크롤 변화량이 너무 작음 - 스킵")
+                return
             
             # 부드러운 스크롤 애니메이션
             from kivy.animation import Animation
             anim = Animation(
-                scroll_y=target_scroll, 
-                duration=0.3, 
-                transition='out_cubic'
+                scroll_y=target_scroll_y, 
+                duration=0.4,  # 조금 더 느리게
+                transition='out_quart'  # 더 부드러운 전환
             )
             anim.start(self.scroll_view)
             
+            print(f"🚀 스크롤 애니메이션 시작: {target_scroll_y:.2f}")
+            
         except Exception as e:
-            print(f"❌ 스크롤 오류: {e}")
+            print(f"❌ 스크롤 계산 오류: {e}")
+            import traceback
+            traceback.print_exc()
     
     def smart_scroll_to_bottom(self):
-        """하단 필드 편집 시 자동으로 최하단으로 스크롤"""
+        """하단 필드 편집 시 자동으로 최하단으로 스크롤 - 개선된 버전"""
         if not self.scroll_view:
+            print("❌ scroll_view가 없음")
             return
             
         try:
+            print(f"🔽 최하단 스크롤 시작")
+            print(f"   현재 scroll_y: {self.scroll_view.scroll_y:.2f}")
+            print(f"   목표 scroll_y: 0.0 (최하단)")
+            
             # 부드럽게 최하단으로 스크롤
             from kivy.animation import Animation
             anim = Animation(
@@ -1482,11 +1637,20 @@ class EditClassDialog:
                 duration=0.4, 
                 transition='out_cubic'
             )
+            
+            # 애니메이션 완료 시 콜백
+            def on_complete(animation, widget):
+                print(f"✅ 최하단 스크롤 완료: {widget.scroll_y:.2f}")
+            
+            anim.bind(on_complete=on_complete)
             anim.start(self.scroll_view)
-            print("🔽 최하단으로 스크롤")
+            
+            print("🚀 최하단 스크롤 애니메이션 시작")
             
         except Exception as e:
             print(f"❌ 하단 스크롤 오류: {e}")
+            import traceback
+            traceback.print_exc()
     
     def populate_fields_with_existing_data(self, class_data):
         """기존 데이터로 필드 채우기"""
@@ -2545,7 +2709,7 @@ class MainScreen(MDScreen):
             # 클릭 이벤트 연결
             card.on_release_callback = lambda card: self.edit_class_dialog.show_edit_dialog(card)
             
-            # 🔥 백그라운드 알람 설정 (Android인 경우에만)
+             # 🔥 백그라운드 알람 설정 (Android인 경우에만)
             if 'ANDROID_STORAGE' in os.environ:
                 print(f"🔔 백그라운드 알람 설정 시도: {name} - {notify_before}분 전")
                 
@@ -2553,13 +2717,81 @@ class MainScreen(MDScreen):
                 
                 try:
                     # App을 통해 alarm_manager 접근
-                    app = App.get_running_app()
+                    app = self.app  # 🔥 수정: App.get_running_app() → self.app
                     print(f"📱 App 확인: {type(app).__name__}")
+                    
+                    # 🔥 누락된 부분: class_data_for_alarm 정의
+                    class_data_for_alarm = {
+                        'id': class_id,
+                        'name': name,
+                        'day': day,
+                        'start_time': start_time,
+                        'end_time': end_time,
+                        'room': room,
+                        'professor': professor,
+                        'color': color,  # 이미 위에서 튜플로 변환됨
+                        'notify_before': notify_before
+                    }
+                    
+                    # 🔥 디버그: 알람 데이터 출력
+                    print(f"🎯 알람 데이터 확인:")
+                    print(f"   - 과목: {class_data_for_alarm['name']}")
+                    print(f"   - 요일: {class_data_for_alarm['day']}")
+                    print(f"   - 시간: {class_data_for_alarm['start_time']}")
+                    print(f"   - 강의실: {class_data_for_alarm['room']}")
+                    print(f"   - 알람: {class_data_for_alarm['notify_before']}분 전")
                     
                     if hasattr(app, 'alarm_manager'):
                         print(f"🔧 AlarmManager 존재: {app.alarm_manager}")
                         if app.alarm_manager:
                             print(f"🎯 AlarmManager.schedule_alarm() 호출 중...")
+                            
+                            # 🔥 디버그: 알람 시간 계산 과정 출력
+                            try:
+                                from datetime import datetime, timedelta
+                                
+                                # 요일 매핑
+                                day_map = {'Monday': 0, 'Tuesday': 1, 'Wednesday': 2, 'Thursday': 3, 'Friday': 4}
+                                target_weekday = day_map.get(day, 0)
+                                
+                                # 현재 시간
+                                now = datetime.now()
+                                print(f"🕐 현재 시간: {now.strftime('%Y-%m-%d %H:%M:%S (%A)')}")
+                                
+                                # 이번 주 해당 요일 계산
+                                days_ahead = target_weekday - now.weekday()
+                                if days_ahead <= 0:  # 이미 지났으면 다음 주
+                                    days_ahead += 7
+                                    
+                                target_date = now + timedelta(days=days_ahead)
+                                print(f"📅 목표 요일: {day} (오늘로부터 {days_ahead}일 후)")
+                                
+                                # 시간 파싱
+                                hour, minute = map(int, start_time.split(':'))
+                                class_datetime = target_date.replace(
+                                    hour=hour, 
+                                    minute=minute, 
+                                    second=0, 
+                                    microsecond=0
+                                )
+                                
+                                # 알람 시간 계산
+                                alarm_time = class_datetime - timedelta(minutes=notify_before)
+                                
+                                print(f"🎓 수업 시간: {class_datetime.strftime('%Y-%m-%d %H:%M:%S (%A)')}")
+                                print(f"⏰ 알람 시간: {alarm_time.strftime('%Y-%m-%d %H:%M:%S (%A)')}")
+                                print(f"⏳ 알람까지: {(alarm_time - now).total_seconds() / 60:.1f}분 후")
+                                
+                                # 과거 시간인지 확인
+                                if alarm_time <= now:
+                                    print(f"⚠️ 경고: 알람 시간이 과거입니다!")
+                                    alarm_time += timedelta(days=7)  # 다음 주로
+                                    print(f"🔄 다음 주로 조정: {alarm_time.strftime('%Y-%m-%d %H:%M:%S (%A)')}")
+                                
+                            except Exception as time_error:
+                                print(f"❌ 시간 계산 오류: {time_error}")
+                                import traceback
+                                traceback.print_exc()
                             
                             # 진짜 알람 설정 호출
                             real_alarm_success = app.alarm_manager.schedule_alarm(
@@ -2588,20 +2820,20 @@ class MainScreen(MDScreen):
                     if real_alarm_success:
                         print(f"🎉 최종 결과: 진짜 알람 설정 완료!")
                     else:
-                        print(f"💥 최종 결과: 알람 설정 실패! (파일 저장만 됨)")
-                        
-                except Exception as e:
-                    print(f"❌ 알람 설정 중 오류: {e}")
-                    import traceback
-                    traceback.print_exc()
-            else:
-                print("💻 PC 환경 - 백그라운드 알람 스킵")
-            
-            # 시간표 저장 - 수정 중이 아닐 때만 저장
-            if not hasattr(self, '_updating_class'):
-                self.save_timetable()
-            
-            return True
+                print(f"💥 최종 결과: 알람 설정 실패! (파일 저장만 됨)")
+                
+        except Exception as e:
+            print(f"❌ 알람 설정 중 오류: {e}")
+            import traceback
+            traceback.print_exc()
+    else:
+        print("💻 PC 환경 - 백그라운드 알람 스킵")
+    
+    # 시간표 저장 - 수정 중이 아닐 때만 저장
+    if not hasattr(self, '_updating_class'):
+        self.save_timetable()
+    
+    return True
                         
         except Exception as e:
             print(f"카드 생성 중 오류 발생: {e}")
