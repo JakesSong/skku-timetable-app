@@ -486,7 +486,7 @@ class AddClassDialog:
             size_hint_y=None,
             height=dp(10),
             spacing=dp(0),
-            padding=(-35, 0, 0, 0),
+            padding=(-40, 0, 0, 0),
             adaptive_width=False
         )
         
@@ -603,7 +603,7 @@ class AddClassDialog:
             from kivymd.uix.card import MDCard
             color_btn = MDCard(
                 size_hint=(None, None),
-                size=(dp(40), dp(26)),  # 작은 크기
+                size=(dp(40), dp(25)),  # 작은 크기
                 md_bg_color=color,
                 radius=[dp(2)],  # 약간의 모서리 둥글기
                 elevation=1 if i == 0 else 0  # 첫 번째 버튼은 선택된 상태로 표시
@@ -1044,7 +1044,7 @@ class EditClassDialog:
             size_hint_y=None,
             height=dp(20),
             spacing=dp(0),
-            padding=(-35, 0, 0, 0),
+            padding=(-40, 0, 0, 0),
             adaptive_width=False
         )
         
@@ -1153,7 +1153,7 @@ class EditClassDialog:
             from kivymd.uix.card import MDCard
             color_btn = MDCard(
                 size_hint=(None, None),
-                size=(dp(40), dp(26)),
+                size=(dp(40), dp(25)),
                 md_bg_color=color,
                 radius=[dp(2)],
                 # 현재 색상과 일치하면 강조 표시
