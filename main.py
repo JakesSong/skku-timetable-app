@@ -1824,14 +1824,14 @@ class MainScreen(MDScreen):
             )
             self.add_widget(self.attendance_button)
 
-            # 기존 버튼들 뒤에 추가
-            self.test_button = MDFloatingActionButton(
-                icon="bell-ring",
-                pos_hint={"right": 0.98, "y": 0.22},  # 다른 버튼들 위에
-                md_bg_color=[1, 0.5, 0, 1],  # 주황색
-                on_release=lambda x: self.test_notification()
-            )
-            self.add_widget(self.test_button)
+            # 테스트 알람 버튼 (주석처리)
+            # self.test_button = MDFloatingActionButton(
+            #     icon="bell-ring",
+            #     pos_hint={"right": 0.98, "y": 0.22},  # 다른 버튼들 위에
+            #     md_bg_color=[1, 0.5, 0, 1],  # 주황색
+            #     on_release=lambda x: self.test_notification()
+            # )
+            # self.add_widget(self.test_button)
 
             # 🔥 초기화 완료 플래그 설정
             self.layout_created = True
