@@ -2286,11 +2286,11 @@ class MainScreen(MDScreen):
             # 클릭 이벤트 연결
             card.on_release_callback = lambda card: self.edit_class_dialog.show_edit_dialog(card)
             
-            # 🔥 알람 설정 (Android인 경우에만) - 수정된 버전
+            # 🔥 백그라운드 서비스용 알람 설정 (Android인 경우에만)
             if 'ANDROID_STORAGE' in os.environ:
                 print(f"🔔 백그라운드 알람 설정 시도: {name} - {notify_before}분 전")
                 
-                # 새로운 통합 시스템 알람 설정 함수 사용
+                # 서비스용 알람 데이터 저장
                 class_data_for_alarm = {
                     'id': class_id,
                     'name': name,
@@ -2301,17 +2301,17 @@ class MainScreen(MDScreen):
                 }
                 
                 try:
-                    success = self.schedule_system_alarm(class_data_for_alarm, notify_before)
+                    success = self.app.save_alarm_for_service(class_data_for_alarm, notify_before)
                     if success:
-                        print(f"✅ 백그라운드 시스템 알람 설정 성공: {name} - {notify_before}분 전")
+                        print(f"✅ 백그라운드 서비스 알람 설정 성공: {name} - {notify_before}분 전")
                     else:
-                        print(f"❌ 백그라운드 시스템 알람 설정 실패: {name}")
+                        print(f"❌ 백그라운드 서비스 알람 설정 실패: {name}")
                 except Exception as e:
-                    print(f"❌ 백그라운드 시스템 알람 설정 오류: {e}")
+                    print(f"❌ 백그라운드 서비스 알람 설정 오류: {e}")
                     import traceback
                     traceback.print_exc()
             else:
-                print("💻 PC 환경 - 백그라운드 시스템 알람 스킵")
+                print("💻 PC 환경 - 백그라운드 서비스 알람 스킵")
             
             # 시간표 저장 - 수정 중이 아닐 때만 저장
             if not hasattr(self, '_updating_class'):
@@ -2663,6 +2663,14 @@ class TimeTableApp(MDApp):
                 except:
                     Logger.error(f"DoubleCheck: 알림 채널 예외 - {e}")
 
+        # Android에서 백그라운드 서비스 시작
+        if 'ANDROID_STORAGE' in os.environ:
+            try:
+                self.start_background_service()
+                print("✅ 백그라운드 알림 서비스 시작됨")
+            except Exception as e:
+                print(f"❌ 백그라운드 서비스 시작 실패: {e}")
+        
         # 🔥 바로 메인 스크린 반환 (로딩 화면 완전 삭제)
         print("🔧 메인 스크린 바로 생성")
         self.main_screen = MainScreen(name="main", app=self)
@@ -2686,6 +2694,105 @@ class TimeTableApp(MDApp):
         """백그라운드로 갈 때 호출"""
         print("📱 앱 일시정지됨")
         return True  # True 반환해야 앱이 종료되지 않음
+
+    def start_background_service(self):
+        """백그라운드 알림 서비스 시작"""
+        try:
+            from jnius import autoclass
+            
+            # 서비스 클래스 가져오기 (buildozer.spec의 package.name + ServiceAlarmService)
+            # 실제 패키지명은 buildozer.spec에 따라 다름
+            service_name = "org.test.timetableapp.ServiceAlarmService"  # 예시 - 실제 패키지명으로 변경 필요
+            service = autoclass(service_name)
+            
+            # 현재 액티비티 가져오기
+            PythonActivity = autoclass('org.kivy.android.PythonActivity')
+            mActivity = PythonActivity.mActivity
+            
+            # 서비스 시작
+            service.start(mActivity, "")
+            print("✅ 백그라운드 알림 서비스 시작")
+            
+            return True
+            
+        except Exception as e:
+            print(f"❌ 서비스 시작 실패: {e}")
+            import traceback
+            traceback.print_exc()
+            return False
+    
+    def save_alarm_for_service(self, class_data, notify_before):
+        """서비스가 읽을 수 있도록 알람 데이터 저장"""
+        try:
+            import pickle
+            from datetime import datetime, timedelta
+            
+            # 알람 시간 계산
+            alarm_time = self.parse_class_time_for_service(class_data) - timedelta(minutes=notify_before)
+            
+            # 알람 데이터 구조
+            alarm_data = {
+                'alarm_time': alarm_time.isoformat(),  # 문자열로 저장
+                'class_name': class_data['name'],
+                'class_room': class_data['room'],
+                'class_time': class_data['start_time'],
+                'class_professor': class_data['professor'],
+                'notify_before': notify_before
+            }
+            
+            # 기존 알람 데이터 로드
+            try:
+                with open(self.alarm_file_path, 'rb') as f:
+                    alarms = pickle.load(f)
+            except:
+                alarms = {}
+            
+            # 새 알람 추가
+            alarms[class_data['id']] = alarm_data
+            
+            # 저장
+            with open(self.alarm_file_path, 'wb') as f:
+                pickle.dump(alarms, f)
+                
+            print(f"✅ 서비스용 알람 데이터 저장: {class_data['name']}")
+            return True
+            
+        except Exception as e:
+            print(f"❌ 서비스용 알람 데이터 저장 실패: {e}")
+            return False
+    
+    def parse_class_time_for_service(self, class_data):
+        """수업 시간을 datetime 객체로 변환 (서비스용)"""
+        day = class_data['day']
+        start_time = class_data['start_time']
+        
+        # 요일 매핑
+        day_map = {'Monday': 0, 'Tuesday': 1, 'Wednesday': 2, 'Thursday': 3, 'Friday': 4}
+        target_weekday = day_map.get(day, 0)
+        
+        # 현재 시간
+        now = datetime.now()
+        
+        # 이번 주 해당 요일 계산
+        days_ahead = target_weekday - now.weekday()
+        if days_ahead <= 0:  # 이미 지났으면 다음 주
+            days_ahead += 7
+            
+        target_date = now + timedelta(days=days_ahead)
+        
+        # 시간 파싱
+        try:
+            hour, minute = map(int, start_time.split(':'))
+            class_datetime = target_date.replace(
+                hour=hour, 
+                minute=minute, 
+                second=0, 
+                microsecond=0
+            )
+            return class_datetime
+        except ValueError:
+            print(f"⚠️ 시간 파싱 실패: {start_time}")
+            return now + timedelta(hours=1)    
     
     def show_alarm_notification(self, class_name, class_room, class_time, class_professor):
         try:
