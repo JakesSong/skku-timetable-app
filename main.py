@@ -484,7 +484,7 @@ class AddClassDialog:
         days_layout = MDBoxLayout(
             orientation='horizontal',
             size_hint_y=None,
-            height=dp(10),
+            height=dp(20),
             spacing=dp(0),
             padding=(-40, 0, 0, 0),
             adaptive_width=False
@@ -505,7 +505,7 @@ class AddClassDialog:
                 font_name=FONT_NAME,
                 on_release=lambda x, d=day, k=day_names[day]: self.set_day(d, k),
                 size_hint_x=None,
-                width=dp(10)
+                width=dp(20)
             )
             days_layout.add_widget(day_btn)
         
@@ -561,8 +561,8 @@ class AddClassDialog:
 
         
         # 시작 시간 필드와 days_layout 사이에 작은 간격 위젯 추가
-        spacer = Widget(size_hint_y=None, height=dp(10))  # 아주 작은 간격
-        self.content.add_widget(spacer)
+        #spacer = Widget(size_hint_y=None, height=dp(10))  # 아주 작은 간격
+        #self.content.add_widget(spacer)
 
         # 색상 선택 라벨
         self.color_label = MDLabel(
