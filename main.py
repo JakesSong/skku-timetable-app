@@ -901,8 +901,8 @@ class AddClassDialog:
             import traceback
             traceback.print_exc()
     
-       def smart_scroll_to_bottom(self):
-        """하단 필드 편집 시 자동으로 최하단으로 스크롤 - 개선된 버전"""
+    def smart_scroll_to_bottom(self):
+        """하단 필드 편집 시 자동으로 최하단으로 스크롤 - 들여쓰기 수정"""
         if not self.scroll_view:
             print("❌ scroll_view가 없음")
             return
@@ -920,7 +920,7 @@ class AddClassDialog:
                 transition='out_cubic'
             )
             
-            # 애니메이션 완료 시 콜백
+            # 애니메이션 완료 시 콜백 - 🔥 들여쓰기 수정!
             def on_complete(animation, widget):
                 print(f"✅ 최하단 스크롤 완료: {widget.scroll_y:.2f}")
             
@@ -933,6 +933,7 @@ class AddClassDialog:
             print(f"❌ 하단 스크롤 오류: {e}")
             import traceback
             traceback.print_exc()
+
     
     def set_day(self, english_day, korean_day):
         """요일 설정"""
