@@ -434,7 +434,7 @@ class AddClassDialog:
         # 🔥 ScrollView로 감싸기 (키보드 가림 방지)
         self.scroll_view = ScrollView(
             size_hint_y=None,
-            height=dp(500),  # 전체 높이를 줄여서 키보드 공간 확보
+            height=dp(550),  # 전체 높이를 줄여서 키보드 공간 확보
             do_scroll_x=False,
             do_scroll_y=True,
             bar_width=dp(4),
@@ -447,12 +447,12 @@ class AddClassDialog:
             orientation="vertical",
             spacing=dp(5),
             size_hint_y=None,
-            height=dp(890),  # 높이를 조금 늘려서 충분한 스크롤 공간 확보
+            height=dp(800),  # 높이를 조금 늘려서 충분한 스크롤 공간 확보
             padding=(dp(20), dp(20), dp(20), dp(15))
         )
         
         # 🔥 제목과의 간격을 주는 양수 스페이서 추가 (음수 대신 양수!)
-        positive_spacer = Widget(size_hint_y=None, height=dp(60))  # 🔥 20dp 간격 추가
+        positive_spacer = Widget(size_hint_y=None, height=dp(100))  # 🔥 20dp 간격 추가
         self.content.add_widget(positive_spacer)
         
         
@@ -1216,7 +1216,7 @@ class EditClassDialog:
         # 🔥 ScrollView로 감싸기 (키보드 가림 방지)
         self.scroll_view = ScrollView(
             size_hint_y=None,
-            height=dp(500),  # 전체 높이를 줄여서 키보드 공간 확보
+            height=dp(550),  # 전체 높이를 줄여서 키보드 공간 확보
             do_scroll_x=False,
             do_scroll_y=True,
             bar_width=dp(4),
@@ -1229,12 +1229,12 @@ class EditClassDialog:
             orientation="vertical",
             spacing=dp(5),
             size_hint_y=None,
-            height=dp(890),  # 높이를 조금 늘려서 충분한 스크롤 공간 확보
+            height=dp(800),  # 높이를 조금 늘려서 충분한 스크롤 공간 확보
             padding=(dp(20), dp(20), dp(20), dp(15))
         )
         
         # 🔥 제목과의 간격을 주는 양수 스페이서 추가 (음수 대신 양수!)
-        positive_spacer = Widget(size_hint_y=None, height=dp(60))  # 🔥 20dp 간격 추가
+        positive_spacer = Widget(size_hint_y=None, height=dp(100))  # 🔥 20dp 간격 추가
         self.content.add_widget(positive_spacer)
             
         # 과목명 입력
@@ -1833,25 +1833,33 @@ class MainScreen(MDScreen):
         self.classes_data = {}
         self.storage = TimeTableStorage()
         self.subtitle_text = "2025년 1학기 소재부품융합공학과"
-
-        # 🔥 AlarmManager 초기화 추가!
+    
+        # 🔥 AlarmManager 초기화 - 안전한 버전 (app에도 설정)
+        self.alarm_manager = None
         if 'ANDROID_STORAGE' in os.environ:
             try:
                 from alarm_manager import AlarmManager
                 self.alarm_manager = AlarmManager(app)
+                # 🔥 중요: app 객체에도 alarm_manager 속성 추가!
+                self.app.alarm_manager = self.alarm_manager
                 print("✅ Android 알람 매니저 초기화 완료")
+            except ImportError:
+                print("⚠️ alarm_manager 모듈을 찾을 수 없습니다.")
+                self.alarm_manager = None
+                self.app.alarm_manager = None  # 🔥 app에도 None 설정
             except Exception as e:
                 print(f"❌ 알람 매니저 초기화 실패: {e}")
                 self.alarm_manager = None
+                self.app.alarm_manager = None  # 🔥 app에도 None 설정
         else:
-            self.alarm_manager = None
             print("💻 PC 환경 - 알람 매니저 비활성화")
+            self.app.alarm_manager = None  # 🔥 PC에서도 app에 설정
         
-        # 🔥 초기화 상태 플래그 추가
+        # 초기화 상태 플래그
         self.is_initialized = False
         self.layout_created = False
         
-        # 🔥 즉시 레이아웃 설정 시도 (Window가 준비되었을 때)
+        # 즉시 레이아웃 설정 시도
         Clock.schedule_once(self.setup_layout, 0)
 
     def show_subtitle_edit_dialog(self, instance):
@@ -2710,7 +2718,7 @@ class MainScreen(MDScreen):
             # 클릭 이벤트 연결
             card.on_release_callback = lambda card: self.edit_class_dialog.show_edit_dialog(card)
             
-        # 🔥 백그라운드 알람 설정 (Android인 경우에만) - 수정된 부분
+             # 🔥 백그라운드 알람 설정 (Android인 경우에만) - 상세 디버깅 포함
             if 'ANDROID_STORAGE' in os.environ:
                 print(f"🔔 백그라운드 알람 설정 시도: {name} - {notify_before}분 전")
                 
@@ -2742,74 +2750,81 @@ class MainScreen(MDScreen):
                     
                     real_alarm_success = False  # 진짜 알람 성공 플래그
                     
-                    if hasattr(app, 'alarm_manager'):
+                    if hasattr(app, 'alarm_manager') and getattr(app, 'alarm_manager', None) is not None:
                         print(f"🔧 AlarmManager 존재: {app.alarm_manager}")
-                        if app.alarm_manager:
-                            print(f"🎯 AlarmManager.schedule_alarm() 호출 중...")
+                        print(f"🎯 AlarmManager.schedule_alarm() 호출 중...")
+                        
+                        # 🔥 상세한 시간 계산 과정 디버깅 추가
+                        try:
+                            from datetime import datetime, timedelta
                             
-                            # 디버그: 알람 시간 계산 과정 출력
-                            try:
-                                from datetime import datetime, timedelta
-                                
-                                # 요일 매핑
-                                day_map = {'Monday': 0, 'Tuesday': 1, 'Wednesday': 2, 'Thursday': 3, 'Friday': 4}
-                                target_weekday = day_map.get(day, 0)
-                                
-                                # 현재 시간
-                                now = datetime.now()
-                                print(f"🕐 현재 시간: {now.strftime('%Y-%m-%d %H:%M:%S (%A)')}")
-                                
-                                # 이번 주 해당 요일 계산
-                                days_ahead = target_weekday - now.weekday()
-                                if days_ahead <= 0:
-                                    days_ahead += 7
-                                    
-                                target_date = now + timedelta(days=days_ahead)
-                                print(f"📅 목표 요일: {day} (오늘로부터 {days_ahead}일 후)")
-                                
-                                # 시간 파싱
-                                hour, minute = map(int, start_time.split(':'))
-                                class_datetime = target_date.replace(
-                                    hour=hour, 
-                                    minute=minute, 
-                                    second=0, 
-                                    microsecond=0
-                                )
-                                
-                                # 알람 시간 계산
-                                alarm_time = class_datetime - timedelta(minutes=notify_before)
-                                
-                                print(f"🎓 수업 시간: {class_datetime.strftime('%Y-%m-%d %H:%M:%S (%A)')}")
-                                print(f"⏰ 알람 시간: {alarm_time.strftime('%Y-%m-%d %H:%M:%S (%A)')}")
-                                print(f"⏳ 알람까지: {(alarm_time - now).total_seconds() / 60:.1f}분 후")
-                                
-                                # 과거 시간인지 확인
-                                if alarm_time <= now:
-                                    print(f"⚠️ 경고: 알람 시간이 과거입니다!")
-                                    alarm_time += timedelta(days=7)
-                                    print(f"🔄 다음 주로 조정: {alarm_time.strftime('%Y-%m-%d %H:%M:%S (%A)')}")
-                                
-                            except Exception as time_error:
-                                print(f"❌ 시간 계산 오류: {time_error}")
-                                import traceback
-                                traceback.print_exc()
+                            # 요일 매핑
+                            day_map = {'Monday': 0, 'Tuesday': 1, 'Wednesday': 2, 'Thursday': 3, 'Friday': 4}
+                            target_weekday = day_map.get(day, 0)
                             
-                            # 진짜 알람 설정 호출
-                            real_alarm_success = app.alarm_manager.schedule_alarm(
-                                class_id, 
-                                class_data_for_alarm, 
-                                notify_before
+                            # 현재 시간
+                            now = datetime.now()
+                            print(f"🕐 현재 시간: {now.strftime('%Y-%m-%d %H:%M:%S')}")
+                            
+                            # 이번 주 해당 요일 계산
+                            days_ahead = target_weekday - now.weekday()
+                            if days_ahead <= 0:
+                                days_ahead += 7
+                                
+                            target_date = now + timedelta(days=days_ahead)
+                            print(f"📅 목표 요일: {day} (오늘로부터 {days_ahead}일 후)")
+                            
+                            # 시간 파싱
+                            hour, minute = map(int, start_time.split(':'))
+                            class_datetime = target_date.replace(
+                                hour=hour, 
+                                minute=minute, 
+                                second=0, 
+                                microsecond=0
                             )
                             
-                            if real_alarm_success:
-                                print(f"✅ 진짜 AlarmManager 알람 설정 성공: {name}")
-                            else:
-                                print(f"❌ 진짜 AlarmManager 알람 설정 실패: {name}")
+                            print(f"📅 다음 수업 시간: {class_datetime.strftime('%Y-%m-%d %H:%M:%S')}")
+                            
+                            # 알람 시간 계산
+                            alarm_time = class_datetime - timedelta(minutes=notify_before)
+                            print(f"⏰ 알람 시간: {alarm_time.strftime('%Y-%m-%d %H:%M:%S')}")
+                            print(f"⏳ 알람까지: {(alarm_time - now).total_seconds() / 60:.1f}분 후")
+                            
+                            # 과거 시간인지 확인
+                            if alarm_time <= now:
+                                print(f"⚠️ 경고: 알람 시간이 과거입니다!")
+                                alarm_time += timedelta(days=7)
+                                print(f"🔄 다음 주로 조정: {alarm_time.strftime('%Y-%m-%d %H:%M:%S')}")
+                            
+                        except Exception as time_error:
+                            print(f"❌ 시간 계산 오류: {time_error}")
+                            import traceback
+                            traceback.print_exc()
+                        
+                        # 진짜 알람 설정 호출
+                        real_alarm_success = app.alarm_manager.schedule_alarm(
+                            class_id, 
+                            class_data_for_alarm, 
+                            notify_before
+                        )
+                        
+                        if real_alarm_success:
+                            print(f"✅ 진짜 AlarmManager 알람 설정 성공: {name}")
                         else:
-                            print(f"❌ app.alarm_manager가 None")
+                            print(f"❌ 진짜 AlarmManager 알람 설정 실패: {name}")
                     else:
-                        print(f"❌ app에 alarm_manager 속성 없음")
-                
+                        print(f"❌ app.alarm_manager가 존재하지 않거나 None입니다.")
+                        # 시스템 알람 직접 호출 시도
+                        try:
+                            system_alarm_success = self.schedule_system_alarm(class_data_for_alarm, notify_before)
+                            if system_alarm_success:
+                                print(f"✅ 시스템 알람 직접 설정 성공: {name}")
+                                real_alarm_success = True
+                            else:
+                                print(f"❌ 시스템 알람 직접 설정 실패: {name}")
+                        except Exception as sys_e:
+                            print(f"❌ 시스템 알람 직접 설정 오류: {sys_e}")
+            
                     # 서비스용 파일 저장 (별개)
                     file_save_success = app.save_alarm_for_service(class_data_for_alarm, notify_before)
                     if file_save_success:
