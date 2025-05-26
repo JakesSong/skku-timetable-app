@@ -1249,7 +1249,7 @@ class EditClassDialog:
         self.apply_fonts_to_dialog(self.dialog)
 
     def update_class(self, *args):
-        """과목 정보 업데이트"""
+        """과목 정보 업데이트 - 중복 생성 방지 + 알람 시간 반영"""
         if not self.editing_card:
             return
             
@@ -1283,46 +1283,69 @@ class EditClassDialog:
         # 기존 카드의 클래스 ID 가져오기
         class_id = self.editing_card.class_data['id']
         
-        # 색상 정보 준비
+        # 1단계: 메모리에서 기존 데이터 삭제
+        if class_id in self.screen.classes_data:
+            del self.screen.classes_data[class_id]
+            print(f"✅ 메모리에서 기존 데이터 삭제: {class_id}")
+        
+        # 2단계: 화면에서 기존 카드 제거
+        try:
+            self.screen.time_grid.remove_widget(self.editing_card)
+            print(f"✅ 화면에서 기존 카드 제거: {class_id}")
+        except Exception as e:
+            print(f"⚠️ 카드 제거 실패: {e}")
+        
+        # 3단계: 기존 알람 취소
+        if hasattr(self.screen, 'cancel_system_alarm'):
+            try:
+                self.screen.cancel_system_alarm(class_id)
+                print(f"✅ 기존 알람 취소: {class_id}")
+            except Exception as e:
+                print(f"⚠️ 알람 취소 실패: {e}")
+        
+        # 4단계: 색상 정보 준비
         color_str = f"{self.selected_color[0]},{self.selected_color[1]},{self.selected_color[2]},{self.selected_color[3]}"
         
-        # 알림 시간 가져오기
+        # 5단계: 알림 시간 가져오기
         notify_before = int(self.notify_input.text) if self.notify_input.text.strip() else 5
         
-        # 기존 카드 제거
-        self.screen.time_grid.remove_widget(self.editing_card)
-        
-        # 스토리지에서 해당 클래스 정보 삭제
-        if class_id in self.screen.classes_data:
-            # 기존 알람 취소 (Android 환경인 경우)
-            if 'ANDROID_STORAGE' in os.environ and hasattr(self.screen, 'alarm_manager'):
-                self.screen.alarm_manager.cancel_alarm(class_id)
-            
-            del self.screen.classes_data[class_id]
-        
-        # 카드 다시 추가 (업데이트된 정보로)
-        self.screen.add_class_to_grid(
+        # 6단계: 새로운 카드 생성 (동일한 ID로)
+        success = self.screen.add_class_to_grid(
             class_id, name, day, start_time, end_time, room, professor, color_str
         )
         
-        # 알림 설정 업데이트 (데이터만 저장)
-        if class_id in self.screen.classes_data:
-            self.screen.classes_data[class_id]['notify_before'] = notify_before
+        if success:
+            # 7단계: 알림 설정 업데이트
+            if class_id in self.screen.classes_data:
+                self.screen.classes_data[class_id]['notify_before'] = notify_before
+                
+                # 새로운 시스템 알람 설정 (수정된 시간으로)
+                class_data = {
+                    'id': class_id,
+                    'name': name,
+                    'day': day,
+                    'start_time': start_time,
+                    'room': room,
+                    'professor': professor
+                }
+                
+                # 수정된 알람 시간으로 다시 설정
+                if hasattr(self.screen, 'schedule_system_alarm'):
+                    try:
+                        alarm_success = self.screen.schedule_system_alarm(class_data, notify_before)
+                        if alarm_success:
+                            print(f"✅ 알람 재설정 완료: {notify_before}분 전")
+                        else:
+                            print(f"⚠️ 알람 재설정 실패")
+                    except Exception as e:
+                        print(f"❌ 알람 재설정 오류: {e}")
             
-            # 알람 관리자에 알람 갱신 (있을 경우)
-            if hasattr(self.screen, 'alarm_manager') and self.screen.alarm_manager is not None:
-                try:
-                    self.screen.alarm_manager.schedule_class_alarm(
-                        class_id, name, day, start_time, room, professor, notify_before
-                    )
-                except Exception as e:
-                    print(f"알람 설정 오류: {e}")
-        
-        # 시간표 저장
-        self.screen.save_timetable()
-        
-        # 대화상자 닫기
-        self.dialog.dismiss()
+            print(f"✅ 과목 수정 완료: {name} (ID: {class_id}, 알람: {notify_before}분 전)")
+            
+            # 대화상자 닫기
+            self.dialog.dismiss()
+        else:
+            print(f"❌ 과목 수정 실패: {name}")
         
     def delete_class(self, *args):
         """과목 삭제"""
@@ -1859,7 +1882,186 @@ class MainScreen(MDScreen):
         
         if success:
             print("시간표 저장 완료")
+
+    def cancel_system_alarm(self, class_id):
+        """시스템 알람 취소 - 백그라운드 알람 포함"""
+        try:
+            if platform != 'android':
+                return False
+                
+            from jnius import autoclass
+            
+            AlarmManager = autoclass('android.app.AlarmManager')
+            Intent = autoclass('android.content.Intent')
+            PendingIntent = autoclass('android.app.PendingIntent')
+            Context = autoclass('android.content.Context')
+            PythonActivity = autoclass('org.kivy.android.PythonActivity')
+            ComponentName = autoclass('android.content.ComponentName')
+            
+            context = PythonActivity.mActivity
+            alarm_manager = context.getSystemService(Context.ALARM_SERVICE)
+            
+            # 동일한 Intent 생성 (설정할 때와 정확히 동일해야 함)
+            intent = Intent()
+            intent.setComponent(ComponentName(
+                "org.kivy.android",
+                "org.kivy.android.AlarmReceiver"
+            ))
+            
+            flags = PendingIntent.FLAG_UPDATE_CURRENT
+            if hasattr(PendingIntent, 'FLAG_IMMUTABLE'):
+                flags |= PendingIntent.FLAG_IMMUTABLE
+                
+            pending_intent = PendingIntent.getBroadcast(
+                context, class_id, intent, flags
+            )
+            
+            # 시스템 알람 취소
+            alarm_manager.cancel(pending_intent)
+            print(f"✅ 백그라운드 시스템 알람 취소됨: ID {class_id}")
+            return True
+            
+        except Exception as e:
+            print(f"❌ 시스템 알람 취소 실패: {e}")
+            return False
     
+    def schedule_system_alarm(self, class_data, minutes_before=5):
+        """통합 시스템 알람 설정 - 수정 반영 + 백그라운드 작동"""
+        try:
+            if platform != 'android':
+                print("Android에서만 사용 가능")
+                return False
+                
+            from jnius import autoclass
+            from datetime import datetime, timedelta
+            import time
+            
+            # Android 클래스들
+            AlarmManager = autoclass('android.app.AlarmManager')
+            Intent = autoclass('android.content.Intent')
+            PendingIntent = autoclass('android.app.PendingIntent')
+            Context = autoclass('android.content.Context')
+            PythonActivity = autoclass('org.kivy.android.PythonActivity')
+            ComponentName = autoclass('android.content.ComponentName')
+            
+            context = PythonActivity.mActivity
+            alarm_manager = context.getSystemService(Context.ALARM_SERVICE)
+            
+            # Android 12+ 권한 확인
+            if hasattr(alarm_manager, 'canScheduleExactAlarms'):
+                if not alarm_manager.canScheduleExactAlarms():
+                    print("⚠️ 정확한 알람 권한 필요")
+                    self.request_alarm_permission()
+                    return False
+            
+            # 1단계: 기존 알람 먼저 취소 (중복 방지)
+            self.cancel_system_alarm(class_data['id'])
+            
+            # 2단계: 알람 시간 계산
+            class_time = self.parse_class_time(class_data)
+            alarm_time = class_time - timedelta(minutes=minutes_before)
+            
+            # 과거 시간이면 다음 주로
+            if alarm_time <= datetime.now():
+                alarm_time += timedelta(days=7)
+                
+            alarm_millis = int(alarm_time.timestamp() * 1000)
+            
+            # 3단계: 기존 AlarmReceiver로 Intent 전송
+            intent = Intent()
+            intent.setComponent(ComponentName(
+                "org.kivy.android",
+                "org.kivy.android.AlarmReceiver"
+            ))
+            
+            # 4단계: 수업 정보 전달
+            intent.putExtra("class_name", class_data['name'])
+            intent.putExtra("class_room", class_data['room'])
+            intent.putExtra("class_time", class_data['start_time'])
+            intent.putExtra("class_professor", class_data.get('professor', ''))
+            
+            # 5단계: PendingIntent 생성
+            flags = PendingIntent.FLAG_UPDATE_CURRENT
+            if hasattr(PendingIntent, 'FLAG_IMMUTABLE'):
+                flags |= PendingIntent.FLAG_IMMUTABLE
+                
+            pending_intent = PendingIntent.getBroadcast(
+                context, 
+                class_data['id'],
+                intent, 
+                flags
+            )
+            
+            # 6단계: 시스템 알람 설정
+            alarm_manager.setExactAndAllowWhileIdle(
+                AlarmManager.RTC_WAKEUP, 
+                alarm_millis, 
+                pending_intent
+            )
+            
+            print(f"✅ 통합 시스템 알람 설정 완료!")
+            print(f"📚 과목: {class_data['name']}")
+            print(f"⏰ 알람: {minutes_before}분 전 ({alarm_time.strftime('%Y-%m-%d %H:%M')})")
+            print(f"📱 앱이 꺼져도 시스템이 알람을 울려줍니다!")
+            
+            return True
+            
+        except Exception as e:
+            print(f"❌ 통합 시스템 알람 설정 실패: {e}")
+            import traceback
+            traceback.print_exc()
+            return False
+    
+    def parse_class_time(self, class_data):
+        """수업 시간을 datetime 객체로 변환"""
+        day = class_data['day']
+        start_time = class_data['start_time']
+        
+        # 요일 매핑
+        day_map = {'Monday': 0, 'Tuesday': 1, 'Wednesday': 2, 'Thursday': 3, 'Friday': 4}
+        target_weekday = day_map.get(day, 0)
+        
+        # 현재 시간
+        now = datetime.now()
+        
+        # 이번 주 해당 요일 계산
+        days_ahead = target_weekday - now.weekday()
+        if days_ahead <= 0:  # 이미 지났으면 다음 주
+            days_ahead += 7
+            
+        target_date = now + timedelta(days=days_ahead)
+        
+        # 시간 파싱
+        try:
+            hour, minute = map(int, start_time.split(':'))
+            class_datetime = target_date.replace(
+                hour=hour, 
+                minute=minute, 
+                second=0, 
+                microsecond=0
+            )
+            return class_datetime
+        except ValueError:
+            print(f"⚠️ 시간 파싱 실패: {start_time}")
+            return now + timedelta(hours=1)
+    
+    def request_alarm_permission(self):
+        """알람 권한 요청 (Android 12+)"""
+        try:
+            from jnius import autoclass
+            
+            Intent = autoclass('android.content.Intent')
+            Settings = autoclass('android.provider.Settings')
+            PythonActivity = autoclass('org.kivy.android.PythonActivity')
+            
+            # 알람 권한 설정 페이지로 이동
+            intent = Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM)
+            PythonActivity.mActivity.startActivity(intent)
+            
+            print("알람 권한을 허용해주세요!")
+            
+        except Exception as e:
+            print(f"권한 요청 실패: {e}")    
 
     def refresh_ui(self):
         """UI 새로고침 - 중복 방지"""
@@ -1977,7 +2179,14 @@ class MainScreen(MDScreen):
         self.add_class_dialog.dialog.dismiss()
         
     def add_class_to_grid(self, class_id, name, day, start_time, end_time, room, professor, color_str):
-        
+
+           # 🔥 맨 앞에 추가: 중복 확인
+        for existing_card in self.time_grid.children[:]:
+            if hasattr(existing_card, 'class_data') and existing_card.class_data.get('id') == class_id:
+                print(f"🔄 기존 카드 발견 - 제거 중: {class_id}")
+                self.time_grid.remove_widget(existing_card)
+                break
+                
         # 시간 문자열을 숫자로 변환
         start_time_float = parse_time_string(start_time)
         end_time_float = parse_time_string(end_time)
@@ -2091,32 +2300,52 @@ class MainScreen(MDScreen):
             self.save_timetable()
                         
             # 🔥 알람 설정 (Android인 경우에만) - 수정된 버전
-            if 'ANDROID_STORAGE' in os.environ and hasattr(self, 'alarm_manager') and self.alarm_manager is not None:
+            if 'ANDROID_STORAGE' in os.environ:
                 # 알람 시간 가져오기
                 minutes_before = 5  # 기본값
                 
-                # AddClassDialog에서 설정한 알람 시간 가져오기
-                if hasattr(self.add_class_dialog, 'notify_input') and self.add_class_dialog.notify_input.text.strip():
+                # 저장된 데이터에서 알람 시간 확인
+                if class_id in self.classes_data and 'notify_before' in self.classes_data[class_id]:
+                    minutes_before = self.classes_data[class_id]['notify_before']
+                    print(f"🔔 저장된 알람 시간 사용: {minutes_before}분")
+                # AddClassDialog에서 설정한 알람 시간 확인
+                elif hasattr(self.add_class_dialog, 'notify_input') and self.add_class_dialog.notify_input.text.strip():
                     try:
                         minutes_before = int(self.add_class_dialog.notify_input.text.strip())
+                        print(f"🔔 새로 설정된 알람 시간: {minutes_before}분")
                     except:
                         minutes_before = 5
                 
-                print(f"🔔 알람 설정 시도: {name} - {minutes_before}분 전")
+                print(f"🔔 백그라운드 알람 설정 시도: {name} - {minutes_before}분 전")
                 
-                # 알람 예약
+                # 새로운 통합 시스템 알람 설정 함수 사용
+                class_data_for_alarm = {
+                    'id': class_id,
+                    'name': name,
+                    'day': day,
+                    'start_time': start_time,
+                    'room': room,
+                    'professor': professor
+                }
+                
                 try:
-                    success = self.alarm_manager.schedule_alarm(class_id, card.class_data, minutes_before)
+                    success = self.schedule_system_alarm(class_data_for_alarm, minutes_before)
                     if success:
-                        print(f"✅ 알람 예약 성공: {name}")
+                        print(f"✅ 백그라운드 시스템 알람 설정 성공: {name} - {minutes_before}분 전")
+                        # notify_before 데이터 저장
+                        self.classes_data[class_id]['notify_before'] = minutes_before
                     else:
-                        print(f"❌ 알람 예약 실패: {name}")
+                        print(f"❌ 백그라운드 시스템 알람 설정 실패: {name}")
                 except Exception as e:
-                    print(f"❌ 알람 스케줄링 오류: {e}")
+                    print(f"❌ 백그라운드 시스템 알람 설정 오류: {e}")
                     import traceback
                     traceback.print_exc()
             else:
-                print("💻 PC 환경 또는 알람 매니저 없음 - 알람 스킵")
+                print("💻 PC 환경 - 백그라운드 시스템 알람 스킵")
+            
+            # 시간표 저장 - 수정 중이 아닐 때만 저장
+            if not hasattr(self, '_updating_class'):
+                self.save_timetable()
             
             return True
                         
