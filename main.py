@@ -446,13 +446,14 @@ class AddClassDialog:
             orientation="vertical",
             spacing=dp(5),
             size_hint_y=None,
-            height=dp(800),  # 높이를 조금 늘려서 충분한 스크롤 공간 확보
-            padding=(dp(20), dp(10), dp(20), dp(15))
+            height=dp(890),  # 높이를 조금 늘려서 충분한 스크롤 공간 확보
+            padding=(dp(20), dp(20), dp(20), dp(15))
         )
-    
-        # 🔥 제목과의 간격을 줄이는 음수 스페이서 추가
-        #negative_spacer = Widget(size_hint_y=None, height=dp(-20))
-        #self.content.add_widget(negative_spacer)
+        
+        # 🔥 제목과의 간격을 주는 양수 스페이서 추가 (음수 대신 양수!)
+        positive_spacer = Widget(size_hint_y=None, height=dp(20))  # 🔥 20dp 간격 추가
+        self.content.add_widget(positive_spacer)
+        
         
         # MDTextField의 폰트 속성을 직접 설정하기 위한 함수
         def set_font_for_textfield(textfield):
@@ -576,8 +577,8 @@ class AddClassDialog:
     
         
         # 시작 시간 필드와 days_layout 사이에 작은 간격 위젯 추가
-        #spacer = Widget(size_hint_y=None, height=dp(10))  # 아주 작은 간격
-        #self.content.add_widget(spacer)
+        spacer = Widget(size_hint_y=None, height=dp(10))  # 아주 작은 간격
+        self.content.add_widget(spacer)
     
         # 색상 선택 라벨
         self.color_label = MDLabel(
@@ -1144,14 +1145,14 @@ class EditClassDialog:
             orientation="vertical",
             spacing=dp(5),
             size_hint_y=None,
-            height=dp(800),  # 높이를 조금 늘려서 충분한 스크롤 공간 확보
-            padding=(dp(20), dp(10), dp(20), dp(15))
+            height=dp(890),  # 높이를 조금 늘려서 충분한 스크롤 공간 확보
+            padding=(dp(20), dp(20), dp(20), dp(15))
         )
-    
-        # 제목과의 간격을 줄이는 음수 스페이서 추가
-        #negative_spacer = Widget(size_hint_y=None, height=dp(-20))
-        #self.content.add_widget(negative_spacer)
         
+        # 🔥 제목과의 간격을 주는 양수 스페이서 추가 (음수 대신 양수!)
+        positive_spacer = Widget(size_hint_y=None, height=dp(20))  # 🔥 20dp 간격 추가
+        self.content.add_widget(positive_spacer)
+            
         # 과목명 입력
         self.name_field = MDTextField(
             hint_text="Class Name",
