@@ -603,7 +603,7 @@ class AddClassDialog:
             from kivymd.uix.card import MDCard
             color_btn = MDCard(
                 size_hint=(None, None),
-                size=(dp(35), dp(25)),  # 작은 크기
+                size=(dp(41), dp(35)),  # 작은 크기
                 md_bg_color=color,
                 radius=[dp(2)],  # 약간의 모서리 둥글기
                 elevation=1 if i == 0 else 0  # 첫 번째 버튼은 선택된 상태로 표시
@@ -993,11 +993,36 @@ class EditClassDialog:
                 textfield._line_lbl.font_name = FONT_NAME
         except Exception as e:
             print(f"텍스트 필드 폰트 설정 오류: {e}")
-    
+        
     def show_edit_dialog(self, card):
-        """과목 수정 대화상자 표시"""
-        self.editing_card = card  # 편집할 카드 참조 저장
-        class_data = card.class_data
+        """과목 수정 대화상자 표시 - AddClassDialog와 동일한 패턴"""
+        self.editing_card = card
+        
+        # 기존 다이얼로그가 있으면 닫기
+        if self.dialog:
+            self.dialog.dismiss()
+            self.dialog = None
+        
+        # 새 다이얼로그 생성
+        self.create_edit_dialog()
+        
+        # 기존 데이터로 필드 채우기
+        self.populate_fields_with_existing_data(card.class_data)
+        
+        # 다이얼로그 열기
+        self.dialog.open()
+        
+    def create_edit_dialog(self):
+        """수정 다이얼로그 생성 - AddClassDialog.create_dialog()와 유사한 구조"""
+        # 🔥 ScrollView로 감싸기
+        scroll_view = ScrollView(
+            size_hint_y=None,
+            height=dp(500),  # 전체 높이를 줄임
+            do_scroll_x=False,
+            do_scroll_y=True,
+            bar_width=dp(4),
+            scroll_type=['bars', 'content']
+        )
         
         # 대화상자 내용 레이아웃
         self.content = MDBoxLayout(
@@ -1008,7 +1033,7 @@ class EditClassDialog:
             padding=(dp(20), dp(10), dp(20), dp(15))
         )
     
-        # 🔥 제목과의 간격을 줄이는 음수 스페이서 추가
+        # 제목과의 간격을 줄이는 음수 스페이서 추가
         negative_spacer = Widget(size_hint_y=None, height=dp(-20))
         self.content.add_widget(negative_spacer)
         
@@ -1018,8 +1043,7 @@ class EditClassDialog:
             helper_text="Ex: Physics1",
             helper_text_mode="on_focus",
             height=dp(20),
-            font_name=FONT_NAME,
-            text=class_data['name']
+            font_name=FONT_NAME
         )
         self.set_font_for_textfield(self.name_field)
         self.content.add_widget(self.name_field)
@@ -1030,15 +1054,13 @@ class EditClassDialog:
             helper_text_mode="on_focus",
             font_name=FONT_NAME,
             height=dp(20),
-            readonly=True,
-            text=korean_day_map.get(class_data['day'], "월")
+            readonly=True
         )
-        self.current_day = class_data['day']
         self.day_field.font_size = "15.5sp" 
         self.set_font_for_textfield(self.day_field)
         self.content.add_widget(self.day_field)
         
-        # 요일 버튼 레이아웃 추가
+        # 요일 버튼 레이아웃
         days_layout = MDBoxLayout(
             orientation='horizontal',
             size_hint_y=None,
@@ -1048,7 +1070,7 @@ class EditClassDialog:
             adaptive_width=False
         )
         
-        # 한글 요일 이름과 영어 요일 매핑 사용
+        # 한글 요일 이름과 영어 요일 매핑
         day_names = {
             "Monday": "월",
             "Tuesday": "화",
@@ -1059,7 +1081,7 @@ class EditClassDialog:
         
         for day, day_kr in day_names.items():
             day_btn = MDFlatButton(
-                text=day_kr,  # 한글 요일 표시
+                text=day_kr,
                 font_name=FONT_NAME,
                 on_release=lambda x, d=day, k=day_names[day]: self.set_day(d, k),
                 size_hint_x=None,
@@ -1068,7 +1090,7 @@ class EditClassDialog:
             days_layout.add_widget(day_btn)
         
         self.content.add_widget(days_layout)
-
+    
         # 시작 시간
         self.start_time_field = MDTextField(
             hint_text="Start Time",
@@ -1076,8 +1098,7 @@ class EditClassDialog:
             helper_text_mode="on_focus",
             height=dp(20),
             font_name=FONT_NAME,
-            readonly=True,
-            text=class_data['start_time']
+            readonly=True
         )
         self.start_time_field.bind(on_touch_down=self.on_start_time_touch)
         self.set_font_for_textfield(self.start_time_field)
@@ -1090,8 +1111,7 @@ class EditClassDialog:
             helper_text_mode="on_focus",
             height=dp(20),
             font_name=FONT_NAME,
-            readonly=True,
-            text=class_data['end_time']
+            readonly=True
         )
         self.end_time_field.bind(on_touch_down=self.on_end_time_touch)
         self.set_font_for_textfield(self.end_time_field)
@@ -1103,8 +1123,7 @@ class EditClassDialog:
             helper_text="Ex: 61304A",
             helper_text_mode="on_focus",
             height=dp(20),
-            font_name=FONT_NAME,
-            text=class_data['room']
+            font_name=FONT_NAME
         )
         self.set_font_for_textfield(self.room_field)
         self.content.add_widget(self.room_field)
@@ -1115,16 +1134,15 @@ class EditClassDialog:
             helper_text="Ex: Kim Bumjun",
             helper_text_mode="on_focus",
             height=dp(20),
-            font_name=FONT_NAME,
-            text=class_data['professor']
+            font_name=FONT_NAME
         )
         self.set_font_for_textfield(self.professor_field)
         self.content.add_widget(self.professor_field)
-
-        # 작은 간격 위젯 추가
+    
+        # 간격 위젯
         spacer = Widget(size_hint_y=None, height=dp(10))
         self.content.add_widget(spacer)
-
+    
         # 색상 선택 라벨
         self.color_label = MDLabel(
             text="Color Selection", 
@@ -1136,7 +1154,7 @@ class EditClassDialog:
         )
         self.color_label.font_size = "15.5sp" 
         self.content.add_widget(self.color_label)
-
+    
         # 색상 선택 버튼들
         colors_layout = MDBoxLayout(
             orientation='horizontal',
@@ -1144,40 +1162,29 @@ class EditClassDialog:
             height=dp(40),
             spacing=dp(2)
         )
-
-        # 현재 색상 정보
-        self.selected_color = class_data['color']
+    
         self.color_buttons = []
-
         for i, color in enumerate(self.class_colors):
             from kivymd.uix.card import MDCard
             color_btn = MDCard(
                 size_hint=(None, None),
-                size=(dp(35), dp(25)),
+                size=(dp(41), dp(35)),
                 md_bg_color=color,
                 radius=[dp(2)],
-                # 현재 색상과 일치하면 강조 표시
-                elevation=3 if color == self.selected_color else 0
+                elevation=0  # 기본값
             )
-            # 터치 이벤트 추가
             color_btn.bind(on_touch_down=lambda instance, touch, c=color, i=i: 
                         self.set_color(c, i) if instance.collide_point(*touch.pos) else None)
             
             self.color_buttons.append(color_btn)
             colors_layout.add_widget(color_btn)
-        
-        # 선택된 버튼 인덱스 설정
-        for i, color in enumerate(self.class_colors):
-            if color == self.selected_color:
-                self.selected_button_index = i
-                break
                 
         self.content.add_widget(colors_layout)
-
-        # 작은 간격 위젯 추가
+    
+        # 간격 위젯
         spacer = Widget(size_hint_y=None, height=dp(10))
         self.content.add_widget(spacer)
-
+    
         # 알림 설정 레이블
         self.notify_label = MDLabel(
             text="Set Alarm",
@@ -1189,7 +1196,7 @@ class EditClassDialog:
         )
         self.notify_label.font_size = "15.5sp" 
         self.content.add_widget(self.notify_label)
-
+    
         # 알림 시간 입력 레이아웃
         notify_layout = MDBoxLayout(
             orientation="horizontal",
@@ -1198,18 +1205,17 @@ class EditClassDialog:
             spacing=dp(5),
             padding=[0, 0, 0, 0]
         )
-
+    
         # 알림 시간 입력 필드
         self.notify_input = MDTextField(
             hint_text="",
             input_filter="int",
-            # 기존 알림 시간 표시 (기본값: 5분)
-            text=str(class_data.get('notify_before', 5)),
+            text="5",  # 기본값
             font_name=FONT_NAME,
             size_hint_x=0.2,
         )
         self.set_font_for_textfield(self.notify_input)
-
+    
         # "Minute" 레이블
         minute_label = MDLabel(
             text="Minutes Before",
@@ -1219,13 +1225,25 @@ class EditClassDialog:
             halign="left",
             valign="center"
         )
-
-        # 레이아웃에 위젯 추가
+    
         notify_layout.add_widget(self.notify_input)
         notify_layout.add_widget(minute_label)
         self.content.add_widget(notify_layout)
-
-        # 버튼 생성 (취소, 삭제, 저장)
+    
+        # 폰트 설정 함수
+        def post_dialog_open(dialog):
+            try:
+                if hasattr(dialog, '_title'):
+                    dialog._title.font_name = FONT_NAME
+                
+                if hasattr(dialog, 'content_cls'):
+                    for child in dialog.content_cls.children:
+                        if isinstance(child, MDTextField):
+                            self.set_font_for_textfield(child)
+            except Exception as e:
+                print(f"다이얼로그 폰트 설정 오류: {e}")
+    
+        # 버튼 생성
         buttons = [
             MDFlatButton(
                 text="취소",
@@ -1246,7 +1264,7 @@ class EditClassDialog:
             )
         ]
         
-        # 팝업 대화상자 생성 - halign 속성 없음!
+        # 다이얼로그 생성
         self.dialog = MDDialog(
             title="과목 수정",
             type="custom",
@@ -1255,11 +1273,40 @@ class EditClassDialog:
             buttons=buttons
         )
         
-        # 다이얼로그 열기
-        self.dialog.open()
+        # 다이얼로그가 열릴 때 폰트 설정 (AddClassDialog와 동일한 방식)
+        self.dialog.bind(on_open=lambda *args: post_dialog_open(self.dialog))
+
+    def populate_fields_with_existing_data(self, class_data):
+        """기존 데이터로 필드 채우기"""
+        # 필드에 기존 데이터 입력
+        self.name_field.text = class_data['name']
+        self.room_field.text = class_data['room']
+        self.professor_field.text = class_data['professor']
+        self.start_time_field.text = class_data['start_time']
+        self.end_time_field.text = class_data['end_time']
         
-        # 폰트 설정 적용
-        self.apply_fonts_to_dialog(self.dialog)
+        # 요일 설정
+        korean_day_map = {
+            "Monday": "월",
+            "Tuesday": "화", 
+            "Wednesday": "수",
+            "Thursday": "목",
+            "Friday": "금"
+        }
+        self.day_field.text = korean_day_map.get(class_data['day'], "월")
+        self.current_day = class_data['day']
+        
+        # 색상 설정
+        self.selected_color = class_data['color']
+        for i, color in enumerate(self.class_colors):
+            if color == self.selected_color:
+                self.color_buttons[i].elevation = 3
+                self.selected_button_index = i
+            else:
+                self.color_buttons[i].elevation = 0
+        
+        # 알림 시간 설정
+        self.notify_input.text = str(class_data.get('notify_before', 5))
 
     def update_class(self, *args):
         """과목 정보 업데이트 - 중복 생성 방지 + 알람 시간 반영"""
