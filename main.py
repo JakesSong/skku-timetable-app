@@ -603,15 +603,16 @@ class AddClassDialog:
     
         # 과목 색상 정의
         self.class_colors = [
-            (0.3, 0.55, 0.96, 1),   # 진한 파란색 (Deep Blue)
-            (0.3, 0.9, 0.5, 1),    # 민트 그린 (Mint Green)  
-            (0.4, 0.8, 1.0, 1),    # 하늘색 (Sky Blue)
             (0.9, 0.5, 0.2, 1),    # 주황색 (Orange)
             (0.8, 0.3, 0.6, 1),    # 분홍색 (Pink)
             (0.6, 0.2, 0.2, 1),    # 진한 빨간색 (Dark Red)
+            (0.3, 0.9, 0.5, 1),    # 민트 그린 (Mint Green)  
+            (0.4, 0.8, 1.0, 1),    # 하늘색 (Sky Blue)
+            (0.3, 0.55, 0.96, 1),   # 진한 파란색 (Deep Blue)
             (0.5, 0.4, 0.8, 1),    # 보라색 (Purple)
-            (0.4, 0.4, 0.4, 1),    # 진한 회색 (Dark Gray)
+            (0.7, 0.7, 0.7, 1),    # 진한 회색 (Dark Gray)
         ]
+        
         self.selected_color = self.class_colors[0]  # 기본 색상
         self.color_buttons = []
     
@@ -1025,14 +1026,14 @@ class EditClassDialog:
         
         # 과목 색상 정의 (AddClassDialog와 동일하게 유지)
         self.class_colors = [
-            (0.3, 0.55, 0.96, 1),   # 진한 파란색 (Deep Blue)
-            (0.3, 0.9, 0.5, 1),    # 민트 그린 (Mint Green)  
-            (0.4, 0.8, 1.0, 1),    # 하늘색 (Sky Blue)
             (0.9, 0.5, 0.2, 1),    # 주황색 (Orange)
             (0.8, 0.3, 0.6, 1),    # 분홍색 (Pink)
             (0.6, 0.2, 0.2, 1),    # 진한 빨간색 (Dark Red)
+            (0.3, 0.9, 0.5, 1),    # 민트 그린 (Mint Green)  
+            (0.4, 0.8, 1.0, 1),    # 하늘색 (Sky Blue)
+            (0.3, 0.55, 0.96, 1),   # 진한 파란색 (Deep Blue)
             (0.5, 0.4, 0.8, 1),    # 보라색 (Purple)
-            (0.4, 0.4, 0.4, 1),    # 진한 회색 (Dark Gray)
+            (0.7, 0.7, 0.7, 1),    # 진한 회색 (Dark Gray)
         ]
         self.selected_button_index = 0
     
