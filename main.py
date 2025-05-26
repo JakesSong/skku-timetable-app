@@ -260,10 +260,13 @@ class AddClassDialog:
         
         # 현재 등록된 가장 높은 클래스 ID 찾기
         self.next_class_id = 1
-
+    
         # 시간 드롭다운 변수 초기화
         self.start_time_dropdown = None
         self.end_time_dropdown = None
+        
+        # 🔥 스크롤뷰 참조 저장용
+        self.scroll_view = None
 
     def show_start_time_dropdown(self, instance, value):
         """시작 시간 드롭다운 메뉴 표시"""
@@ -425,16 +428,17 @@ class AddClassDialog:
 
         
     def create_dialog(self, edit_mode=False, class_id=None):
-        """대화상자 생성 - 스크롤 가능하게 개선"""
+        """대화상자 생성 - 키보드 자동 스크롤 포함"""
         
         # 🔥 ScrollView로 감싸기 (키보드 가림 방지)
-        scroll_view = ScrollView(
+        self.scroll_view = ScrollView(
             size_hint_y=None,
             height=dp(500),  # 전체 높이를 줄여서 키보드 공간 확보
             do_scroll_x=False,
             do_scroll_y=True,
             bar_width=dp(4),
-            scroll_type=['bars', 'content']
+            scroll_type=['bars', 'content'],
+            effect_cls='ScrollEffect'  # 부드러운 스크롤 효과
         )
         
         # 대화상자 내용 레이아웃
@@ -442,7 +446,7 @@ class AddClassDialog:
             orientation="vertical",
             spacing=dp(5),
             size_hint_y=None,
-            height=dp(590),
+            height=dp(640),  # 높이를 조금 늘려서 충분한 스크롤 공간 확보
             padding=(dp(20), dp(10), dp(20), dp(15))
         )
     
@@ -686,12 +690,12 @@ class AddClassDialog:
         # 메인 컨텐트에 레이아웃 추가
         self.content.add_widget(notify_layout)
         
-        # 🔥 키보드 가림 방지용 여분 공간 추가
-        extra_spacer = Widget(size_hint_y=None, height=dp(50))
+        # 🔥 키보드 가림 방지용 여분 공간 추가 (더 넉넉하게)
+        extra_spacer = Widget(size_hint_y=None, height=dp(100))
         self.content.add_widget(extra_spacer)
     
         # 🔥 ScrollView에 콘텐츠 추가
-        scroll_view.add_widget(self.content)
+        self.scroll_view.add_widget(self.content)
     
         # 다이얼로그 생성 후 글꼴 설정을 위한 함수
         def post_dialog_open(dialog):
@@ -705,6 +709,9 @@ class AddClassDialog:
                     for child in dialog.content_cls.children:
                         if isinstance(child, MDTextField):
                             set_font_for_textfield(child)
+                            
+                # 🔥 키보드 자동 스크롤 설정
+                Clock.schedule_once(lambda dt: self.setup_keyboard_scroll(), 0.2)
             except Exception as e:
                 print(f"다이얼로그 폰트 설정 오류: {e}")
                 
@@ -749,13 +756,99 @@ class AddClassDialog:
         self.dialog = MDDialog(
             title="새 과목 추가" if not edit_mode else "과목 수정",
             type="custom",
-            content_cls=scroll_view,  # ScrollView를 content로 사용
-            size_hint=(0.90, 0.8),   # 높이를 80%로 조정하여 키보드 공간 확보
+            content_cls=self.scroll_view,  # ScrollView를 content로 사용
+            size_hint=(0.90, 0.75),   # 높이를 75%로 조정하여 더 많은 키보드 공간 확보
             buttons=buttons
         )
         
-        # 다이얼로그가 열릴 때 한 번 더 글꼴 설정 시도
+        # 다이얼로그가 열릴 때 한 번 더 글꼴 설정 및 키보드 스크롤 설정
         self.dialog.bind(on_open=lambda *args: post_dialog_open(self.dialog))
+
+    def setup_keyboard_scroll(self):
+        """키보드 올라올 때 자동 스크롤 설정"""
+        # 각 텍스트 필드에 포커스 이벤트 바인딩
+        fields = [
+            self.name_field, 
+            self.room_field, 
+            self.professor_field, 
+            self.notify_input
+        ]
+        
+        for field in fields:
+            field.bind(focus=self.on_field_focus)
+            # 터치 이벤트도 추가로 바인딩
+            field.bind(on_touch_down=lambda instance, touch: self.on_field_touch(instance, touch))
+    
+    def on_field_focus(self, instance, value):
+        """텍스트 필드에 포커스가 갈 때 호출"""
+        if value and self.scroll_view:  # 포커스를 얻었을 때
+            print(f"🎯 필드 포커스: {instance.hint_text}")
+            # 키보드가 올라올 시간을 고려해서 0.5초 후 스크롤
+            Clock.schedule_once(lambda dt: self.scroll_to_widget(instance), 0.5)
+    
+    def on_field_touch(self, instance, touch):
+        """텍스트 필드 터치 시 호출"""
+        if instance.collide_point(*touch.pos):
+            print(f"👆 필드 터치: {instance.hint_text}")
+            # 터치 시에도 스크롤 (포커스보다 빠르게)
+            Clock.schedule_once(lambda dt: self.scroll_to_widget(instance), 0.3)
+            return False  # 이벤트 전파 계속
+    
+    def scroll_to_widget(self, widget):
+        """특정 위젯이 보이도록 부드럽게 스크롤"""
+        if not self.scroll_view or not widget:
+            return
+            
+        try:
+            # 위젯의 전체 높이에서의 상대적 위치 계산
+            widget_bottom = widget.y
+            widget_top = widget.y + widget.height
+            content_height = self.content.height
+            scroll_height = self.scroll_view.height
+            
+            # 키보드 높이를 고려한 가시 영역 계산 (대략 키보드 높이의 60% 정도)
+            keyboard_height = dp(250)  # 일반적인 키보드 높이
+            visible_height = scroll_height - keyboard_height * 0.6
+            
+            # 위젯이 가시 영역에 완전히 들어오도록 스크롤 위치 계산
+            # ScrollView의 scroll_y는 0(하단)에서 1(상단) 범위
+            target_scroll = 1 - (widget_top + dp(50)) / content_height
+            
+            # 스크롤 범위 제한 (0~1)
+            target_scroll = max(0, min(1, target_scroll))
+            
+            print(f"📱 스크롤 이동: {self.scroll_view.scroll_y:.2f} → {target_scroll:.2f}")
+            
+            # 부드러운 스크롤 애니메이션
+            from kivy.animation import Animation
+            anim = Animation(
+                scroll_y=target_scroll, 
+                duration=0.3, 
+                transition='out_cubic'
+            )
+            anim.start(self.scroll_view)
+            
+        except Exception as e:
+            print(f"❌ 스크롤 오류: {e}")
+    
+    def smart_scroll_to_bottom(self):
+        """하단 필드 편집 시 자동으로 최하단으로 스크롤"""
+        if not self.scroll_view:
+            return
+            
+        try:
+            # 부드럽게 최하단으로 스크롤
+            from kivy.animation import Animation
+            anim = Animation(
+                scroll_y=0,  # 0은 최하단
+                duration=0.4, 
+                transition='out_cubic'
+            )
+            anim.start(self.scroll_view)
+            print("🔽 최하단으로 스크롤")
+            
+        except Exception as e:
+            print(f"❌ 하단 스크롤 오류: {e}")
     
     def set_day(self, english_day, korean_day):
         """요일 설정"""
@@ -841,6 +934,9 @@ class EditClassDialog:
         self.end_time_dropdown = None
         self.selected_color = None
         self.color_buttons = []
+        
+        # 🔥 스크롤뷰 참조 저장용
+        self.scroll_view = None
         
         # 과목 색상 정의 (AddClassDialog와 동일하게 유지)
         self.class_colors = [
@@ -1030,24 +1126,25 @@ class EditClassDialog:
         self.dialog.open()
         
     def create_edit_dialog(self):
-        """수정 다이얼로그 생성 - 스크롤 가능하게 개선"""
+        """수정 다이얼로그 생성 - 키보드 자동 스크롤 포함"""
         
         # 🔥 ScrollView로 감싸기 (키보드 가림 방지)
-        scroll_view = ScrollView(
+        self.scroll_view = ScrollView(
             size_hint_y=None,
             height=dp(500),  # 전체 높이를 줄여서 키보드 공간 확보
             do_scroll_x=False,
             do_scroll_y=True,
             bar_width=dp(4),
-            scroll_type=['bars', 'content']
+            scroll_type=['bars', 'content'],
+            effect_cls='ScrollEffect'  # 부드러운 스크롤 효과
         )
         
-        # 대화상자 내용 레이아웃 (기존과 동일)
+        # 대화상자 내용 레이아웃
         self.content = MDBoxLayout(
             orientation="vertical",
             spacing=dp(5),
             size_hint_y=None,
-            height=dp(590),  # 실제 콘텐츠 높이는 그대로
+            height=dp(640),  # 높이를 조금 늘려서 충분한 스크롤 공간 확보
             padding=(dp(20), dp(10), dp(20), dp(15))
         )
     
@@ -1248,12 +1345,12 @@ class EditClassDialog:
         notify_layout.add_widget(minute_label)
         self.content.add_widget(notify_layout)
         
-        # 🔥 키보드 가림 방지용 여분 공간 추가
-        extra_spacer = Widget(size_hint_y=None, height=dp(50))
+        # 🔥 키보드 가림 방지용 여분 공간 추가 (더 넉넉하게)
+        extra_spacer = Widget(size_hint_y=None, height=dp(100))
         self.content.add_widget(extra_spacer)
     
         # 🔥 ScrollView에 콘텐츠 추가
-        scroll_view.add_widget(self.content)
+        self.scroll_view.add_widget(self.content)
     
         # 폰트 설정 함수
         def post_dialog_open(dialog):
@@ -1265,6 +1362,9 @@ class EditClassDialog:
                     for child in dialog.content_cls.children:
                         if isinstance(child, MDTextField):
                             self.set_font_for_textfield(child)
+                            
+                # 🔥 키보드 자동 스크롤 설정
+                Clock.schedule_once(lambda dt: self.setup_keyboard_scroll(), 0.2)
             except Exception as e:
                 print(f"다이얼로그 폰트 설정 오류: {e}")
     
@@ -1293,60 +1393,100 @@ class EditClassDialog:
         self.dialog = MDDialog(
             title="과목 수정",
             type="custom",
-            content_cls=scroll_view,  # ScrollView를 content로 사용
-            size_hint=(0.90, 0.8),   # 높이를 80%로 조정하여 키보드 공간 확보
+            content_cls=self.scroll_view,  # ScrollView를 content로 사용
+            size_hint=(0.90, 0.75),   # 높이를 75%로 조정하여 더 많은 키보드 공간 확보
             buttons=buttons
         )
         
-        # 다이얼로그가 열릴 때 폰트 설정 (AddClassDialog와 동일한 방식)
-        self.dialog.bind(on_open=lambda *args: post_dialog_open(self.dialog))
-    
-        # 폰트 설정 함수
-        def post_dialog_open(dialog):
-            try:
-                if hasattr(dialog, '_title'):
-                    dialog._title.font_name = FONT_NAME
-                
-                if hasattr(dialog, 'content_cls'):
-                    for child in dialog.content_cls.children:
-                        if isinstance(child, MDTextField):
-                            self.set_font_for_textfield(child)
-            except Exception as e:
-                print(f"다이얼로그 폰트 설정 오류: {e}")
-    
-        # 버튼 생성
-        buttons = [
-            MDFlatButton(
-                text="취소",
-                font_name=FONT_NAME,
-                on_release=lambda x: self.dialog.dismiss()
-            ),
-            MDFlatButton(
-                text="삭제",
-                font_name=FONT_NAME,
-                theme_text_color="Custom",
-                text_color=[1, 0.3, 0.3, 1],
-                on_release=lambda x: self.delete_class()
-            ),
-            MDRaisedButton(
-                text="저장",
-                font_name=FONT_NAME,
-                on_release=lambda x: self.update_class()
-            )
-        ]
-        
-        # 다이얼로그 생성
-        self.dialog = MDDialog(
-            title="과목 수정",
-            type="custom",
-            content_cls=self.content,
-            size_hint=(0.90, None),
-            buttons=buttons
-        )
-        
-        # 다이얼로그가 열릴 때 폰트 설정 (AddClassDialog와 동일한 방식)
+        # 다이얼로그가 열릴 때 폰트 설정 및 키보드 스크롤 설정
         self.dialog.bind(on_open=lambda *args: post_dialog_open(self.dialog))
 
+    def setup_keyboard_scroll(self):
+        """키보드 올라올 때 자동 스크롤 설정"""
+        # 각 텍스트 필드에 포커스 이벤트 바인딩
+        fields = [
+            self.name_field, 
+            self.room_field, 
+            self.professor_field, 
+            self.notify_input
+        ]
+        
+        for field in fields:
+            field.bind(focus=self.on_field_focus)
+            # 터치 이벤트도 추가로 바인딩
+            field.bind(on_touch_down=lambda instance, touch: self.on_field_touch(instance, touch))
+    
+    def on_field_focus(self, instance, value):
+        """텍스트 필드에 포커스가 갈 때 호출"""
+        if value and self.scroll_view:  # 포커스를 얻었을 때
+            print(f"🎯 필드 포커스: {instance.hint_text}")
+            # 키보드가 올라올 시간을 고려해서 0.5초 후 스크롤
+            Clock.schedule_once(lambda dt: self.scroll_to_widget(instance), 0.5)
+    
+    def on_field_touch(self, instance, touch):
+        """텍스트 필드 터치 시 호출"""
+        if instance.collide_point(*touch.pos):
+            print(f"👆 필드 터치: {instance.hint_text}")
+            # 터치 시에도 스크롤 (포커스보다 빠르게)
+            Clock.schedule_once(lambda dt: self.scroll_to_widget(instance), 0.3)
+            return False  # 이벤트 전파 계속
+    
+    def scroll_to_widget(self, widget):
+        """특정 위젯이 보이도록 부드럽게 스크롤"""
+        if not self.scroll_view or not widget:
+            return
+            
+        try:
+            # 위젯의 전체 높이에서의 상대적 위치 계산
+            widget_bottom = widget.y
+            widget_top = widget.y + widget.height
+            content_height = self.content.height
+            scroll_height = self.scroll_view.height
+            
+            # 키보드 높이를 고려한 가시 영역 계산 (대략 키보드 높이의 60% 정도)
+            keyboard_height = dp(250)  # 일반적인 키보드 높이
+            visible_height = scroll_height - keyboard_height * 0.6
+            
+            # 위젯이 가시 영역에 완전히 들어오도록 스크롤 위치 계산
+            # ScrollView의 scroll_y는 0(하단)에서 1(상단) 범위
+            target_scroll = 1 - (widget_top + dp(50)) / content_height
+            
+            # 스크롤 범위 제한 (0~1)
+            target_scroll = max(0, min(1, target_scroll))
+            
+            print(f"📱 스크롤 이동: {self.scroll_view.scroll_y:.2f} → {target_scroll:.2f}")
+            
+            # 부드러운 스크롤 애니메이션
+            from kivy.animation import Animation
+            anim = Animation(
+                scroll_y=target_scroll, 
+                duration=0.3, 
+                transition='out_cubic'
+            )
+            anim.start(self.scroll_view)
+            
+        except Exception as e:
+            print(f"❌ 스크롤 오류: {e}")
+    
+    def smart_scroll_to_bottom(self):
+        """하단 필드 편집 시 자동으로 최하단으로 스크롤"""
+        if not self.scroll_view:
+            return
+            
+        try:
+            # 부드럽게 최하단으로 스크롤
+            from kivy.animation import Animation
+            anim = Animation(
+                scroll_y=0,  # 0은 최하단
+                duration=0.4, 
+                transition='out_cubic'
+            )
+            anim.start(self.scroll_view)
+            print("🔽 최하단으로 스크롤")
+            
+        except Exception as e:
+            print(f"❌ 하단 스크롤 오류: {e}")
+    
     def populate_fields_with_existing_data(self, class_data):
         """기존 데이터로 필드 채우기"""
         # 필드에 기존 데이터 입력
