@@ -2283,12 +2283,9 @@ class MainScreen(MDScreen):
             self.add_class_button = MDFloatingActionButton(
                 icon="plus",
                 pos_hint={"right": 0.98, "y": 0.02},
-                md_bg_color=self.app.theme_cls.primary_color
-                # on_release는 여기서 설정하지 말고 아래에서 bind로 설정
+                md_bg_color=self.app.theme_cls.primary_color,
+                on_release=self.add_class_dialog.show_dialog  # 🔥 이 줄 삭제
             )
-            
-            # 🔥 이벤트 바인딩을 별도로 설정
-            self.add_class_button.bind(on_release=self.on_add_button_click)
             self.add_widget(self.add_class_button)
 
             # 전자출결 앱 실행 버튼
@@ -2325,37 +2322,7 @@ class MainScreen(MDScreen):
             traceback.print_exc()
             # 오류 발생 시 다시 시도
             Clock.schedule_once(self.setup_layout, 0.5)
-            
-    def on_add_button_click(self, instance):
-        """추가 버튼 클릭 이벤트 핸들러"""
-        try:
-            print("🔘 추가 버튼 클릭됨!")
-            
-            # 🔥 안드로이드에서 디버깅 로그
-            if 'ANDROID_STORAGE' in os.environ:
-                try:
-                    with open("/sdcard/button_debug.txt", "a") as f:
-                        f.write("추가 버튼 클릭됨!\n")
-                except:
-                    pass
-            
-            # 다이얼로그 표시
-            self.add_class_dialog.show_dialog()
-            print("✅ 다이얼로그 표시 완료")
-            
-        except Exception as e:
-            print(f"❌ 추가 버튼 이벤트 오류: {e}")
-            import traceback
-            traceback.print_exc()
-            
-            # 🔥 안드로이드에서 오류 로그
-            if 'ANDROID_STORAGE' in os.environ:
-                try:
-                    with open("/sdcard/button_debug.txt", "a") as f:
-                        f.write(f"버튼 이벤트 오류: {e}\n")
-                except:
-                    pass
-    
+
     def on_subtitle_touch(self, instance, touch):
         """부제목 터치 이벤트"""
         if instance.collide_point(*touch.pos):
