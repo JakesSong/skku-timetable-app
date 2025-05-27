@@ -447,7 +447,7 @@ class AddClassDialog:
             orientation="vertical",
             spacing=dp(5),
             size_hint_y=None,
-            height=dp(800),  # 높이를 조금 늘려서 충분한 스크롤 공간 확보
+            height=dp(760),  # 높이를 조금 늘려서 충분한 스크롤 공간 확보
             padding=(dp(20), dp(20), dp(20), dp(15))
         )
         
@@ -793,12 +793,15 @@ class AddClassDialog:
             elif hasattr(self, 'day_field') and instance == self.day_field:
                 print("📅 요일 필드 - 스크롤 안 함")
                 return
-            # 🔥 하단 필드들(알람 설정)인 경우 최하단으로 스크롤
+            # 🔥 하단 필드들(교수명, 알람 설정)인 경우 최하단으로 스크롤
+            elif hasattr(self, 'professor_field') and instance == self.professor_field:
+                print("👨‍🏫 교수명 필드 - 최하단으로 스크롤")
+                Clock.schedule_once(lambda dt: self.smart_scroll_to_bottom(), 0.5)
             elif hasattr(self, 'notify_input') and instance == self.notify_input:
                 print("🔽 알람 설정 필드 - 최하단으로 스크롤")
                 Clock.schedule_once(lambda dt: self.smart_scroll_to_bottom(), 0.5)
             else:
-                # 중간 필드들(시간, 강의실, 교수)만 적당한 위치로 스크롤
+                # 중간 필드들(시간, 강의실)만 적당한 위치로 스크롤
                 print("📍 중간 필드 - 적당한 위치로 스크롤")
                 Clock.schedule_once(lambda dt: self.scroll_to_widget(instance), 0.6)
     
@@ -814,7 +817,10 @@ class AddClassDialog:
             elif hasattr(self, 'day_field') and instance == self.day_field:
                 print("📅 요일 필드 터치 - 스크롤 안 함")
                 return False
-            # 🔥 하단 필드들(알람 설정)인 경우 최하단으로 스크롤
+            # 🔥 하단 필드들(교수명, 알람 설정)인 경우 최하단으로 스크롤
+            elif hasattr(self, 'professor_field') and instance == self.professor_field:
+                print("👨‍🏫 교수명 필드 터치 - 최하단으로 스크롤")
+                Clock.schedule_once(lambda dt: self.smart_scroll_to_bottom(), 0.3)
             elif hasattr(self, 'notify_input') and instance == self.notify_input:
                 print("🔽 알람 설정 필드 터치 - 최하단으로 스크롤")
                 Clock.schedule_once(lambda dt: self.smart_scroll_to_bottom(), 0.3)
@@ -1529,12 +1535,15 @@ class EditClassDialog:
             elif hasattr(self, 'day_field') and instance == self.day_field:
                 print("📅 요일 필드 - 스크롤 안 함")
                 return
-            # 🔥 하단 필드들(알람 설정)인 경우 최하단으로 스크롤
+            # 🔥 하단 필드들(교수명, 알람 설정)인 경우 최하단으로 스크롤
+            elif hasattr(self, 'professor_field') and instance == self.professor_field:
+                print("👨‍🏫 교수명 필드 - 최하단으로 스크롤")
+                Clock.schedule_once(lambda dt: self.smart_scroll_to_bottom(), 0.5)
             elif hasattr(self, 'notify_input') and instance == self.notify_input:
                 print("🔽 알람 설정 필드 - 최하단으로 스크롤")
                 Clock.schedule_once(lambda dt: self.smart_scroll_to_bottom(), 0.5)
             else:
-                # 중간 필드들(시간, 강의실, 교수)만 적당한 위치로 스크롤
+                # 중간 필드들(시간, 강의실)만 적당한 위치로 스크롤
                 print("📍 중간 필드 - 적당한 위치로 스크롤")
                 Clock.schedule_once(lambda dt: self.scroll_to_widget(instance), 0.6)
     
@@ -1550,7 +1559,10 @@ class EditClassDialog:
             elif hasattr(self, 'day_field') and instance == self.day_field:
                 print("📅 요일 필드 터치 - 스크롤 안 함")
                 return False
-            # 🔥 하단 필드들(알람 설정)인 경우 최하단으로 스크롤
+            # 🔥 하단 필드들(교수명, 알람 설정)인 경우 최하단으로 스크롤
+            elif hasattr(self, 'professor_field') and instance == self.professor_field:
+                print("👨‍🏫 교수명 필드 터치 - 최하단으로 스크롤")
+                Clock.schedule_once(lambda dt: self.smart_scroll_to_bottom(), 0.3)
             elif hasattr(self, 'notify_input') and instance == self.notify_input:
                 print("🔽 알람 설정 필드 터치 - 최하단으로 스크롤")
                 Clock.schedule_once(lambda dt: self.smart_scroll_to_bottom(), 0.3)
