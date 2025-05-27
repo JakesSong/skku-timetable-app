@@ -2377,8 +2377,8 @@ class MainScreen(MDScreen):
             # 동일한 Intent 생성 (설정할 때와 정확히 동일해야 함)
             intent = Intent()
             intent.setComponent(ComponentName(
-                "org.kivy.android",
-                "org.kivy.android.AlarmReceiver"
+                "org.kivy.skkutimetable.doublecheck",
+                "org.kivy.skkutimetable.doublecheck.AlarmReceiver"
             ))
             
             flags = PendingIntent.FLAG_UPDATE_CURRENT
