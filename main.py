@@ -2589,35 +2589,37 @@ class MainScreen(MDScreen):
             return False
     
     def parse_class_time(self, class_data):
-        """수업 시간을 datetime 객체로 변환"""
-        day = class_data['day']
-        start_time = class_data['start_time']
-        
-        # 요일 매핑
-        day_map = {'Monday': 0, 'Tuesday': 1, 'Wednesday': 2, 'Thursday': 3, 'Friday': 4}
-        target_weekday = day_map.get(day, 0)
-        
-        # 현재 시간
+    
+        day_map = {
+            "Monday": 0, "Tuesday": 1, "Wednesday": 2,
+            "Thursday": 3, "Friday": 4,
+            "월요일": 0, "화요일": 1, "수요일": 2,
+            "목요일": 3, "금요일": 4
+        }
+    
+        day = class_data.get("day")
+        start_time = class_data.get("start_time")
+    
+        if not day or not start_time:
+            return None
+    
+        target_weekday = day_map.get(day)
+        if target_weekday is None:
+            return None
+    
         now = datetime.now()
-        
-        # 이번 주 해당 요일 계산
-        days_ahead = target_weekday - now.weekday()
+        today_weekday = now.weekday()
+    
+        days_ahead = (target_weekday - today_weekday) % 7
         target_date = now + timedelta(days=days_ahead)
     
-        try:
-            # 수업 시간 datetime 객체로 만들기
-            hour, minute = map(int, start_time.split(':'))
-            class_datetime = target_date.replace(hour=hour, minute=minute, second=0, microsecond=0)
+        hour, minute = map(int, start_time.split(":"))
+        class_datetime = target_date.replace(hour=hour, minute=minute, second=0, microsecond=0)
     
-            # ✅ 이미 지난 시간이면 다음 주로 미룸
-            if class_datetime <= now:
-                class_datetime += timedelta(days=7)
+        if class_datetime <= now:
+            class_datetime += timedelta(days=7)
     
-            return class_datetime
-    
-        except ValueError:
-            print(f"⚠️ 시간 파싱 실패: {start_time}")
-            return now + timedelta(hours=1)
+        return class_datetime
     
     def request_alarm_permission(self):
         """알람 권한 요청 (Android 12+)"""
@@ -3445,37 +3447,38 @@ class TimeTableApp(MDApp):
             return False
     
     def parse_class_time_for_service(self, class_data):
-        """수업 시간을 datetime 객체로 변환 (서비스용)"""
-        day = class_data['day']
-        start_time = class_data['start_time']
-        
-        # 요일 매핑
-        day_map = {'Monday': 0, 'Tuesday': 1, 'Wednesday': 2, 'Thursday': 3, 'Friday': 4}
-        target_weekday = day_map.get(day, 0)
-        
-        # 현재 시간
+    
+        day_map = {
+            "Monday": 0, "Tuesday": 1, "Wednesday": 2,
+            "Thursday": 3, "Friday": 4,
+            "월요일": 0, "화요일": 1, "수요일": 2,
+            "목요일": 3, "금요일": 4
+        }
+    
+        day = class_data.get("day")
+        start_time = class_data.get("start_time")
+    
+        if not day or not start_time:
+            return None
+    
+        target_weekday = day_map.get(day)
+        if target_weekday is None:
+            return None
+    
         now = datetime.now()
-        
-        # 이번 주 해당 요일 계산
-        days_ahead = target_weekday - now.weekday()
-        if days_ahead <= 0:  # 이미 지났으면 다음 주
-            days_ahead += 7
-            
+        today_weekday = now.weekday()
+    
+        days_ahead = (target_weekday - today_weekday) % 7
         target_date = now + timedelta(days=days_ahead)
-        
-        # 시간 파싱
-        try:
-            hour, minute = map(int, start_time.split(':'))
-            class_datetime = target_date.replace(
-                hour=hour, 
-                minute=minute, 
-                second=0, 
-                microsecond=0
-            )
-            return class_datetime
-        except ValueError:
-            print(f"⚠️ 시간 파싱 실패: {start_time}")
-            return now + timedelta(hours=1)    
+    
+        hour, minute = map(int, start_time.split(":"))
+        class_datetime = target_date.replace(hour=hour, minute=minute, second=0, microsecond=0)
+    
+        if class_datetime <= now:
+            class_datetime += timedelta(days=7)
+    
+        return class_datetime
+  
     
     def show_alarm_notification(self, class_name, class_room, class_time, class_professor):
         try:
