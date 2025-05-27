@@ -114,23 +114,6 @@ jobs:
           echo "No bin directory found - build may have failed"
         fi
         
-    - name: Check build logs on failure
-      if: failure()
-      run: |
-        echo "=== Checking build logs ==="
-        find .buildozer -name "*.log" -type f -exec echo "=== {} ===" \; -exec head -50 {} \; || true
-        
-        echo "=== Last 100 lines of build output ==="
-        find .buildozer -name "*.log" -type f -exec tail -100 {} \; || true
-        
-    - name: Upload APK
-      if: success()
-      uses: actions/upload-artifact@v4
-      with:
-        name: skku-timetable-apk
-        path: bin/*.apk
-        retention-days: 7
-        if-no-files-found: error
 
 # 🔥 새로 추가: Java 파일 확인 및 준비
     - name: Check and prepare Java files
