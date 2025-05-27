@@ -2323,7 +2323,7 @@ class MainScreen(MDScreen):
                 print("📅 시간표 로드 예약됨")
 
             # 🔥🔥🔥 더미 데이터 추가 (새로 추가하는 부분)
-            Clock.schedule_once(lambda dt: self.add_dummy_data(), 2.0)  # 2초 후 더미 데이터 추가
+            # Clock.schedule_once(lambda dt: self.add_dummy_data(), 2.0)  # 2초 후 더미 데이터 추가
                         
         except Exception as e:
             print(f"레이아웃 설정 오류: {e}")
@@ -2496,6 +2496,7 @@ class MainScreen(MDScreen):
         
         # 다음 ID 설정 (더미 데이터 이후)
         self.add_class_dialog.next_class_id = 1006
+        
     def schedule_system_alarm(self, class_data, minutes_before=5):
         """통합 시스템 알람 설정 - 수정 반영 + 백그라운드 작동"""
         try:
@@ -2532,9 +2533,13 @@ class MainScreen(MDScreen):
             class_time = self.parse_class_time(class_data)
             alarm_time = class_time - timedelta(minutes=minutes_before)
             
-            # 과거 시간이면 다음 주로
-            if alarm_time <= datetime.now():
-                alarm_time += timedelta(days=7)
+            # 과거 시간이지만 오늘이면 알람 설정 허용
+            if alarm_time < datetime.now():
+                if alarm_time.date() == datetime.now().date():
+                    print("✅ 오늘 수업 시간, 아직 안 지남 - 알람 설정 유지")
+                else:
+                    print("⏭ 과거 수업 - 다음 주로 이동")
+                    alarm_time += timedelta(days=7)  # 다음 주로 미룸
                 
             alarm_millis = int(alarm_time.timestamp() * 1000)
             
@@ -2597,21 +2602,19 @@ class MainScreen(MDScreen):
         
         # 이번 주 해당 요일 계산
         days_ahead = target_weekday - now.weekday()
-        if days_ahead <= 0:  # 이미 지났으면 다음 주
-            days_ahead += 7
-            
         target_date = now + timedelta(days=days_ahead)
-        
-        # 시간 파싱
+    
         try:
+            # 수업 시간 datetime 객체로 만들기
             hour, minute = map(int, start_time.split(':'))
-            class_datetime = target_date.replace(
-                hour=hour, 
-                minute=minute, 
-                second=0, 
-                microsecond=0
-            )
+            class_datetime = target_date.replace(hour=hour, minute=minute, second=0, microsecond=0)
+    
+            # ✅ 이미 지난 시간이면 다음 주로 미룸
+            if class_datetime < now:
+                class_datetime += timedelta(days=7)
+    
             return class_datetime
+    
         except ValueError:
             print(f"⚠️ 시간 파싱 실패: {start_time}")
             return now + timedelta(hours=1)
