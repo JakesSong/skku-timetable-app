@@ -694,7 +694,7 @@ class AddClassDialog:
         self.content.add_widget(notify_layout)
         
         # 🔥 키보드 가림 방지용 여분 공간 추가 (더 넉넉하게)
-        extra_spacer = Widget(size_hint_y=None, height=dp(300))
+        extra_spacer = Widget(size_hint_y=None, height=dp(150))
         self.content.add_widget(extra_spacer)
     
         # 🔥 ScrollView에 콘텐츠 추가
@@ -1448,7 +1448,7 @@ class EditClassDialog:
         self.content.add_widget(notify_layout)
         
         # 🔥 키보드 가림 방지용 여분 공간 추가 (더 넉넉하게)
-        extra_spacer = Widget(size_hint_y=None, height=dp(300))
+        extra_spacer = Widget(size_hint_y=None, height=dp(150))
         self.content.add_widget(extra_spacer)
     
         # 🔥 ScrollView에 콘텐츠 추가
