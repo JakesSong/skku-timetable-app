@@ -11,7 +11,7 @@ os.environ['LANG'] = 'ko_KR.UTF-8'
 
 from kivy.core.text import LabelBase
 
-# APK용 폰트 설정
+# APK용 폰트 설정 
 def setup_korean_font():
     FONT_NAME = "KoreanFont"
     
