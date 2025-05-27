@@ -14,6 +14,7 @@ fullscreen = 0
 services = AlarmService:service/main.py:foreground:sticky
 android.wakelock = True
 android.permissions = INTERNET,WRITE_EXTERNAL_STORAGE, READ_EXTERNAL_STORAGE, SCHEDULE_EXACT_ALARM, USE_EXACT_ALARM, VIBRATE, WAKE_LOCK, RECEIVE_BOOT_COMPLETED, FOREGROUND_SERVICE, POST_NOTIFICATIONS
+android.manifest_placeholders = <receiver android:name="org.kivy.skkutimetable.doublecheck.AlarmReceiver" android:exported="true" />
 android.add_java_src = android/src/main/java
 android.add_src = android/
 android.api = 33
