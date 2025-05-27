@@ -1,5 +1,5 @@
 // AlarmService.java
-package org.kivy.android;
+package org.kivy.skkutimetable.doublecheck;
 
 import android.app.Notification;
 import android.app.NotificationChannel;
