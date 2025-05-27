@@ -133,8 +133,13 @@ class AlarmManager:
             calendar.set(self.Calendar.SECOND, 0)
             calendar.set(self.Calendar.MILLISECOND, 0)
     
-            if calendar.getTimeInMillis() <= current_time:
+            alarm_time = calendar.getTimeInMillis()
+            
+            # 오직 지금보다 과거인 경우에만 다음 주로 넘김 (같은 시간은 허용)
+            if alarm_time < current_time:
                 calendar.add(self.Calendar.WEEK_OF_YEAR, 1)
+                alarm_time = calendar.getTimeInMillis()  # 다시 갱신
+
     
             # BroadcastReceiver를 정확히 지정
             intent = self.Intent()
