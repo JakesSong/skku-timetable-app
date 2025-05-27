@@ -747,7 +747,7 @@ class AddClassDialog:
                 MDRaisedButton(
                     text="추가",
                     font_name=FONT_NAME,
-                    on_release=lambda x: self.add_class()  # ← lambda 추가
+                    on_release=lambda x: print("🔥🔥🔥 추가 버튼 눌림!!!")
                 )
             ]
         
@@ -762,6 +762,12 @@ class AddClassDialog:
         
         # 다이얼로그가 열릴 때 한 번 더 글꼴 설정 및 키보드 스크롤 설정
         self.dialog.bind(on_open=lambda *args: post_dialog_open(self.dialog))
+
+        # 이 부분 추가
+        print(f"🔍 다이얼로그 생성됨: {self.dialog}")
+        print(f"🔍 버튼 개수: {len(buttons) if buttons else 0}")
+        for i, btn in enumerate(buttons):
+            print(f"🔍 버튼 {i}: {btn.text}")
 
     def setup_keyboard_scroll(self):
         """키보드 올라올 때 자동 스크롤 설정 - 개선된 버전"""
