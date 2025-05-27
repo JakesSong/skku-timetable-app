@@ -447,13 +447,9 @@ class AddClassDialog:
             orientation="vertical",
             spacing=dp(5),
             size_hint_y=None,
-            height=dp(760),  # 높이를 조금 늘려서 충분한 스크롤 공간 확보
+            height=dp(800),  # 높이를 조금 늘려서 충분한 스크롤 공간 확보
             padding=(dp(20), dp(20), dp(20), dp(15))
         )
-        
-        # 🔥 제목과의 간격을 주는 양수 스페이서 추가 (음수 대신 양수!)
-        # positive_spacer = Widget(size_hint_y=None, height=dp(100))  # 🔥 20dp 간격 추가
-        # self.content.add_widget(positive_spacer)
         
         
         # MDTextField의 폰트 속성을 직접 설정하기 위한 함수
