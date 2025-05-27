@@ -2911,43 +2911,28 @@ class MainScreen(MDScreen):
                         try:
                             from datetime import datetime, timedelta
                             
-                            # 요일 매핑
                             day_map = {'Monday': 0, 'Tuesday': 1, 'Wednesday': 2, 'Thursday': 3, 'Friday': 4}
                             target_weekday = day_map.get(day, 0)
                             
-                            # 현재 시간
                             now = datetime.now()
                             print(f"🕐 현재 시간: {now.strftime('%Y-%m-%d %H:%M:%S')}")
                             
-                            # 이번 주 해당 요일 계산
-                            days_ahead = target_weekday - now.weekday()
-                            if days_ahead <= 0:
-                                days_ahead += 7
-                                
+                            days_ahead = (target_weekday - now.weekday()) % 7
                             target_date = now + timedelta(days=days_ahead)
                             print(f"📅 목표 요일: {day} (오늘로부터 {days_ahead}일 후)")
                             
-                            # 시간 파싱
                             hour, minute = map(int, start_time.split(':'))
-                            class_datetime = target_date.replace(
-                                hour=hour, 
-                                minute=minute, 
-                                second=0, 
-                                microsecond=0
-                            )
+                            class_datetime = target_date.replace(hour=hour, minute=minute, second=0, microsecond=0)
+                            
+                            # ✅ 오늘이어도 수업 시간이 미래면 유지, 과거면 다음 주로 미룸
+                            if class_datetime <= now:
+                                class_datetime += timedelta(days=7)
+                            
+                            alarm_time = class_datetime - timedelta(minutes=notify_before)
                             
                             print(f"📅 다음 수업 시간: {class_datetime.strftime('%Y-%m-%d %H:%M:%S')}")
-                            
-                            # 알람 시간 계산
-                            alarm_time = class_datetime - timedelta(minutes=notify_before)
                             print(f"⏰ 알람 시간: {alarm_time.strftime('%Y-%m-%d %H:%M:%S')}")
                             print(f"⏳ 알람까지: {(alarm_time - now).total_seconds() / 60:.1f}분 후")
-                            
-                            # 과거 시간인지 확인
-                            if alarm_time <= now:
-                                print(f"⚠️ 경고: 알람 시간이 과거입니다!")
-                                alarm_time += timedelta(days=7)
-                                print(f"🔄 다음 주로 조정: {alarm_time.strftime('%Y-%m-%d %H:%M:%S')}")
                             
                         except Exception as time_error:
                             print(f"❌ 시간 계산 오류: {time_error}")
