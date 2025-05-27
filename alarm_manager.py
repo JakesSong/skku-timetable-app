@@ -33,6 +33,7 @@ class AlarmManager:
             self.Context = autoclass('android.content.Context')
             self.PendingIntent = autoclass('android.app.PendingIntent')
             self.Intent = autoclass('android.content.Intent')
+            self.ComponentName = autoclass('android.content.ComponentName')
             self.Calendar = autoclass('java.util.Calendar')
             self.AlarmManager = autoclass('android.app.AlarmManager')
             self.PythonActivity = autoclass('org.kivy.android.PythonActivity')
@@ -88,10 +89,9 @@ class AlarmManager:
         if not class_data:
             print("❌ 클래스 데이터가 없습니다.")
             return False
-        
+    
         if not self.is_android:
             print(f"💻 PC 환경: {class_data['name']} 알람 예약 시뮬레이션")
-            # PC 환경에서는 데이터만 저장
             self.alarms[class_id] = {
                 'class_data': class_data,
                 'minutes_before': minutes_before,
@@ -99,7 +99,7 @@ class AlarmManager:
             }
             self.save_alarms()
             return True
-        
+    
         try:
             # 요일 매핑
             day_map = {
@@ -114,69 +114,63 @@ class AlarmManager:
                 "목요일": self.Calendar.THURSDAY,
                 "금요일": self.Calendar.FRIDAY
             }
-            
+    
             class_day = class_data['day']
             if class_day not in day_map:
                 print(f"❌ 지원하지 않는 요일: {class_day}")
                 return False
-            
-            # 시간 파싱
-            try:
-                start_time = class_data['start_time']
-                hour, minute = map(int, start_time.split(':'))
-            except Exception as e:
-                print(f"❌ 시간 파싱 오류: {e}")
-                return False
-            
-            # 알람 시간 계산 (수업 시작 N분 전)
+    
+            start_time = class_data['start_time']
+            hour, minute = map(int, start_time.split(':'))
+    
             calendar = self.Calendar.getInstance()
             current_time = int(datetime.now().timestamp() * 1000)
             calendar.setTimeInMillis(current_time)
-            
-            # 해당 요일로 설정
+    
             calendar.set(self.Calendar.DAY_OF_WEEK, day_map[class_day])
             calendar.set(self.Calendar.HOUR_OF_DAY, hour)
             calendar.set(self.Calendar.MINUTE, minute - minutes_before)
             calendar.set(self.Calendar.SECOND, 0)
             calendar.set(self.Calendar.MILLISECOND, 0)
-            
-            # 현재 시간보다 이전이면 다음 주로 설정
+    
             if calendar.getTimeInMillis() <= current_time:
                 calendar.add(self.Calendar.WEEK_OF_YEAR, 1)
-            
-            # 브로드캐스트 인텐트 생성
+    
+            # BroadcastReceiver를 정확히 지정
             intent = self.Intent()
             intent.setAction("org.kivy.skkutimetable.TIMETABLE_ALARM")
+            intent.setComponent(self.ComponentName(
+                "org.kivy.skkutimetable.doublecheck",
+                "org.kivy.skkutimetable.doublecheck.AlarmReceiver"
+            ))
+    
+            # 수업 정보 전달
             intent.putExtra('class_id', str(class_id))
             intent.putExtra('class_name', class_data['name'])
             intent.putExtra('class_room', class_data['room'])
             intent.putExtra('class_time', class_data['start_time'])
             intent.putExtra('class_professor', class_data['professor'])
             intent.putExtra('minutes_before', minutes_before)
-            
-            # 각 알람에 고유한 ID 사용
+    
             alarm_id = int(class_id) if isinstance(class_id, (int, str)) else hash(str(class_id)) % 1000000
-            
-            # PendingIntent 생성
+    
             pending_intent = self.PendingIntent.getBroadcast(
-                self.context, 
-                alarm_id, 
-                intent, 
+                self.context,
+                alarm_id,
+                intent,
                 self.FLAG_UPDATE_CURRENT | self.FLAG_IMMUTABLE
             )
-            
-            # 알람 예약 (매주 반복)
+    
             alarm_time = calendar.getTimeInMillis()
-            one_week_millis = 7 * 24 * 60 * 60 * 1000  # 일주일
-            
+            one_week_millis = 7 * 24 * 60 * 60 * 1000
+    
             self.alarm_service.setRepeating(
-                self.AlarmManager.RTC_WAKEUP, 
+                self.AlarmManager.RTC_WAKEUP,
                 alarm_time,
                 one_week_millis,
                 pending_intent
             )
-            
-            # 알람 정보 저장
+    
             alarm_datetime = datetime.fromtimestamp(alarm_time / 1000)
             self.alarms[class_id] = {
                 'alarm_id': alarm_id,
@@ -187,17 +181,18 @@ class AlarmManager:
                 'created_at': datetime.now().isoformat()
             }
             self.save_alarms()
-            
+    
             print(f"✅ 알람 예약 성공: {class_data['name']}")
             print(f"📅 다음 알람 시간: {alarm_datetime.strftime('%Y-%m-%d %H:%M:%S')}")
             print(f"⏰ 수업 시작 {minutes_before}분 전 알림")
             return True
-            
+    
         except Exception as e:
             print(f"❌ 알람 예약 오류: {e}")
             import traceback
             traceback.print_exc()
             return False
+
     
     def cancel_alarm(self, class_id):
         """수업 알람 취소"""
