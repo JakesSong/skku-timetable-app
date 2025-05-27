@@ -91,6 +91,7 @@ jobs:
       run: |
         echo "=== Forcing full rebuild ==="
         rm -rf .buildozer bin
+        mkdir -p .buildozer
         touch buildozer.spec
         buildozer android debug --verbose
           
