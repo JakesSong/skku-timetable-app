@@ -1,5 +1,5 @@
 // AlarmReceiver.java
-package org.kivy.android;
+package org.kivy.skkutimetable.doublecheck;
 
 import android.content.BroadcastReceiver;
 import android.content.Context;
