@@ -2321,6 +2321,9 @@ class MainScreen(MDScreen):
                 Clock.schedule_once(lambda dt: self.safe_load_timetable(), 1.0)  # 1초 후 실행
                 self._timetable_loaded = True
                 print("📅 시간표 로드 예약됨")
+
+            # 🔥🔥🔥 더미 데이터 추가 (새로 추가하는 부분)
+            Clock.schedule_once(lambda dt: self.add_dummy_data(), 2.0)  # 2초 후 더미 데이터 추가
                         
         except Exception as e:
             print(f"레이아웃 설정 오류: {e}")
@@ -2394,7 +2397,105 @@ class MainScreen(MDScreen):
         except Exception as e:
             print(f"❌ 시스템 알람 취소 실패: {e}")
             return False
-    
+
+    def add_dummy_data(self):
+        """테스트용 더미 과목 데이터 추가"""
+        print("🔥 더미 데이터 추가 시작")
+        
+        # 더미 과목들
+        dummy_classes = [
+            {
+                'id': 1001,
+                'name': '컴퓨터프로그래밍',
+                'day': 'Monday',
+                'start_time': '09:00',
+                'end_time': '10:30',
+                'room': '61304A',
+                'professor': '김교수',
+                'color': '0.9,0.5,0.2,1',  # 주황색
+                'notify_before': 5
+            },
+            {
+                'id': 1002, 
+                'name': '데이터구조',
+                'day': 'Tuesday',
+                'start_time': '13:00',
+                'end_time': '14:30',
+                'room': '61305B',
+                'professor': '이교수',
+                'color': '0.3,0.9,0.5,1',  # 민트그린
+                'notify_before': 10
+            },
+            {
+                'id': 1003,
+                'name': '알고리즘',
+                'day': 'Wednesday', 
+                'start_time': '15:00',
+                'end_time': '16:30',
+                'room': '61306C',
+                'professor': '박교수',
+                'color': '0.4,0.8,1.0,1',  # 하늘색
+                'notify_before': 15
+            },
+            {
+                'id': 1004,
+                'name': '소프트웨어공학',
+                'day': 'Thursday',
+                'start_time': '10:00', 
+                'end_time': '11:30',
+                'room': '61307D',
+                'professor': '최교수',
+                'color': '0.5,0.4,0.8,1',  # 보라색
+                'notify_before': 5
+            },
+            {
+                'id': 1005,
+                'name': '데이터베이스',
+                'day': 'Friday',
+                'start_time': '14:00',
+                'end_time': '15:30', 
+                'room': '61308E',
+                'professor': '정교수',
+                'color': '0.8,0.3,0.6,1',  # 분홍색
+                'notify_before': 20
+            }
+        ]
+        
+        # time_grid가 준비되었는지 확인
+        if not hasattr(self, 'time_grid') or not self.time_grid:
+            print("❌ time_grid가 아직 준비되지 않음")
+            # 1초 후 다시 시도
+            Clock.schedule_once(lambda dt: self.add_dummy_data(), 1.0)
+            return
+        
+        success_count = 0
+        for dummy_class in dummy_classes:
+            try:
+                success = self.add_class_to_grid(
+                    dummy_class['id'],
+                    dummy_class['name'], 
+                    dummy_class['day'],
+                    dummy_class['start_time'],
+                    dummy_class['end_time'],
+                    dummy_class['room'],
+                    dummy_class['professor'],
+                    dummy_class['color'],
+                    dummy_class['notify_before']
+                )
+                
+                if success:
+                    success_count += 1
+                    print(f"✅ 더미 과목 추가 성공: {dummy_class['name']}")
+                else:
+                    print(f"❌ 더미 과목 추가 실패: {dummy_class['name']}")
+                    
+            except Exception as e:
+                print(f"❌ 더미 과목 추가 오류 ({dummy_class['name']}): {e}")
+        
+        print(f"🎉 더미 데이터 추가 완료: {success_count}/{len(dummy_classes)}개 성공")
+        
+        # 다음 ID 설정 (더미 데이터 이후)
+        self.add_class_dialog.next_class_id = 1006
     def schedule_system_alarm(self, class_data, minutes_before=5):
         """통합 시스템 알람 설정 - 수정 반영 + 백그라운드 작동"""
         try:
