@@ -11,6 +11,7 @@ import android.content.Intent;
 import android.os.Build;
 import android.os.IBinder;
 import android.util.Log;
+import org.kivy.android.PythonActivity;
 
 public class AlarmService extends Service {
     private static final String TAG = "AlarmService";
