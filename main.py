@@ -969,6 +969,7 @@ class AddClassDialog:
     def add_class(self, *args):
         """새 과목 추가"""
         # 입력값 가져오기
+        print("🔥🔥🔥 add_class 호출됨!")  # 이 줄만 추가
         name = self.name_field.text.strip()
         day = self.current_day
         start_time = self.start_time_field.text.strip()
@@ -2284,7 +2285,7 @@ class MainScreen(MDScreen):
                 icon="plus",
                 pos_hint={"right": 0.98, "y": 0.02},
                 md_bg_color=self.app.theme_cls.primary_color,
-                on_release=self.add_class_dialog.show_dialog  # 🔥 이 줄 삭제
+                on_release=self.add_class_dialog.show_dialog 
             )
             self.add_widget(self.add_class_button)
 
