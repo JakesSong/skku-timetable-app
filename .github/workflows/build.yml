@@ -86,22 +86,12 @@ jobs:
         else
           echo "No main_simple.py found!"
         fi
-
-    - name: Build APK
+    
+    - name: Build APK (force rebuild with Java src)
       run: |
-        echo "=== Starting APK build ==="
-        echo "Using Java 17 for build"
-        java -version
-    
-        echo "=== Environment variables ==="
-        echo "GRADLE_OPTS: $GRADLE_OPTS"
-        echo "P4A_GRADLE_OPTS: $P4A_GRADLE_OPTS"
-    
-        echo "=== Forcing rebuild ==="
+        echo "=== Forcing full rebuild ==="
+        rm -rf .buildozer bin
         touch buildozer.spec
-        buildozer android clean
-    
-        echo "=== Starting fresh buildozer build ==="
         buildozer android debug --verbose
           
     - name: Check build results
