@@ -47,7 +47,6 @@ def setup_korean_font():
         LabelBase.register(FONT_NAME, fn_regular="")
         return FONT_NAME
     except:
-        # 최후의 수단
         return "Roboto"
 
 # 폰트 설정 실행
