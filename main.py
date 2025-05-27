@@ -433,7 +433,7 @@ class AddClassDialog:
         # 🔥 ScrollView로 감싸기 (키보드 가림 방지)
         self.scroll_view = ScrollView(
             size_hint_y=None,
-            height=dp(550),  # 전체 높이를 줄여서 키보드 공간 확보
+            height=dp(450),  # 전체 높이를 줄여서 키보드 공간 확보
             do_scroll_x=False,
             do_scroll_y=True,
             bar_width=dp(4),
@@ -1241,7 +1241,7 @@ class EditClassDialog:
         # 🔥 ScrollView로 감싸기 (키보드 가림 방지)
         self.scroll_view = ScrollView(
             size_hint_y=None,
-            height=dp(550),  # 전체 높이를 줄여서 키보드 공간 확보
+            height=dp(450),  # 전체 높이를 줄여서 키보드 공간 확보
             do_scroll_x=False,
             do_scroll_y=True,
             bar_width=dp(4),
