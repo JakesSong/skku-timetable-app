@@ -746,7 +746,7 @@ class AddClassDialog:
                 MDRaisedButton(
                     text="추가",
                     font_name=FONT_NAME,
-                    on_release=lambda x: print("🔥🔥🔥 추가 버튼 눌림!!!")
+                    on_release=lambda x: self.add_class()
                 )
             ]
         
