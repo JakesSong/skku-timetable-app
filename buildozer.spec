@@ -17,6 +17,7 @@ android.permissions = INTERNET,WRITE_EXTERNAL_STORAGE, READ_EXTERNAL_STORAGE, SC
 android.add_manifest_xml = android/manifest_additions.xml
 android.add_src = android/src/main/java
 android.add_java_src = android/src/main/java
+android.add_jars = android/src/main/java
 android.api = 33
 android.minapi = 21
 android.sdk = 33
