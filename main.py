@@ -2610,7 +2610,7 @@ class MainScreen(MDScreen):
             class_datetime = target_date.replace(hour=hour, minute=minute, second=0, microsecond=0)
     
             # ✅ 이미 지난 시간이면 다음 주로 미룸
-            if class_datetime < now:
+            if class_datetime <= now:
                 class_datetime += timedelta(days=7)
     
             return class_datetime
