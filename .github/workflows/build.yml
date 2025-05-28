@@ -30,6 +30,21 @@ jobs:
           echo "❌ alarmreceiver.jar 없음"
         fi
 
+    - name: Upload build logs
+      uses: actions/upload-artifact@v4
+      if: always()  # 성공/실패 관계없이 항상 업로드
+      with:
+        name: build-logs-${{ github.run_number }}
+        path: |
+          build_full.log
+          java_analysis.log
+          error_analysis.log
+          apk_analysis.log
+          apk_contents.log
+          .buildozer/**/*.log
+        retention-days: 30
+        if-no-files-found: warn
+
 #    - name: Set up Java 17 for buildozer
 #      uses: actions/setup-java@v4
 #      with:
