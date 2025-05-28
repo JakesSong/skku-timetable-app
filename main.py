@@ -2612,7 +2612,10 @@ class MainScreen(MDScreen):
             return False
     
     def parse_class_time(self, class_data):
-    
+        print(f"🔥 [DEBUG 26] parse_class_time 시작")
+        print(f"   - 요일: {class_data.get('day')}")
+        print(f"   - 시간: {class_data.get('start_time')}")
+        
         day_map = {
             "Monday": 0, "Tuesday": 1, "Wednesday": 2,
             "Thursday": 3, "Friday": 4,
@@ -2624,23 +2627,31 @@ class MainScreen(MDScreen):
         start_time = class_data.get("start_time")
     
         if not day or not start_time:
+            print(f"🔥 [DEBUG 26B] 요일 또는 시간 누락")
             return None
     
         target_weekday = day_map.get(day)
         if target_weekday is None:
+            print(f"🔥 [DEBUG 26C] 잘못된 요일: {day}")
             return None
+        
+        print(f"🔥 [DEBUG 27] 요일 매핑: {day} → {target_weekday}")
     
         now = datetime.now()
         today_weekday = now.weekday()
+        print(f"🔥 [DEBUG 28] 오늘: {today_weekday}, 목표: {target_weekday}")
     
         days_ahead = (target_weekday - today_weekday) % 7
         target_date = now + timedelta(days=days_ahead)
+        print(f"🔥 [DEBUG 29] {days_ahead}일 후: {target_date.date()}")
     
         hour, minute = map(int, start_time.split(":"))
         class_datetime = target_date.replace(hour=hour, minute=minute, second=0, microsecond=0)
+        print(f"🔥 [DEBUG 30] 수업 일시: {class_datetime}")
     
         if class_datetime <= now:
             class_datetime += timedelta(days=7)
+            print(f"🔥 [DEBUG 31] 다음 주로 조정: {class_datetime}")
     
         return class_datetime
     
