@@ -18,10 +18,10 @@ jobs:
       with:
         python-version: '3.9'
 
-    - name: Check jar file visibility
+    # 🔍 .jar 및 .java 파일만 확인
+    - name: Check jar and java file visibility
       run: |
-        echo "=== jar 파일 확인 시작 ==="
-        ls -la
+        echo "=== 🔍 jar 파일 확인 시작 ==="
         ls -la android
         ls -la android/libs
         if [ -f "android/libs/alarmreceiver.jar" ]; then
@@ -30,62 +30,72 @@ jobs:
           echo "❌ alarmreceiver.jar 없음"
         fi
 
+        echo "=== 🔍 java 파일 경로 확인 ==="
+        find android/src -type f -name "*.java" || echo "❌ java 파일 없음"
+        if [ -d "android/src/main/java/org/kivy/skkutimetable/doublecheck" ]; then
+          echo "✅ java 소스 디렉토리 존재함"
+          ls -R android/src/main/java/org/kivy/skkutimetable/doublecheck
+        else
+          echo "❌ java 소스 디렉토리 없음"
+        fi
+
+    # 📦 빌드 로그 및 자바 확인용 파일 업로드
     - name: Upload build logs
       uses: actions/upload-artifact@v4
-      if: always()  # 성공/실패 관계없이 항상 업로드
+      if: always()
       with:
-        name: build-logs-${{ github.run_number }}
+        name: java-jar-check-${{ github.run_number }}
         path: |
-          build_full.log
-          java_analysis.log
-          error_analysis.log
-          apk_analysis.log
-          apk_contents.log
-          .buildozer/**/*.log
-        retention-days: 30
+          android/libs/alarmreceiver.jar
+          android/src/main/java/org/kivy/skkutimetable/doublecheck/*.java
+        retention-days: 7
         if-no-files-found: warn
 
-#    - name: Set up Java 17 for buildozer
-#      uses: actions/setup-java@v4
-#      with:
-#        distribution: 'temurin'
-#        java-version: '17'
+    ##########################################
+    ## ⛔ 아래는 빌드 관련 Step - 주석처리됨 ##
+    ##########################################
 
-#    - name: Install system dependencies
-#      run: |
-#        sudo apt-get update -qq
-#        sudo apt-get install -y \
-#          git zip unzip autoconf libtool pkg-config \
-#          zlib1g-dev libncurses5-dev libncursesw5-dev libtinfo5 cmake \
-#          libffi-dev libssl-dev build-essential libsqlite3-dev sqlite3 \
-#          bzip2 libbz2-dev libreadline-dev llvm \
-#          xz-utils tk-dev libxml2-dev libxmlsec1-dev liblzma-dev \
-#          libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev \
-#          libportmidi-dev libswscale-dev libavformat-dev libavcodec-dev \
-#          libfreetype6-dev libpng-dev libjpeg-dev
+    # - name: Set up Java 17 for buildozer
+    #   uses: actions/setup-java@v4
+    #   with:
+    #     distribution: 'temurin'
+    #     java-version: '17'
 
-#    - name: Install Python dependencies
-#      run: |
-#        python -m pip install --upgrade pip
-#        pip install --upgrade setuptools wheel
-#        pip install Cython==0.29.33
-#        pip install buildozer==1.5.0
+    # - name: Install system dependencies
+    #   run: |
+    #     sudo apt-get update -qq
+    #     sudo apt-get install -y \
+    #       git zip unzip autoconf libtool pkg-config \
+    #       zlib1g-dev libncurses5-dev libncursesw5-dev libtinfo5 cmake \
+    #       libffi-dev libssl-dev build-essential libsqlite3-dev sqlite3 \
+    #       bzip2 libbz2-dev libreadline-dev llvm \
+    #       xz-utils tk-dev libxml2-dev libxmlsec1-dev liblzma-dev \
+    #       libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev \
+    #       libportmidi-dev libswscale-dev libavformat-dev libavcodec-dev \
+    #       libfreetype6-dev libpng-dev libjpeg-dev
 
-#    - name: Set environment variables
-#      run: |
-#        echo "P4A_NUM_PROCS=1" >> $GITHUB_ENV
-#        echo "GRADLE_OPTS=-Dorg.gradle.daemon=false -Dorg.gradle.jvmargs='-Xmx3072m -XX:MaxMetaspaceSize=768m' -Dorg.gradle.parallel=false" >> $GITHUB_ENV
-#        echo "P4A_GRADLE_OPTS=--stacktrace --info" >> $GITHUB_ENV
+    # - name: Install Python dependencies
+    #   run: |
+    #     python -m pip install --upgrade pip
+    #     pip install --upgrade setuptools wheel
+    #     pip install Cython==0.29.33
+    #     pip install buildozer==1.5.0
 
-#    - name: Complete clean build
-#      run: |
-#        echo "=== Completely cleaning build environment ==="
-#        rm -rf .buildozer
-#        rm -rf bin
-#        rm -rf ~/.buildozer
-#        rm -rf ~/.gradle
-#        rm -rf ~/.android
+    # - name: Set environment variables
+    #   run: |
+    #     echo "P4A_NUM_PROCS=1" >> $GITHUB_ENV
+    #     echo "GRADLE_OPTS=-Dorg.gradle.daemon=false -Dorg.gradle.jvmargs='-Xmx3072m -XX:MaxMetaspaceSize=768m' -Dorg.gradle.parallel=false" >> $GITHUB_ENV
+    #     echo "P4A_GRADLE_OPTS=--stacktrace --info" >> $GITHUB_ENV
 
-#    - name: Build APK (force rebuild)
-#      run: |
-#        buildozer android debug --verbose
+    # - name: Complete clean build
+    #   run: |
+    #     echo "=== Completely cleaning build environment ==="
+    #     rm -rf .buildozer
+    #     rm -rf bin
+    #     rm -rf ~/.buildozer
+    #     rm -rf ~/.gradle
+    #     rm -rf ~/.android
+
+    # - name: Build APK (force rebuild)
+    #   run: |
+    #     buildozer android debug --verbose
