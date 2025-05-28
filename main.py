@@ -3349,6 +3349,11 @@ class TimeTableApp(MDApp):
     def on_start(self):
         """앱 시작 시 호출"""
         print("✅ 앱 시작됨")
+        Intent = autoclass('android.content.Intent')
+        Context = autoclass('org.kivy.android.PythonActivity').mActivity
+        AlarmReceiver = autoclass('org.kivy.skkutimetable.doublecheck.AlarmReceiver')
+        test_intent = Intent(Context, AlarmReceiver)
+        Context.sendBroadcast(test_intent)
         
     def on_resume(self):
         """백그라운드에서 돌아올 때 호출"""
