@@ -1,5 +1,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <application>
+
+        <!-- 알람 리시버 등록 -->
         <receiver
             android:name="org.kivy.skkutimetable.doublecheck.AlarmReceiver"
             android:enabled="true"
@@ -9,5 +11,13 @@
                 <action android:name="org.kivy.ALARM_TRIGGERED" />
             </intent-filter>
         </receiver>
+
+        <!-- 알람 서비스 등록 -->
+        <service
+            android:name="org.kivy.skkutimetable.doublecheck.AlarmService"
+            android:enabled="true"
+            android:exported="true"
+            android:foregroundServiceType="dataSync" />
+            
     </application>
 </manifest>
