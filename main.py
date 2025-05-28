@@ -3464,18 +3464,18 @@ class TimeTableApp(MDApp):
     
         days_ahead = (target_weekday - today_weekday) % 7
         target_date = now + timedelta(days=days_ahead)
-    print(f"🔥 [DEBUG 29] {days_ahead}일 후: {target_date.date()}")
-
-    hour, minute = map(int, start_time.split(":"))
-    class_datetime = target_date.replace(hour=hour, minute=minute, second=0, microsecond=0)
-    print(f"🔥 [DEBUG 30] 수업 일시: {class_datetime}")
-
-    if class_datetime <= now:
-        class_datetime += timedelta(days=7)
-        print(f"🔥 [DEBUG 31] 다음 주로 조정: {class_datetime}")
-
-    return class_datetime
-  
+        print(f"🔥 [DEBUG 29] {days_ahead}일 후: {target_date.date()}")
+    
+        hour, minute = map(int, start_time.split(":"))
+        class_datetime = target_date.replace(hour=hour, minute=minute, second=0, microsecond=0)
+        print(f"🔥 [DEBUG 30] 수업 일시: {class_datetime}")
+    
+        if class_datetime <= now:
+            class_datetime += timedelta(days=7)
+            print(f"🔥 [DEBUG 31] 다음 주로 조정: {class_datetime}")
+    
+        return class_datetime
+      
     
     def show_alarm_notification(self, class_name, class_room, class_time, class_professor):
         try:
