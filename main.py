@@ -3370,19 +3370,20 @@ class TimeTableApp(MDApp):
         try:
             from jnius import autoclass
             
-            # 서비스 클래스 가져오기 (buildozer.spec의 package.name + AlarmService)
-            # 실제 패키지명은 buildozer.spec에 따라 다름
-            service_name = "org.kivy.skkutimetable.doublecheck.AlarmService"
-            service = autoclass(service_name)
-            
-            # 현재 액티비티 가져오기
+            Intent = autoclass('android.content.Intent')
             PythonActivity = autoclass('org.kivy.android.PythonActivity')
-            mActivity = PythonActivity.mActivity
             
-            # 서비스 시작
-            service.start(mActivity, "")
+            # ✅ 올바른 방식: Intent로 서비스 시작
+            context = PythonActivity.mActivity
+            intent = Intent(context, autoclass('org.kivy.skkutimetable.doublecheck.AlarmService'))
+            
+            # Android O 이상에서는 startForegroundService 사용
+            if hasattr(context, 'startForegroundService'):
+                context.startForegroundService(intent)
+            else:
+                context.startService(intent)
+                
             print("✅ 백그라운드 알림 서비스 시작")
-            
             return True
             
         except Exception as e:
