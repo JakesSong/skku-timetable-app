@@ -16,6 +16,13 @@ public class AlarmReceiver extends BroadcastReceiver {
     public void onReceive(Context context, Intent intent) {
         Log.d(TAG, "🔔 알람 수신됨");
 
+            // ➕ 테스트용 푸시 알림
+        NotificationCompat.Builder builder = new NotificationCompat.Builder(context, "alarm_channel")
+        .setSmallIcon(android.R.drawable.ic_dialog_info)
+        .setContentTitle("⏰ 테스트 알람")
+        .setContentText("AlarmReceiver가 성공적으로 호출되었습니다.")
+        .setPriority(NotificationCompat.PRIORITY_HIGH);
+        
         // 수업 정보 가져오기
         int classId = intent.getIntExtra("class_id", 0);
         String className = intent.getStringExtra("class_name");
