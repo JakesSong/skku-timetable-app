@@ -123,20 +123,12 @@ jobs:
         retention-days: 30
         if-no-files-found: warn
 
-    ##########################################
-    ## 🔒 분석 및 결과 확인은 주석 처리됨 ##
-    ##########################################
-
-    # - name: Analyze build logs
-    #   if: always()
-    #   run: |
-    #     ...
-
-    # - name: Upload APK
-    #   if: success()
-    #   uses: actions/upload-artifact@v4
-    #   with:
-    #     name: skku-timetable-apk
-    #     path: bin/*.apk
-    #     retention-days: 7
-    #     if-no-files-found: error
+    # ✅ APK 업로드
+    - name: Upload APK
+      if: success()
+      uses: actions/upload-artifact@v4
+      with:
+        name: skku-timetable-apk
+        path: bin/*.apk
+        retention-days: 7
+        if-no-files-found: error
