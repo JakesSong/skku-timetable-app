@@ -8,245 +8,69 @@ on:
 jobs:
   build:
     runs-on: ubuntu-22.04
-    
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-      
+
     - name: Set up Python 3.9
       uses: actions/setup-python@v5
       with:
         python-version: '3.9'
-        
-    - name: Set up Java 17 for buildozer
-      uses: actions/setup-java@v4
-      with:
-        distribution: 'temurin'
-        java-version: '17'
-        
-    - name: Install system dependencies
-      run: |
-        sudo apt-get update -qq
-        sudo apt-get install -y \
-          git zip unzip autoconf libtool pkg-config \
-          zlib1g-dev libncurses5-dev libncursesw5-dev libtinfo5 cmake \
-          libffi-dev libssl-dev build-essential libsqlite3-dev sqlite3 \
-          bzip2 libbz2-dev libreadline-dev llvm \
-          xz-utils tk-dev libxml2-dev libxmlsec1-dev liblzma-dev \
-          libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev \
-          libportmidi-dev libswscale-dev libavformat-dev libavcodec-dev \
-          libfreetype6-dev libpng-dev libjpeg-dev
-        
-    - name: Install Python dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install --upgrade setuptools wheel
-        pip install Cython==0.29.33
-        pip install buildozer==1.5.0
-        
-    - name: Set environment variables
-      run: |
-        echo "P4A_NUM_PROCS=1" >> $GITHUB_ENV
-        echo "GRADLE_OPTS=-Dorg.gradle.daemon=false -Dorg.gradle.jvmargs='-Xmx3072m -XX:MaxMetaspaceSize=768m' -Dorg.gradle.parallel=false" >> $GITHUB_ENV
-        echo "P4A_GRADLE_OPTS=--stacktrace --info" >> $GITHUB_ENV
-        
-    - name: Complete clean build
-      run: |
-        echo "=== Completely cleaning build environment ==="
-        rm -rf .buildozer
-        rm -rf bin
-        rm -rf ~/.buildozer
-        rm -rf ~/.gradle
-        rm -rf ~/.android
-        
-    - name: Verify buildozer.spec and main files
-      run: |
-        echo "=== Checking current files ==="
-        ls -la
-        
-        echo "=== buildozer.spec content ==="
-        if [ -f "buildozer.spec" ]; then
-          cat buildozer.spec
-        else
-          echo "No buildozer.spec found!"
-        fi
-        
-        echo "=== main.py content ==="
-        if [ -f "main.py" ]; then
-          echo "main.py exists:"
-          head -20 main.py
-        else
-          echo "No main.py found!"
-        fi
-        
-        echo "=== main_simple.py content ==="
-        if [ -f "main_simple.py" ]; then
-          echo "main_simple.py exists:"
-          head -10 main_simple.py
-        else
-          echo "No main_simple.py found!"
-        fi
-    
-    - name: Build APK (force rebuild with Java src)
-      run: |
-        echo "=== Forcing full rebuild ==="
-        rm -rf .buildozer bin
-        mkdir -p .buildozer
-        touch buildozer.spec
-        buildozer android debug --verbose
-          
-    - name: Check build results
-      run: |
-        echo "=== Build Results ==="
-        ls -la
-        
-        if [ -d "bin" ]; then
-          echo "=== APK files ==="
-          ls -la bin/
-          for apk in bin/*.apk; do
-            if [ -f "$apk" ]; then
-              echo "APK file: $apk"
-              file "$apk"
-              echo "APK size: $(du -h "$apk")"
-            fi
-          done
-        else
-          echo "No bin directory found - build may have failed"
-        fi
-        
 
-# 🔥 새로 추가: Java 파일 확인 및 준비
-    - name: Check and prepare Java files
+    - name: Check jar file visibility
       run: |
-        echo "=== Java 파일 확인 중 ==="
-        if ls *.java >/dev/null 2>&1; then
-          echo "✅ Java 파일들 발견:"
-          ls -la *.java
-          
-          # Java 소스 디렉토리 생성
-          mkdir -p src/main/java/org/kivy/skkutimetable/
-          cp *.java src/main/java/org/kivy/skkutimetable/
-          
-          echo "✅ Java 파일들 복사 완료:" 
-          ls -la src/main/java/org/kivy/skkutimetable/
+        echo "=== jar 파일 확인 시작 ==="
+        ls -la
+        ls -la android
+        ls -la android/libs
+        if [ -f "android/libs/alarmreceiver.jar" ]; then
+          echo "✅ alarmreceiver.jar 발견됨"
         else
-          echo "⚠️ Java 파일을 찾을 수 없습니다."
-        fi
-    
-    # 🔥 수정: 빌드 로그를 파일로 저장
-    - name: Build APK (force rebuild with Java src)
-      run: |
-        echo "=== Forcing full rebuild ==="
-        rm -rf .buildozer bin
-        mkdir -p .buildozer
-        touch buildozer.spec
-        
-        echo "🚀 빌드 시작 시간: $(date)"
-        
-        # 🔥 핵심: 빌드 로그를 파일로 저장
-        buildozer android debug --verbose > build_full.log 2>&1 || BUILD_FAILED=true
-        
-        echo "📅 빌드 완료 시간: $(date)"
-        
-        # 빌드 결과 확인
-        if [ "$BUILD_FAILED" = "true" ]; then
-          echo "❌ 빌드 실패!"
-          echo "=== 마지막 50줄 에러 로그 ==="
-          tail -50 build_full.log
-          exit 1
-        else
-          echo "✅ 빌드 성공!"
+          echo "❌ alarmreceiver.jar 없음"
         fi
 
-    # 🔥 새로 추가: 로그 분석
-    - name: Analyze build logs
-      if: always()  # 빌드 실패해도 실행
-      run: |
-        echo "🔍 빌드 로그 분석 중..."
-        
-        # Java 파일 관련 로그 추출
-        echo "=== Java 파일 처리 로그 ==="
-        grep -i "java\|\.java\|including.*java\|copying.*java" build_full.log > java_analysis.log || echo "Java 관련 로그 없음"
-        if [ -s java_analysis.log ]; then
-          echo "Java 파일 처리 로그 발견:"
-          cat java_analysis.log
-        else
-          echo "⚠️ Java 파일 처리 로그가 없습니다."
-        fi
-        
-        # 에러 메시지 추출
-        echo "=== 에러 메시지 분석 ==="
-        grep -i "error\|fail\|exception\|could not\|unable to" build_full.log > error_analysis.log || echo "에러 메시지 없음"
-        if [ -s error_analysis.log ]; then
-          echo "발견된 에러들 (첫 20개):"
-          head -20 error_analysis.log
-        fi
-        
-        # APK 관련 로그 추출
-        echo "=== APK 생성 로그 ==="
-        grep -i "apk\|packaging\|signing\|generated.*apk" build_full.log > apk_analysis.log || echo "APK 관련 로그 없음"
-        if [ -s apk_analysis.log ]; then
-          echo "APK 생성 로그:"
-          tail -10 apk_analysis.log
-        fi
-          
-    - name: Check build results
-      run: |
-        echo "=== Build Results ==="
-        ls -la
-        
-        if [ -d "bin" ]; then
-          echo "=== APK files ==="
-          ls -la bin/
-          for apk in bin/*.apk; do
-            if [ -f "$apk" ]; then
-              echo "APK file: $apk"
-              file "$apk"
-              echo "APK size: $(du -h "$apk")"
-              
-              # 🔥 새로 추가: APK 내용 확인 (Java 클래스 포함 여부)
-              echo "=== APK 내 Java 클래스 확인 ==="
-              unzip -l "$apk" | grep -i "\.class\|\.dex\|alarm\|receiver\|service" > apk_contents.log || echo "클래스 파일 없음"
-              if [ -s apk_contents.log ]; then
-                echo "APK 내 관련 파일들:"
-                head -20 apk_contents.log
-              fi
-            fi
-          done
-        else
-          echo "No bin directory found - build may have failed"
-        fi
-        
-    - name: Check build logs on failure
-      if: failure()
-      run: |
-        echo "=== Checking build logs ==="
-        find .buildozer -name "*.log" -type f -exec echo "=== {} ===" \; -exec head -50 {} \; || true
-        
-        echo "=== Last 100 lines of build output ==="
-        find .buildozer -name "*.log" -type f -exec tail -100 {} \; || true
+#    - name: Set up Java 17 for buildozer
+#      uses: actions/setup-java@v4
+#      with:
+#        distribution: 'temurin'
+#        java-version: '17'
 
-    # 🔥 새로 추가: 모든 로그 파일 업로드
-    - name: Upload build logs
-      uses: actions/upload-artifact@v4
-      if: always()  # 성공/실패 관계없이 항상 업로드
-      with:
-        name: build-logs-${{ github.run_number }}
-        path: |
-          build_full.log
-          java_analysis.log
-          error_analysis.log
-          apk_analysis.log
-          apk_contents.log
-          .buildozer/**/*.log
-        retention-days: 30
-        if-no-files-found: warn
-        
-    - name: Upload APK
-      if: success()
-      uses: actions/upload-artifact@v4
-      with:
-        name: skku-timetable-apk
-        path: bin/*.apk
-        retention-days: 7
-        if-no-files-found: error
+#    - name: Install system dependencies
+#      run: |
+#        sudo apt-get update -qq
+#        sudo apt-get install -y \
+#          git zip unzip autoconf libtool pkg-config \
+#          zlib1g-dev libncurses5-dev libncursesw5-dev libtinfo5 cmake \
+#          libffi-dev libssl-dev build-essential libsqlite3-dev sqlite3 \
+#          bzip2 libbz2-dev libreadline-dev llvm \
+#          xz-utils tk-dev libxml2-dev libxmlsec1-dev liblzma-dev \
+#          libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev \
+#          libportmidi-dev libswscale-dev libavformat-dev libavcodec-dev \
+#          libfreetype6-dev libpng-dev libjpeg-dev
+
+#    - name: Install Python dependencies
+#      run: |
+#        python -m pip install --upgrade pip
+#        pip install --upgrade setuptools wheel
+#        pip install Cython==0.29.33
+#        pip install buildozer==1.5.0
+
+#    - name: Set environment variables
+#      run: |
+#        echo "P4A_NUM_PROCS=1" >> $GITHUB_ENV
+#        echo "GRADLE_OPTS=-Dorg.gradle.daemon=false -Dorg.gradle.jvmargs='-Xmx3072m -XX:MaxMetaspaceSize=768m' -Dorg.gradle.parallel=false" >> $GITHUB_ENV
+#        echo "P4A_GRADLE_OPTS=--stacktrace --info" >> $GITHUB_ENV
+
+#    - name: Complete clean build
+#      run: |
+#        echo "=== Completely cleaning build environment ==="
+#        rm -rf .buildozer
+#        rm -rf bin
+#        rm -rf ~/.buildozer
+#        rm -rf ~/.gradle
+#        rm -rf ~/.android
+
+#    - name: Build APK (force rebuild)
+#      run: |
+#        buildozer android debug --verbose
