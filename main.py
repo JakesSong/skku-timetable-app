@@ -2498,90 +2498,65 @@ class MainScreen(MDScreen):
         self.add_class_dialog.next_class_id = 1006
         
     def schedule_system_alarm(self, class_data, minutes_before=5):
-        """통합 시스템 알람 설정"""
-        print(f"🔥 [DEBUG 7] schedule_system_alarm 시작")
-        print(f"   - 과목: {class_data['name']}")
-        print(f"   - 알람: {minutes_before}분 전")
-        
+        """통합 시스템 알람 설정 - 수정 반영 + 백그라운드 작동"""
         try:
             if platform != 'android':
-                print(f"🔥 [DEBUG 7B] Android가 아님 - 종료")
+                print("Android에서만 사용 가능")
                 return False
                 
-            print(f"🔥 [DEBUG 8] Android 환경 확인 - jnius import 시도")
             from jnius import autoclass
             from datetime import datetime, timedelta
+            import time
             
-            print(f"🔥 [DEBUG 9] Android 클래스들 로드 시작")
+            # Android 클래스들
             AlarmManager = autoclass('android.app.AlarmManager')
             Intent = autoclass('android.content.Intent')
             PendingIntent = autoclass('android.app.PendingIntent')
             Context = autoclass('android.content.Context')
             PythonActivity = autoclass('org.kivy.android.PythonActivity')
             ComponentName = autoclass('android.content.ComponentName')
-            print(f"🔥 [DEBUG 10] Android 클래스들 로드 완료")
             
             context = PythonActivity.mActivity
             alarm_manager = context.getSystemService(Context.ALARM_SERVICE)
-            print(f"🔥 [DEBUG 11] AlarmManager 서비스 획득: {alarm_manager}")
             
             # Android 12+ 권한 확인
             if hasattr(alarm_manager, 'canScheduleExactAlarms'):
-                can_schedule = alarm_manager.canScheduleExactAlarms()
-                print(f"🔥 [DEBUG 12] 정확한 알람 권한: {can_schedule}")
-                if not can_schedule:
-                    print(f"🔥 [DEBUG 12B] 정확한 알람 권한 없음 - 권한 요청")
+                if not alarm_manager.canScheduleExactAlarms():
+                    print("⚠️ 정확한 알람 권한 필요")
                     self.request_alarm_permission()
                     return False
-            else:
-                print(f"🔥 [DEBUG 12C] Android 12 미만 - 권한 확인 불필요")
             
-            # 기존 알람 취소
-            print(f"🔥 [DEBUG 13] 기존 알람 취소 시도: ID {class_data['id']}")
+            # 1단계: 기존 알람 먼저 취소 (중복 방지)
             self.cancel_system_alarm(class_data['id'])
             
-            # 알람 시간 계산
-            print(f"🔥 [DEBUG 14] 알람 시간 계산 시작")
+            # 2단계: 알람 시간 계산
             class_time = self.parse_class_time(class_data)
-            if class_time is None:
-                print(f"🔥 [DEBUG 14B] 수업 시간 파싱 실패")
-                return False
-                
             alarm_time = class_time - timedelta(minutes=minutes_before)
-            print(f"🔥 [DEBUG 15] 수업 시간: {class_time}")
-            print(f"🔥 [DEBUG 16] 알람 시간: {alarm_time}")
             
-            # 과거 시간 체크
-            now = datetime.now()
-            if alarm_time < now:
-                if alarm_time.date() == now.date():
-                    print(f"🔥 [DEBUG 17A] 오늘 수업 - 알람 유지")
+            # 과거 시간이지만 오늘이면 알람 설정 허용
+            if alarm_time < datetime.now():
+                if alarm_time.date() == datetime.now().date():
+                    print("✅ 오늘 수업 시간, 아직 안 지남 - 알람 설정 유지")
                 else:
-                    print(f"🔥 [DEBUG 17B] 과거 수업 - 다음 주로 이동")
-                    alarm_time += timedelta(days=7)
-                    print(f"🔥 [DEBUG 17C] 수정된 알람 시간: {alarm_time}")
+                    print("⏭ 과거 수업 - 다음 주로 이동")
+                    alarm_time += timedelta(days=7)  # 다음 주로 미룸
                 
             alarm_millis = int(alarm_time.timestamp() * 1000)
-            print(f"🔥 [DEBUG 18] 알람 밀리초: {alarm_millis}")
             
-            # Intent 생성
-            print(f"🔥 [DEBUG 19] Intent 생성 시작")
+            # 3단계: 기존 AlarmReceiver로 Intent 전송
             intent = Intent()
             intent.setComponent(ComponentName(
                 "org.kivy.skkutimetable.doublecheck",
                 "org.kivy.skkutimetable.doublecheck.AlarmReceiver"
             ))
-            print(f"🔥 [DEBUG 20] ComponentName 설정 완료")
             
-            # 수업 정보 전달
+            # 4단계: 수업 정보 전달
             intent.putExtra("class_name", class_data['name'])
             intent.putExtra("class_room", class_data['room'])
             intent.putExtra("class_time", class_data['start_time'])
             intent.putExtra("class_professor", class_data.get('professor', ''))
-            print(f"🔥 [DEBUG 21] Intent extras 설정 완료")
             
-            # PendingIntent 생성
-            print(f"🔥 [DEBUG 22] PendingIntent 생성 시작")
+            # 5단계: PendingIntent 생성
             flags = PendingIntent.FLAG_UPDATE_CURRENT
             if hasattr(PendingIntent, 'FLAG_IMMUTABLE'):
                 flags |= PendingIntent.FLAG_IMMUTABLE
@@ -2592,30 +2567,29 @@ class MainScreen(MDScreen):
                 intent, 
                 flags
             )
-            print(f"🔥 [DEBUG 23] PendingIntent 생성 완료: ID={class_data['id']}")
             
-            # 시스템 알람 설정
-            print(f"🔥 [DEBUG 24] 시스템 알람 설정 시도")
+            # 6단계: 시스템 알람 설정
             alarm_manager.setExactAndAllowWhileIdle(
                 AlarmManager.RTC_WAKEUP, 
                 alarm_millis, 
                 pending_intent
             )
-            print(f"🔥 [DEBUG 25] ✅ 시스템 알람 설정 완료!")
+            
+            print(f"✅ 통합 시스템 알람 설정 완료!")
+            print(f"📚 과목: {class_data['name']}")
+            print(f"⏰ 알람: {minutes_before}분 전 ({alarm_time.strftime('%Y-%m-%d %H:%M')})")
+            print(f"📱 앱이 꺼져도 시스템이 알람을 울려줍니다!")
             
             return True
             
         except Exception as e:
-            print(f"🔥 [DEBUG ERROR] 시스템 알람 설정 실패: {e}")
+            print(f"❌ 통합 시스템 알람 설정 실패: {e}")
             import traceback
             traceback.print_exc()
             return False
     
     def parse_class_time(self, class_data):
-        print(f"🔥 [DEBUG 26] parse_class_time 시작")
-        print(f"   - 요일: {class_data.get('day')}")
-        print(f"   - 시간: {class_data.get('start_time')}")
-        
+    
         day_map = {
             "Monday": 0, "Tuesday": 1, "Wednesday": 2,
             "Thursday": 3, "Friday": 4,
@@ -2627,31 +2601,23 @@ class MainScreen(MDScreen):
         start_time = class_data.get("start_time")
     
         if not day or not start_time:
-            print(f"🔥 [DEBUG 26B] 요일 또는 시간 누락")
             return None
     
         target_weekday = day_map.get(day)
         if target_weekday is None:
-            print(f"🔥 [DEBUG 26C] 잘못된 요일: {day}")
             return None
-        
-        print(f"🔥 [DEBUG 27] 요일 매핑: {day} → {target_weekday}")
     
         now = datetime.now()
         today_weekday = now.weekday()
-        print(f"🔥 [DEBUG 28] 오늘: {today_weekday}, 목표: {target_weekday}")
     
         days_ahead = (target_weekday - today_weekday) % 7
         target_date = now + timedelta(days=days_ahead)
-        print(f"🔥 [DEBUG 29] {days_ahead}일 후: {target_date.date()}")
     
         hour, minute = map(int, start_time.split(":"))
         class_datetime = target_date.replace(hour=hour, minute=minute, second=0, microsecond=0)
-        print(f"🔥 [DEBUG 30] 수업 일시: {class_datetime}")
     
         if class_datetime <= now:
             class_datetime += timedelta(days=7)
-            print(f"🔥 [DEBUG 31] 다음 주로 조정: {class_datetime}")
     
         return class_datetime
     
