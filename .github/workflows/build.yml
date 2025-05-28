@@ -132,9 +132,6 @@ jobs:
         else
           echo "⚠️ Java 파일을 찾을 수 없습니다."
         fi
-        
-        echo "=== buildozer.spec Java 설정 확인 ==="
-        grep -n -i "java\|source.include_exts\|android.add_java" buildozer.spec || echo "Java 관련 설정 없음"
     
     # 🔥 수정: 빌드 로그를 파일로 저장
     - name: Build APK (force rebuild with Java src)
