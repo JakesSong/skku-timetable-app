@@ -1,7 +1,7 @@
 [app]
 title = DoubleCheck
 icon.filename = icon.png
-package.name = DoubleCheck
+package.name = doublecheck
 package.domain = org.kivy.skkutimetable
 
 source.dir = .
