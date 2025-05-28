@@ -127,7 +127,7 @@ jobs:
           mkdir -p src/main/java/org/kivy/skkutimetable/
           cp *.java src/main/java/org/kivy/skkutimetable/
           
-          echo "✅ Java 파일들 복사 완료:"
+          echo "✅ Java 파일들 복사 완료:" 
           ls -la src/main/java/org/kivy/skkutimetable/
         else
           echo "⚠️ Java 파일을 찾을 수 없습니다."
