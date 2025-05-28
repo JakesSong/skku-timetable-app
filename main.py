@@ -2546,8 +2546,8 @@ class MainScreen(MDScreen):
             # 3단계: 기존 AlarmReceiver로 Intent 전송
             intent = Intent()
             intent.setComponent(ComponentName(
-                "org.kivy.android",
-                "org.kivy.android.AlarmReceiver"
+                "org.kivy.skkutimetable.doublecheck",
+                "org.kivy.skkutimetable.doublecheck.AlarmReceiver" 
             ))
             
             # 4단계: 수업 정보 전달
