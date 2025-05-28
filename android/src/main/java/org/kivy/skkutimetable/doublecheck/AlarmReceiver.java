@@ -17,7 +17,7 @@ public class AlarmReceiver extends BroadcastReceiver {
         Log.d(TAG, "🔔 알람 수신됨");
 
             // ➕ 테스트용 푸시 알림
-        NotificationCompat.Builder builder = new NotificationCompat.Builder(context, "alarm_channel")
+        NotificationCompat.Builder builder = new NotificationCompat.Builder(context, "timetable_alarm_channel")
         .setSmallIcon(android.R.drawable.ic_dialog_info)
         .setContentTitle("⏰ 테스트 알람")
         .setContentText("AlarmReceiver가 성공적으로 호출되었습니다.")
