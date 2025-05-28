@@ -23,15 +23,15 @@ android.permissions = INTERNET,WRITE_EXTERNAL_STORAGE,READ_EXTERNAL_STORAGE,SCHE
 
 android.add_manifest_xml = android/manifest_additions.xml
 
-# ✅ Java 소스 직접 포함 (테스트 목적 활성화)
+# ✅ Java 소스 직접 포함 (사용)
 android.add_src = android/src/main/java
 android.add_java_src = android/src/main/java
 
-# ✅ jar 파일 포함 (병행 테스트용)
-android.add_jars = android/libs/alarmreceiver.jar
+# ❌ jar 파일 포함 (비활성화)
+# android.add_jars = android/libs/alarmreceiver.jar
 
-# 🔧 build.gradle에 fileTree 설정 patch
-android.patch = android/patches/build.gradle.patch
+# ❌ fileTree 관련 gradle patch도 비활성화
+# android.patch = android/patches/build.gradle.patch
 
 android.api = 33
 android.minapi = 21
