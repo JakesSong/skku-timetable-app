@@ -3370,9 +3370,9 @@ class TimeTableApp(MDApp):
         try:
             from jnius import autoclass
             
-            # 서비스 클래스 가져오기 (buildozer.spec의 package.name + ServiceAlarmService)
+            # 서비스 클래스 가져오기 (buildozer.spec의 package.name + AlarmService)
             # 실제 패키지명은 buildozer.spec에 따라 다름
-            service_name = "org.kivy.skkutimetable.doublecheck.ServiceAlarmService"
+            service_name = "org.kivy.skkutimetable.doublecheck.AlarmService"
             service = autoclass(service_name)
             
             # 현재 액티비티 가져오기
