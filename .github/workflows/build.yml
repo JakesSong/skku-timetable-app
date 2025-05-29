@@ -58,16 +58,34 @@ jobs:
           echo "❌ buildozer.spec 파일 없음"
         fi
 
-    # ✅ manifest_additions.xml 확인
-    - name: Check manifest_additions.xml
+    # ✅ buildozer.spec manifest 설정 확인 (템플릿 방식)
+    - name: Check manifest configuration in buildozer.spec (template mode)
       run: |
-        echo "=== 🔍 manifest_additions.xml 확인 ==="
-        if [ -f "android/manifest_additions.xml" ]; then
-          echo "✅ android/manifest_additions.xml 존재 ($(wc -c < android/manifest_additions.xml) bytes)"
-          echo "AlarmReceiver 포함 유무:"
-          grep -A 5 -B 2 "AlarmReceiver" android/manifest_additions.xml || echo "❌ AlarmReceiver 없음"
+        echo "=== 🔧 buildozer.spec manifest 설정 확인 (템플릿 방식) ==="
+        if [ -f "buildozer.spec" ]; then
+          echo "--- manifest 관련 설정들 ---"
+          grep -n "manifest" buildozer.spec || echo "manifest 설정 없음"
+          echo "--- android.manifest_template 설정 ---"
+          grep -n "android.manifest_template" buildozer.spec || echo "android.manifest_template 설정 없음"
+          echo "--- 주석 처리된 android.add_manifest_xml 확인 ---"
+          grep -n "android.add_manifest_xml" buildozer.spec || echo "android.add_manifest_xml 설정 없음"
+          echo ""
+          echo "--- AndroidManifest.tmpl.xml 파일 존재 확인 ---"
+          if [ -f "AndroidManifest.tmpl.xml" ]; then
+            echo "✅ AndroidManifest.tmpl.xml 파일 존재"
+            echo "--- 템플릿 파일 크기 ---"
+            ls -la AndroidManifest.tmpl.xml
+            echo "--- 템플릿 파일 첫 10줄 ---"
+            head -10 AndroidManifest.tmpl.xml
+            echo "--- AlarmReceiver 포함 여부 ---"
+            grep -n "AlarmReceiver" AndroidManifest.tmpl.xml || echo "❌ AlarmReceiver 없음"
+            echo "--- NonExistentReceiver 디버그 코드 확인 ---"
+            grep -n "NonExistentReceiver" AndroidManifest.tmpl.xml || echo "NonExistentReceiver 없음"
+          else
+            echo "❌ AndroidManifest.tmpl.xml 파일 없음"
+          fi
         else
-          echo "❌ android/manifest_additions.xml 없음"
+          echo "❌ buildozer.spec 파일 없음"
         fi
 
     # ✅ Java 17 세팅
@@ -97,7 +115,7 @@ jobs:
         python -m pip install --upgrade pip
         pip install --upgrade setuptools wheel
         pip install Cython==0.29.33
-        pip install buildozer==1.5.0
+        pip install buildozer==1.4.0
 
     # ✅ 환경 변수 설정
     - name: Set environment variables
@@ -163,52 +181,109 @@ jobs:
         echo "=== 🔍 AlarmReceiver 클래스(smali) 존재 확인 ==="
         find decoded_apk/smali -type f -name "*AlarmReceiver*.smali" || echo "❌ AlarmReceiver 클래스 없음"
 
-    # ✅ 빌드 후 생성된 AndroidManifest.xml 확인
-    - name: Check generated AndroidManifest.xml
+    # ✅ 빌드 후 생성된 AndroidManifest.xml 철저 분석
+    - name: Analyze generated AndroidManifest.xml (Enhanced)
       if: always()
       run: |
-        echo "=== 🔍 생성된 AndroidManifest.xml 확인 ==="
+        echo "=== 🔍 생성된 AndroidManifest.xml 철저 분석 ==="
         echo "모든 AndroidManifest.xml 파일 찾기:"
-        find .buildozer -name "AndroidManifest.xml" 2>/dev/null || echo "AndroidManifest.xml 없음"
-
+        find .buildozer -name "AndroidManifest.xml" -type f 2>/dev/null | while read -r file; do
+          echo "📁 $file ($(wc -c < "$file") bytes)"
+        done || echo "AndroidManifest.xml 없음"
+        
         echo ""
-        echo "=== 🔍 주요 매니페스트 파일들 지적 확인 ==="
-
+        echo "=== 🔍 주요 매니페스트 파일들 상세 분석 ==="
         MAIN_MANIFESTS=(
           ".buildozer/android/platform/build-arm64-v8a/dists/doublecheck/src/main/AndroidManifest.xml"
           ".buildozer/android/platform/build-arm64-v8a/dists/doublecheck/AndroidManifest.xml"
           ".buildozer/android/platform/build-arm64-v8a/dists/doublecheck/build/intermediates/merged_manifests/debug/AndroidManifest.xml"
         )
-
+        
         for manifest in "${MAIN_MANIFESTS[@]}"; do
           if [ -f "$manifest" ]; then
             echo ""
-            echo "📋 매니페스트 파일: $manifest"
-            echo "파일 크기: $(wc -c < "$manifest") bytes"
-
-            echo "--- 패키지 정보 ---"
+            echo "🎯 ================== 매니페스트 분석: $manifest =================="
+            echo "📊 파일 정보: $(wc -c < "$manifest") bytes, $(wc -l < "$manifest") 줄"
+            
+            echo ""
+            echo "--- 📋 기본 정보 ---"
             grep "package=" "$manifest" | head -1 || echo "패키지 정보 없음"
-
-            echo "--- AlarmReceiver 검색 ---"
+            grep "android:versionCode=" "$manifest" | head -1 || echo "버전 코드 없음"
+            grep "android:versionName=" "$manifest" | head -1 || echo "버전 이름 없음"
+            
+            echo ""
+            echo "--- 🔍 전체 구조 통계 ---"
+            echo "uses-permission: $(grep -c '<uses-permission' "$manifest" 2>/dev/null || echo "0")개"
+            echo "activity: $(grep -c '<activity' "$manifest" 2>/dev/null || echo "0")개"
+            echo "receiver: $(grep -c '<receiver' "$manifest" 2>/dev/null || echo "0")개"
+            echo "service: $(grep -c '<service' "$manifest" 2>/dev/null || echo "0")개"
+            echo "intent-filter: $(grep -c '<intent-filter' "$manifest" 2>/dev/null || echo "0")개"
+            
+            echo ""
+            echo "--- 🎯 AlarmReceiver 핵심 검색 ---"
             if grep -q "AlarmReceiver" "$manifest"; then
               echo "✅ AlarmReceiver 발견!"
-              grep -A 5 -B 2 "AlarmReceiver" "$manifest"
+              echo "📍 AlarmReceiver 전체 내용:"
+              grep -A 20 -B 2 "AlarmReceiver" "$manifest" | head -25
             else
               echo "❌ AlarmReceiver 없음"
             fi
-
-            echo "--- receiver 태그 검색 ---"
+            
+            echo ""
+            echo "--- 🔍 모든 receiver 태그 분석 ---"
             receiver_count=$(grep -c "<receiver" "$manifest" 2>/dev/null || echo "0")
-            echo "receiver 개수: $receiver_count"
+            echo "총 receiver 개수: $receiver_count"
             if [ "$receiver_count" -gt 0 ]; then
-              grep -A 2 "<receiver" "$manifest"
+              echo "📋 모든 receiver 목록:"
+              grep -o 'android:name="[^"]*"' "$manifest" | grep -A1 -B1 receiver || echo "receiver name 추출 실패"
+              echo ""
+              echo "📋 receiver 태그들 (처음 10개):"
+              grep -A 5 "<receiver" "$manifest" | head -30
             fi
-
-            echo "--- application 구조 ---"
-            echo "application 태그: $(grep -c '<application' "$manifest" 2>/dev/null || echo "0")"
-            echo "activity 태그: $(grep -c '<activity' "$manifest" 2>/dev/null || echo "0")"
+            
+            echo ""
+            echo "--- 🔍 디버그 코드 검증 ---"
+            if grep -q "NonExistentReceiver" "$manifest"; then
+              echo "🎯 NonExistentReceiver 발견! (템플릿 적용됨)"
+            else
+              echo "❌ NonExistentReceiver 없음 (템플릿 무시됨)"
+            fi
+            
+            echo ""
+            echo "--- 📋 권한 목록 (알람 관련) ---"
+            echo "WAKE_LOCK: $(grep -c 'WAKE_LOCK' "$manifest" 2>/dev/null || echo "0")개"
+            echo "RECEIVE_BOOT_COMPLETED: $(grep -c 'RECEIVE_BOOT_COMPLETED' "$manifest" 2>/dev/null || echo "0")개"
+            echo "SCHEDULE_EXACT_ALARM: $(grep -c 'SCHEDULE_EXACT_ALARM' "$manifest" 2>/dev/null || echo "0")개"
+            echo "SET_ALARM: $(grep -c 'SET_ALARM' "$manifest" 2>/dev/null || echo "0")개"
+            
+            echo ""
+            echo "--- 📋 전체 권한 목록 ---"
+            grep '<uses-permission' "$manifest" | sed 's/.*android:name="//;s/".*//' | sort || echo "권한 목록 추출 실패"
+            
+            echo ""
+            echo "--- 🔍 매니페스트 전체 내용 (처음 50줄) ---"
+            head -50 "$manifest"
+            
+            echo ""
+            echo "--- 🔍 매니페스트 전체 내용 (마지막 20줄) ---"
+            tail -20 "$manifest"
+            
           else
             echo "❌ 파일 없음: $manifest"
+          fi
+          echo ""
+        done
+        
+        echo ""
+        echo "=== 🎯 최종 요약 ==="
+        echo "템플릿 적용 여부 최종 판단:"
+        for manifest in "${MAIN_MANIFESTS[@]}"; do
+          if [ -f "$manifest" ]; then
+            if grep -q "NonExistentReceiver" "$manifest"; then
+              echo "✅ $manifest - 템플릿 적용됨"
+            else
+              echo "❌ $manifest - 템플릿 무시됨"
+            fi
           fi
         done
 
