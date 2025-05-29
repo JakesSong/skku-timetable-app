@@ -34,25 +34,38 @@ jobs:
           echo "❌ java 소스 디렉토리 없음"
         fi
 
-    # 🔥 NEW: AndroidManifest.tmpl.xml 존재 확인
-    - name: Check AndroidManifest.tmpl.xml
+    # 🔥 NEW: 매니페스트 처리 과정 완전 추적
+    - name: Deep manifest processing debug
       run: |
-        echo "=== 🔍 AndroidManifest.tmpl.xml 확인 ==="
+        echo "=== 🔍 매니페스트 파일들 존재 확인 ==="
+        
+        # 1. 소스 매니페스트 파일들 확인
+        echo "--- 소스 매니페스트 파일들 ---"
         if [ -f "AndroidManifest.tmpl.xml" ]; then
-          echo "✅ AndroidManifest.tmpl.xml 존재함"
-          echo "파일 크기: $(wc -c < AndroidManifest.tmpl.xml) bytes"
-          echo "=== AndroidManifest.tmpl.xml 내용 확인 ==="
-          grep -n "AlarmReceiver" AndroidManifest.tmpl.xml || echo "❌ AlarmReceiver 없음"
-          grep -n "android:name.*AlarmReceiver" AndroidManifest.tmpl.xml || echo "❌ AlarmReceiver name 없음"
+          echo "✅ AndroidManifest.tmpl.xml 존재 ($(wc -c < AndroidManifest.tmpl.xml) bytes)"
+          echo "AlarmReceiver 포함: $(grep -c "AlarmReceiver" AndroidManifest.tmpl.xml)"
         else
           echo "❌ AndroidManifest.tmpl.xml 없음"
-          echo "현재 디렉토리 파일들:"
-          ls -la
         fi
         
-        echo "=== buildozer.spec manifest 설정 확인 ==="
-        grep -n "android.manifest_template" buildozer.spec || echo "❌ manifest_template 설정 없음"
-        grep -n "android.add_manifest_xml" buildozer.spec || echo "add_manifest_xml 설정 없음 (정상)"
+        if [ -f "android/manifest_additions.xml" ]; then
+          echo "✅ android/manifest_additions.xml 존재 ($(wc -c < android/manifest_additions.xml) bytes)"
+          echo "AlarmReceiver 포함: $(grep -c "AlarmReceiver" android/manifest_additions.xml)"
+        else
+          echo "❌ android/manifest_additions.xml 없음"
+        fi
+        
+        # 2. buildozer.spec 설정 확인
+        echo ""
+        echo "--- buildozer.spec 매니페스트 설정 ---"
+        grep -n "android.manifest" buildozer.spec || echo "매니페스트 설정 없음"
+        
+        # 3. buildozer 버전 및 p4a 버전 확인
+        echo ""
+        echo "--- buildozer/p4a 버전 정보 ---"
+        buildozer --version || echo "buildozer 버전 확인 실패"
+        
+        # 4. 빌드 로그에서 매니페스트 처리 과정 추출 (빌드 후 실행될 예정)
 
     # ✅ Java 및 jar 파일 업로드
     - name: Upload Java and jar files
@@ -206,7 +219,36 @@ jobs:
             echo "application 태그: $(grep -c '<application' "$manifest" 2>/dev/null || echo "0")"
             echo "activity 태그: $(grep -c '<activity' "$manifest" 2>/dev/null || echo "0")"
             
-            echo "=========================================="
+            echo ""
+        echo "=== 🔍 빌드 과정 중 매니페스트 변화 추적 ==="
+        
+        # buildozer가 생성하는 초기 매니페스트 확인
+        INITIAL_MANIFEST=".buildozer/android/platform/build-arm64-v8a/dists/doublecheck/templates/AndroidManifest.tmpl"
+        if [ -f "$INITIAL_MANIFEST" ]; then
+          echo "✅ buildozer 생성 초기 템플릿: $INITIAL_MANIFEST"
+          grep -q "AlarmReceiver" "$INITIAL_MANIFEST" && echo "  → AlarmReceiver 포함됨" || echo "  → AlarmReceiver 없음"
+        else
+          echo "❌ buildozer 초기 템플릿 없음"
+        fi
+        
+        # p4a가 생성하는 매니페스트 확인
+        P4A_MANIFEST=".buildozer/android/platform/build-arm64-v8a/dists/doublecheck/AndroidManifest.xml"
+        if [ -f "$P4A_MANIFEST" ]; then
+          echo "✅ p4a 생성 매니페스트: $P4A_MANIFEST"
+          grep -q "AlarmReceiver" "$P4A_MANIFEST" && echo "  → AlarmReceiver 포함됨" || echo "  → AlarmReceiver 없음"
+        else
+          echo "❌ p4a 매니페스트 없음"
+        fi
+        
+        # gradle이 처리하는 최종 매니페스트 확인
+        FINAL_MANIFEST=".buildozer/android/platform/build-arm64-v8a/dists/doublecheck/build/intermediates/merged_manifests/debug/AndroidManifest.xml" 
+        if [ -f "$FINAL_MANIFEST" ]; then
+          echo "✅ gradle 최종 매니페스트: $FINAL_MANIFEST"
+          grep -q "AlarmReceiver" "$FINAL_MANIFEST" && echo "  → AlarmReceiver 포함됨" || echo "  → AlarmReceiver 없음"
+          echo "  → 패키지명: $(grep 'package=' "$FINAL_MANIFEST" | cut -d'"' -f2)"
+        else
+          echo "❌ gradle 최종 매니페스트 없음"
+        fi
           else
             echo "❌ 파일 없음: $manifest"
           fi
