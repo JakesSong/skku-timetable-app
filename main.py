@@ -3398,8 +3398,8 @@ class TimeTableApp(MDApp):
             import pickle
             from datetime import datetime, timedelta
             
-            # 알람 시간 계산
-            alarm_time = self.parse_class_time_for_service(class_data) - timedelta(minutes=notify_before)
+            # 🔥 main_screen의 parse_class_time 사용
+            alarm_time = self.main_screen.parse_class_time(class_data) - timedelta(minutes=notify_before)
             
             # 알람 데이터 구조
             alarm_data = {
@@ -3430,52 +3430,10 @@ class TimeTableApp(MDApp):
             
         except Exception as e:
             print(f"❌ 서비스용 알람 데이터 저장 실패: {e}")
+            import traceback
+            traceback.print_exc()
             return False
     
-    def parse_class_time(self, class_data):
-        print(f"🔥 [DEBUG 26] parse_class_time 시작")
-        print(f"   - 요일: {class_data.get('day')}")
-        print(f"   - 시간: {class_data.get('start_time')}")
-        
-        day_map = {
-            "Monday": 0, "Tuesday": 1, "Wednesday": 2,
-            "Thursday": 3, "Friday": 4,
-            "월요일": 0, "화요일": 1, "수요일": 2,
-            "목요일": 3, "금요일": 4
-        }
-    
-        day = class_data.get("day")
-        start_time = class_data.get("start_time")
-    
-        if not day or not start_time:
-            print(f"🔥 [DEBUG 26B] 요일 또는 시간 누락")
-            return None
-    
-        target_weekday = day_map.get(day)
-        if target_weekday is None:
-            print(f"🔥 [DEBUG 26C] 잘못된 요일: {day}")
-            return None
-        
-        print(f"🔥 [DEBUG 27] 요일 매핑: {day} → {target_weekday}")
-    
-        now = datetime.now()
-        today_weekday = now.weekday()
-        print(f"🔥 [DEBUG 28] 오늘: {today_weekday}, 목표: {target_weekday}")
-    
-        days_ahead = (target_weekday - today_weekday) % 7
-        target_date = now + timedelta(days=days_ahead)
-        print(f"🔥 [DEBUG 29] {days_ahead}일 후: {target_date.date()}")
-    
-        hour, minute = map(int, start_time.split(":"))
-        class_datetime = target_date.replace(hour=hour, minute=minute, second=0, microsecond=0)
-        print(f"🔥 [DEBUG 30] 수업 일시: {class_datetime}")
-    
-        if class_datetime <= now:
-            class_datetime += timedelta(days=7)
-            print(f"🔥 [DEBUG 31] 다음 주로 조정: {class_datetime}")
-    
-        return class_datetime
-      
     
     def show_alarm_notification(self, class_name, class_room, class_time, class_professor):
         try:
@@ -3491,6 +3449,53 @@ class TimeTableApp(MDApp):
             )
         except Exception as e:
             print(f"알림 표시 오류: {e}")
+            
+    def parse_class_time_for_service(self, class_data):
+        """서비스용 클래스 시간 파싱 - MainScreen의 parse_class_time과 동일한 로직"""
+        from datetime import datetime, timedelta
+        
+        print(f"🔥 [SERVICE] parse_class_time_for_service 시작")
+        print(f"   - 요일: {class_data.get('day')}")
+        print(f"   - 시간: {class_data.get('start_time')}")
+        
+        day_map = {
+            "Monday": 0, "Tuesday": 1, "Wednesday": 2,
+            "Thursday": 3, "Friday": 4,
+            "월요일": 0, "화요일": 1, "수요일": 2,
+            "목요일": 3, "금요일": 4
+        }
+    
+        day = class_data.get("day")
+        start_time = class_data.get("start_time")
+    
+        if not day or not start_time:
+            print(f"🔥 [SERVICE] 요일 또는 시간 누락")
+            return None
+    
+        target_weekday = day_map.get(day)
+        if target_weekday is None:
+            print(f"🔥 [SERVICE] 잘못된 요일: {day}")
+            return None
+        
+        print(f"🔥 [SERVICE] 요일 매핑: {day} → {target_weekday}")
+    
+        now = datetime.now()
+        today_weekday = now.weekday()
+        print(f"🔥 [SERVICE] 오늘: {today_weekday}, 목표: {target_weekday}")
+    
+        days_ahead = (target_weekday - today_weekday) % 7
+        target_date = now + timedelta(days=days_ahead)
+        print(f"🔥 [SERVICE] {days_ahead}일 후: {target_date.date()}")
+    
+        hour, minute = map(int, start_time.split(":"))
+        class_datetime = target_date.replace(hour=hour, minute=minute, second=0, microsecond=0)
+        print(f"🔥 [SERVICE] 수업 일시: {class_datetime}")
+    
+        if class_datetime <= now:
+            class_datetime += timedelta(days=7)
+            print(f"🔥 [SERVICE] 다음 주로 조정: {class_datetime}")
+    
+        return class_datetime
 
 if __name__ == "__main__":
     import sys
