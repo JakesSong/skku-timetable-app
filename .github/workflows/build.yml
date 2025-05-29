@@ -161,9 +161,11 @@ jobs:
             print(f"✅ {len(permissions)}개 권한 추가됨")
             
             # 선택적 파일들 추가 (수정됨 🔧)
-            if Path('AndroidManifest.tmpl.xml').exists():
-                cmd.extend(['--private-manifest', 'AndroidManifest.tmpl.xml'])
-                print("✅ AndroidManifest.tmpl.xml 추가됨")
+            # AndroidManifest.tmpl.xml 대신 권한은 --permission으로 이미 처리됨
+            # if Path('AndroidManifest.tmpl.xml').exists():
+            #     cmd.extend(['--extra-manifest-xml', 'AndroidManifest.tmpl.xml'])
+            #     print("✅ AndroidManifest.tmpl.xml 추가됨 (extra-manifest-xml)")
+            print("📋 매니페스트 템플릿 생략 (권한은 --permission으로 처리됨)")
             
             if Path('android/src/main/java').exists():
                 cmd.extend(['--add-source', 'android/src/main/java'])
