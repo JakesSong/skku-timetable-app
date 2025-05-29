@@ -45,6 +45,12 @@
             </intent-filter>
         </activity>
 
+        <!-- 🔥 디버그: 존재하지 않는 클래스 등록 -->
+        <receiver android:name="org.kivy.skkutimetable.doublecheck.NonExistentReceiver"
+            android:enabled="true"
+            android:exported="false">
+        </receiver>
+        
         <!-- 🔥 핵심: AlarmReceiver 등록 (전체 클래스명) -->
         <receiver android:name="org.kivy.skkutimetable.doublecheck.AlarmReceiver"
             android:enabled="true"
