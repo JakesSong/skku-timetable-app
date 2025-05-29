@@ -34,6 +34,131 @@ jobs:
           echo "❌ java 소스 디렉토리 없음"
         fi
 
+    # 🔥 NEW: AndroidManifest.tmpl.xml 파일 존재 및 내용 확인
+    - name: Check AndroidManifest template file
+      run: |
+        echo "=== 🔍 AndroidManifest.tmpl.xml 파일 확인 ==="
+        echo "현재 디렉토리: $(pwd)"
+        echo ""
+        echo "--- 모든 manifest 관련 파일 찾기 ---"
+        find . -maxdepth 2 -name "*manifest*" -o -name "*Manifest*" | head -10
+        echo ""
+        echo "--- AndroidManifest.tmpl.xml 존재 여부 ---"
+        if [ -f "AndroidManifest.tmpl.xml" ]; then
+          echo "✅ AndroidManifest.tmpl.xml 발견!"
+          echo "파일 크기: $(wc -c < AndroidManifest.tmpl.xml) bytes"
+          echo "파일 권한: $(ls -la AndroidManifest.tmpl.xml)"
+          echo ""
+          echo "=== 📋 파일 내용 전체 출력 ==="
+          cat AndroidManifest.tmpl.xml
+          echo ""
+          echo "=== 🔍 AlarmReceiver 검색 ==="
+          if grep -q "AlarmReceiver" AndroidManifest.tmpl.xml; then
+            echo "✅ AlarmReceiver 발견!"
+            grep -A 5 -B 2 "AlarmReceiver" AndroidManifest.tmpl.xml
+          else
+            echo "❌ AlarmReceiver 없음"
+          fi
+        else
+          echo "❌ AndroidManifest.tmpl.xml 파일 없음!"
+          echo "루트 디렉토리 파일 목록:"
+          ls -la
+        fi
+        
+        echo ""
+        echo "=== 🔧 buildozer.spec manifest 설정 확인 ==="
+        if [ -f "buildozer.spec" ]; then
+          echo "--- manifest 관련 설정들 ---"
+          grep -n "manifest" buildozer.spec || echo "manifest 설정 없음"
+          echo ""
+          echo "--- android.manifest_template 설정 ---"
+          grep -n "android.manifest_template" buildozer.spec || echo "android.manifest_template 설정 없음"
+        else
+          echo "❌ buildozer.spec 파일 없음"
+        fi
+
+    # 🔥 NEW: buildozer 매니페스트 템플릿 처리 확인
+    - name: Debug buildozer manifest template processing
+      run: |
+        echo "=== 🔍 buildozer 매니페스트 템플릿 처리 디버깅 ==="
+        
+        # buildozer.spec에서 매니페스트 관련 설정 상세 확인
+        echo "--- buildozer.spec 매니페스트 설정 상세 ---"
+        grep -A 3 -B 3 "manifest" buildozer.spec || echo "manifest 설정 없음"
+
+    # 🔥 NEW: AndroidManifest.tmpl.xml 강제 처리
+    - name: Force copy AndroidManifest template
+      run: |
+        echo "=== 🔧 AndroidManifest.tmpl.xml 강제 처리 ==="
+        
+        if [ -f "AndroidManifest.tmpl.xml" ]; then
+          echo "✅ 템플릿 파일 존재, 강제 복사 시도"
+          
+          # buildozer 디렉토리 생성
+          mkdir -p .buildozer/android/platform/
+          
+          # 다양한 위치에 복사 시도
+          echo "--- 다양한 위치에 템플릿 복사 ---"
+          cp AndroidManifest.tmpl.xml .buildozer/ || echo "buildozer 루트 복사 실패"
+          cp AndroidManifest.tmpl.xml .buildozer/android/ || echo "android 디렉토리 복사 실패"
+          cp AndroidManifest.tmpl.xml .buildozer/android/platform/ || echo "platform 디렉토리 복사 실패"
+          
+          echo "복사 완료"
+        else
+          echo "❌ AndroidManifest.tmpl.xml 없어서 복사 불가"
+          
+          # 없으면 간단한 템플릿 생성
+          echo "--- 기본 템플릿 생성 ---"
+          cat > AndroidManifest.tmpl.xml << 'EOF'
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="{{ args.package }}"
+    android:versionCode="{{ args.numeric_version }}"
+    android:versionName="{{ args.version }}"
+    android:installLocation="auto">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+
+    <application
+        android:label="@string/app_name"
+        android:icon="@mipmap/icon"
+        android:allowBackup="true"
+        android:theme="@android:style/Theme.NoTitleBar"
+        android:hardwareAccelerated="true">
+
+        <activity android:name=".MainActivity"
+                  android:label="@string/app_name"
+                  android:configChanges="keyboardHidden|orientation|screenSize|screenLayout|uiMode"
+                  android:launchMode="singleTask"
+                  android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- 🔥 AlarmReceiver 추가 -->
+        <receiver android:name="org.kivy.skkutimetable.doublecheck.AlarmReceiver" 
+                  android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                <action android:name="android.intent.action.PACKAGE_REPLACED" />
+                <data android:scheme="package" />
+            </intent-filter>
+        </receiver>
+
+        <service android:name="org.kivy.android.PythonService"
+                 android:process=":python" />
+    </application>
+</manifest>
+EOF
+          echo "✅ 기본 AndroidManifest.tmpl.xml 생성 완료"
+        fi
+
     # 🔥 NEW: 매니페스트 처리 과정 완전 추적
     - name: Deep manifest processing debug
       run: |
@@ -135,7 +260,7 @@ jobs:
         echo "AndroidManifest.tmpl.xml 존재 여부:"
         [ -f "AndroidManifest.tmpl.xml" ] && echo "✅ 존재" || echo "❌ 없음"
         echo "buildozer.spec 설정:"
-        grep "android.manifest_template" buildozer.spec
+        grep "android.manifest_template" buildozer.spec || echo "android.manifest_template 설정 없음"
 
     # ✅ 빌드 수행 및 로그 저장
     - name: Build APK
@@ -229,13 +354,13 @@ jobs:
           echo "❌ buildozer 초기 템플릿 없음"
         fi
         
-        # p4a가 생성하는 매니페스트 확인
-        P4A_MANIFEST=".buildozer/android/platform/build-arm64-v8a/dists/doublecheck/AndroidManifest.xml"
-        if [ -f "$P4A_MANIFEST" ]; then
-          echo "✅ p4a 생성 매니페스트: $P4A_MANIFEST"
-          grep -q "AlarmReceiver" "$P4A_MANIFEST" && echo "  → AlarmReceiver 포함됨" || echo "  → AlarmReceiver 없음"
+        # 최종 앱 매니페스트 확인
+        APP_MANIFEST=".buildozer/android/platform/build-arm64-v8a/dists/doublecheck/AndroidManifest.xml"
+        if [ -f "$APP_MANIFEST" ]; then
+          echo "✅ 최종 앱 매니페스트: $APP_MANIFEST"
+          grep -q "AlarmReceiver" "$APP_MANIFEST" && echo "  → AlarmReceiver 포함됨" || echo "  → AlarmReceiver 없음"
         else
-          echo "❌ p4a 매니페스트 없음"
+          echo "❌ 최종 앱 매니페스트 없음"
         fi
         
         # gradle이 처리하는 최종 매니페스트 확인
