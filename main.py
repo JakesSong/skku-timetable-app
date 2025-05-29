@@ -2324,6 +2324,9 @@ class MainScreen(MDScreen):
 
             # 🔥🔥🔥 더미 데이터 추가 (새로 추가하는 부분)
             # Clock.schedule_once(lambda dt: self.add_dummy_data(), 2.0)  # 2초 후 더미 데이터 추가
+            
+            # 🧪🧪🧪 테스트 버튼 추가 (새로 추가!)
+            Clock.schedule_once(lambda dt: self.add_test_buttons(), 2.5)  # 2.5초 후 테스트 버튼 추가
                         
         except Exception as e:
             print(f"레이아웃 설정 오류: {e}")
@@ -3229,6 +3232,100 @@ class MainScreen(MDScreen):
                 import traceback
                 traceback.print_exc()
 
+    def test_alarm_now(self):
+        """🧪 30초 후 테스트 알람 설정"""
+        if not self.alarm_manager:
+            print("❌ alarm_manager가 없습니다")
+            return
+        
+        from datetime import datetime, timedelta
+        
+        # 30초 후 알람 설정
+        test_time = datetime.now() + timedelta(seconds=30)
+        
+        test_class_data = {
+            'id': 999,
+            'name': '🧪 테스트 알람',
+            'day': 'Monday',  # 임시로 고정
+            'start_time': test_time.strftime('%H:%M'),
+            'room': '테스트 강의실',
+            'professor': '테스트 교수'
+        }
+        
+        print(f"🧪 테스트 알람 설정 중...")
+        print(f"⏰ 현재 시간: {datetime.now().strftime('%H:%M:%S')}")
+        print(f"⏰ 알람 시간: {test_time.strftime('%H:%M:%S')}")
+        
+        success = self.alarm_manager.schedule_alarm(999, test_class_data, 0)
+        print(f"✅ 테스트 알람 설정 결과: {success}")
+    
+    def test_direct_notification(self):
+        """🧪 즉시 알림 생성 테스트 (AlarmManager 우회)"""
+        try:
+            from jnius import autoclass
+            
+            Context = autoclass('android.content.Context')
+            NotificationManager = autoclass('android.app.NotificationManager')
+            Builder = autoclass('android.app.Notification$Builder')
+            PythonActivity = autoclass('org.kivy.android.PythonActivity')
+            
+            context = PythonActivity.mActivity
+            notification_manager = context.getSystemService(Context.NOTIFICATION_SERVICE)
+            
+            builder = Builder(context, "timetable_alarm_channel")
+            builder.setContentTitle("🧪 직접 알림 테스트")
+            builder.setContentText("BroadcastReceiver 우회 직접 알림")
+            builder.setSmallIcon(17301659)  # android.R.drawable.ic_dialog_info
+            builder.setAutoCancel(True)
+            
+            notification_manager.notify(8888, builder.build())
+            print("✅ 직접 알림 생성 성공!")
+            
+        except Exception as e:
+            print(f"❌ 직접 알림 생성 실패: {e}")
+            import traceback
+            traceback.print_exc()
+    
+    def add_test_buttons(self):
+        """테스트 버튼들을 메인 화면에 추가"""
+        if hasattr(self, 'layout') and self.layout:
+            from kivymd.uix.button import MDRaisedButton
+            from kivy.uix.boxlayout import BoxLayout
+            
+            # 테스트 버튼 컨테이너
+            test_container = BoxLayout(
+                orientation='horizontal',
+                size_hint_y=None,
+                height='48dp',
+                spacing='10dp',
+                pos_hint={'center_x': 0.5, 'y': 0.85}  # 화면 상단에 위치
+            )
+            
+            # 30초 알람 테스트 버튼
+            alarm_test_btn = MDRaisedButton(
+                text="🧪 30초 알람 테스트",
+                size_hint=(0.45, None),
+                height='40dp',
+                font_name=FONT_NAME
+            )
+            alarm_test_btn.bind(on_release=lambda x: self.test_alarm_now())
+            
+            # 즉시 알림 테스트 버튼  
+            notify_test_btn = MDRaisedButton(
+                text="🔔 즉시 알림 테스트", 
+                size_hint=(0.45, None),
+                height='40dp',
+                font_name=FONT_NAME
+            )
+            notify_test_btn.bind(on_release=lambda x: self.test_direct_notification())
+            
+            test_container.add_widget(alarm_test_btn)
+            test_container.add_widget(notify_test_btn)
+            
+            # 메인 레이아웃에 추가
+            self.add_widget(test_container)
+            print("✅ 테스트 버튼 추가 완료")
+            
 class TimeTableApp(MDApp):
     def build(self):
         print("✅ build() 실행됨")
