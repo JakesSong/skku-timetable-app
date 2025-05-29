@@ -277,6 +277,27 @@ jobs:
           echo "✅ 빌드 성공!"
         fi
 
+    # 🔍 NEW: APK 디컴파일 및 AlarmReceiver 확인
+    - name: Decompile APK and check AlarmReceiver
+      run: |
+        echo "=== 🔍 apktool 설치 ==="
+        sudo apt-get install -y apktool
+
+        echo "=== 📦 apk 디컴파일 중 ==="
+        apktool d bin/*.apk -o decoded_apk || echo "❌ apktool 실패"
+
+        echo ""
+        echo "=== 🔍 AndroidManifest.xml 내 AlarmReceiver 확인 ==="
+        if [ -f "decoded_apk/AndroidManifest.xml" ]; then
+          grep -A 5 -B 2 "AlarmReceiver" decoded_apk/AndroidManifest.xml || echo "❌ AlarmReceiver 없음"
+        else
+          echo "❌ decoded_apk/AndroidManifest.xml 없음"
+        fi
+
+        echo ""
+        echo "=== 🔍 AlarmReceiver 클래스(smali) 존재 확인 ==="
+        find decoded_apk/smali -type f -name "*AlarmReceiver*.smali" || echo "❌ AlarmReceiver 클래스 없음"
+
     # 🔥 NEW: 빌드 후 생성된 AndroidManifest.xml 확인
     - name: Check generated AndroidManifest.xml
       if: always()
