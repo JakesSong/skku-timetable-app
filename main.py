@@ -2383,6 +2383,7 @@ class MainScreen(MDScreen):
                 "org.kivy.skkutimetable.doublecheck",
                 "org.kivy.skkutimetable.doublecheck.AlarmReceiver"
             ))
+            intent.setAction("org.kivy.skkutimetable.doublecheck.ALARM_ACTION")
             
             flags = PendingIntent.FLAG_UPDATE_CURRENT
             if hasattr(PendingIntent, 'FLAG_IMMUTABLE'):
