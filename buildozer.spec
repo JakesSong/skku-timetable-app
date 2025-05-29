@@ -16,18 +16,18 @@ version = 0.1
 orientation = portrait
 fullscreen = 0
 
-# 🔥 중요: 서비스 설정 수정 - 경로 확인 필요
-services = AlarmService:service/main.py:foreground:sticky
-
 android.wakelock = True
 
 # 🔥 중요: 권한 순서 정리 및 추가
 android.permissions = INTERNET,WRITE_EXTERNAL_STORAGE,READ_EXTERNAL_STORAGE,SCHEDULE_EXACT_ALARM,USE_EXACT_ALARM,VIBRATE,WAKE_LOCK,RECEIVE_BOOT_COMPLETED,FOREGROUND_SERVICE,POST_NOTIFICATIONS,ACCESS_NOTIFICATION_POLICY
 
-# 🔥 중요: 매니페스트 추가 파일 경로
-android.add_manifest_xml = android/manifest_additions.xml
+# 🔥 핵심 변경: AndroidManifest.tmpl.xml 사용 (더 확실한 방법)
+android.manifest_template = AndroidManifest.tmpl.xml
 
-# 🔥 중요: Java 소스 경로 (하나만 사용)
+# 🔥 기존 설정 주석 처리 (문제가 있었음)
+# android.add_manifest_xml = android/manifest_additions.xml
+
+# 🔥 중요: Java 소스 경로 (기존 설정 유지)
 android.add_src = android/src/main/java
 
 android.api = 33
