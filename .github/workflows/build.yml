@@ -211,7 +211,7 @@ jobs:
     
     - name: Build APK
       run: |
-        echo "=== 🏗️ APK 빌드 시작 ===")
+        echo "=== 🏗️ APK 빌드 시작 ==="
         python build_apk.py
     
     - name: Verify build results
