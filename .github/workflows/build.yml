@@ -123,20 +123,22 @@ jobs:
                 os.environ['NDK_ROOT'] = android_ndk
                 print(f"🔧 NDK 25로 강제 변경: {android_ndk}")
             
-            # p4a 명령어 구성 (buildozer.spec과 일치하도록 수정)
+            # p4a 명령어 구성 (buildozer.spec 기반으로 완전 복원)
             cmd = [
                 'p4a', 'apk',
                 '--private', '.',
-                '--package', 'org.kivy.skkutimetable.doublecheck',  # 🔧 buildozer.spec과 일치
-                '--name', 'DoubleCheck',  # 🔧 buildozer.spec과 일치
-                '--version', '1.0',
+                '--package', 'org.kivy.skkutimetable.doublecheck',
+                '--name', 'DoubleCheck',
+                '--version', '0.1',  # 🔧 buildozer.spec과 일치
                 '--bootstrap', 'sdl2',
                 '--requirements', 'python3,kivy==2.1.0,kivymd==1.1.1,requests,pillow,certifi,urllib3,charset-normalizer,plyer',
                 '--arch', 'arm64-v8a',
                 '--ndk-api', '21',
                 '--sdk-dir', android_sdk,
                 '--ndk-dir', android_ndk,
-                '--release'
+                '--release',
+                '--orientation', 'portrait',  # 🔧 추가
+                '--debug'  # 🔧 release 대신 debug로 변경
             ]
             
             # 🔧 아이콘 추가 (있을 경우)
