@@ -14,6 +14,25 @@ jobs:
       with:
         python-version: '3.9'
 
+    # ✅ 완전한 클린 빌드
+    - name: Complete clean build
+      run: |
+        echo "=== 🧹 Completely cleaning build environment ==="
+        
+        # 프로젝트 디렉토리 기준
+        rm -rf .buildozer
+        rm -rf bin
+        rm -rf build
+        rm -rf android/build
+        rm -rf android/.gradle
+    
+        # 사용자 캐시 디렉토리 기준
+        rm -rf ~/.buildozer
+        rm -rf ~/.gradle
+        rm -rf ~/.android
+    
+        echo "✅ 모든 캐시 제거 완료"
+
     # ✅ .java 파일 경로 확인
     - name: Check java file visibility
       run: |
@@ -86,16 +105,6 @@ jobs:
         echo "P4A_NUM_PROCS=1" >> $GITHUB_ENV
         echo "GRADLE_OPTS=-Dorg.gradle.daemon=false -Dorg.gradle.jvmargs='-Xmx3072m -XX:MaxMetaspaceSize=768m' -Dorg.gradle.parallel=false" >> $GITHUB_ENV
         echo "P4A_GRADLE_OPTS=--stacktrace --info" >> $GITHUB_ENV
-
-    # ✅ 클린 빌드
-    - name: Complete clean build
-      run: |
-        echo "=== Completely cleaning build environment ==="
-        rm -rf .buildozer
-        rm -rf bin
-        rm -rf ~/.buildozer
-        rm -rf ~/.gradle
-        rm -rf ~/.android
 
     # ✅ 빌드 수행 및 로그 저장
     - name: Build APK
