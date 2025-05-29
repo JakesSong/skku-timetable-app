@@ -1,23 +1,19 @@
 name: Build Android APK
-
 on:
   workflow_dispatch:
   push:
     branches: [ main, master ]
-
 jobs:
   build:
     runs-on: ubuntu-22.04
-
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-
     - name: Set up Python 3.9
       uses: actions/setup-python@v5
       with:
         python-version: '3.9'
-
+    
     # ✅ .jar 및 .java 파일 경로 확인
     - name: Check jar and java file visibility
       run: |
@@ -29,7 +25,6 @@ jobs:
         else
           echo "❌ alarmreceiver.jar 없음"
         fi
-
         echo "=== 🔍 java 파일 경로 확인 ==="
         find android/src -type f -name "*.java" || echo "❌ java 파일 없음"
         if [ -d "android/src/main/java/org/kivy/skkutimetable/doublecheck" ]; then
@@ -38,6 +33,26 @@ jobs:
         else
           echo "❌ java 소스 디렉토리 없음"
         fi
+
+    # 🔥 NEW: AndroidManifest.tmpl.xml 존재 확인
+    - name: Check AndroidManifest.tmpl.xml
+      run: |
+        echo "=== 🔍 AndroidManifest.tmpl.xml 확인 ==="
+        if [ -f "AndroidManifest.tmpl.xml" ]; then
+          echo "✅ AndroidManifest.tmpl.xml 존재함"
+          echo "파일 크기: $(wc -c < AndroidManifest.tmpl.xml) bytes"
+          echo "=== AndroidManifest.tmpl.xml 내용 확인 ==="
+          grep -n "AlarmReceiver" AndroidManifest.tmpl.xml || echo "❌ AlarmReceiver 없음"
+          grep -n "android:name.*AlarmReceiver" AndroidManifest.tmpl.xml || echo "❌ AlarmReceiver name 없음"
+        else
+          echo "❌ AndroidManifest.tmpl.xml 없음"
+          echo "현재 디렉토리 파일들:"
+          ls -la
+        fi
+        
+        echo "=== buildozer.spec manifest 설정 확인 ==="
+        grep -n "android.manifest_template" buildozer.spec || echo "❌ manifest_template 설정 없음"
+        grep -n "android.add_manifest_xml" buildozer.spec || echo "add_manifest_xml 설정 없음 (정상)"
 
     # ✅ Java 및 jar 파일 업로드
     - name: Upload Java and jar files
@@ -48,6 +63,7 @@ jobs:
         path: |
           android/libs/alarmreceiver.jar
           android/src/main/java/org/kivy/skkutimetable/doublecheck/*.java
+          AndroidManifest.tmpl.xml
         retention-days: 7
         if-no-files-found: warn
 
@@ -97,18 +113,51 @@ jobs:
         rm -rf ~/.gradle
         rm -rf ~/.android
 
+    # 🔥 NEW: 빌드 전 최종 파일 확인
+    - name: Final pre-build verification
+      run: |
+        echo "=== 🔍 빌드 전 최종 확인 ==="
+        echo "현재 디렉토리:"
+        pwd
+        echo "파일 목록:"
+        ls -la
+        echo "AndroidManifest.tmpl.xml 존재 여부:"
+        [ -f "AndroidManifest.tmpl.xml" ] && echo "✅ 존재" || echo "❌ 없음"
+        echo "buildozer.spec 설정:"
+        grep "android.manifest_template" buildozer.spec
+
     # ✅ 빌드 수행 및 로그 저장
     - name: Build APK
       run: |
         echo "=== Build start ==="
         buildozer android debug --verbose > build_full.log 2>&1 || BUILD_FAILED=true
-
         if [ "$BUILD_FAILED" = "true" ]; then
           echo "❌ 빌드 실패!"
-          tail -50 build_full.log
+          echo "=== 빌드 로그 마지막 100줄 ==="
+          tail -100 build_full.log
+          echo "=== AndroidManifest 관련 로그 검색 ==="
+          grep -i "manifest" build_full.log | tail -20 || echo "manifest 관련 로그 없음"
           exit 1
         else
           echo "✅ 빌드 성공!"
+        fi
+
+    # 🔥 NEW: 빌드 후 생성된 AndroidManifest.xml 확인
+    - name: Check generated AndroidManifest.xml
+      if: always()
+      run: |
+        echo "=== 🔍 생성된 AndroidManifest.xml 확인 ==="
+        MANIFEST_PATH=$(find .buildozer -name "AndroidManifest.xml" 2>/dev/null | head -1)
+        if [ -n "$MANIFEST_PATH" ] && [ -f "$MANIFEST_PATH" ]; then
+          echo "✅ 생성된 AndroidManifest.xml 발견: $MANIFEST_PATH"
+          echo "=== AlarmReceiver 등록 확인 ==="
+          grep -A 5 -B 5 "AlarmReceiver" "$MANIFEST_PATH" || echo "❌ AlarmReceiver 없음"
+          echo "=== 전체 receiver 목록 ==="
+          grep -n "<receiver" "$MANIFEST_PATH" || echo "❌ receiver 없음"
+        else
+          echo "❌ 생성된 AndroidManifest.xml 없음"
+          echo "buildozer 디렉토리 구조:"
+          find .buildozer -name "*.xml" 2>/dev/null | head -10 || echo "xml 파일 없음"
         fi
 
     # ✅ 빌드 로그 업로드
@@ -120,6 +169,7 @@ jobs:
         path: |
           build_full.log
           .buildozer/**/*.log
+          .buildozer/**/AndroidManifest.xml
         retention-days: 30
         if-no-files-found: warn
 
