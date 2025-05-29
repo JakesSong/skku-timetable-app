@@ -2553,6 +2553,7 @@ class MainScreen(MDScreen):
                 "org.kivy.skkutimetable.doublecheck",
                 "org.kivy.skkutimetable.doublecheck.AlarmReceiver"
             ))
+            intent.setAction("org.kivy.skkutimetable.doublecheck.ALARM_ACTION")
             
             # 4단계: 수업 정보 전달
             intent.putExtra("class_name", class_data['name'])
@@ -3290,6 +3291,7 @@ class MainScreen(MDScreen):
             # Intent 생성
             intent = Intent()
             intent.setComponent(ComponentName(package_name, f"{package_name}.AlarmReceiver"))
+            intent.setAction("org.kivy.skkutimetable.doublecheck.ALARM_ACTION")
             
             # 테스트 데이터 전달
             intent.putExtra("class_name", test_class_data['name'])
@@ -3345,6 +3347,7 @@ class MainScreen(MDScreen):
             # Intent 생성
             intent = Intent()
             intent.setComponent(ComponentName(package_name, f"{package_name}.AlarmReceiver"))
+            intent.setAction("org.kivy.skkutimetable.doublecheck.ALARM_ACTION")  
             
             # 테스트 데이터 전달
             intent.putExtra("class_name", "🚀 5초 테스트")
@@ -3440,6 +3443,7 @@ class MainScreen(MDScreen):
             print(f"🎯 AlarmReceiver 클래스: {receiver_class}")
             
             intent.setComponent(ComponentName(package_name, receiver_class))
+            intent.setAction("org.kivy.skkutimetable.doublecheck.ALARM_ACTION")
             
             # 🔍 추가 디버그 정보
             intent.putExtra("DEBUG_MODE", "true")
@@ -3494,6 +3498,7 @@ class MainScreen(MDScreen):
             intent = Intent()
             receiver_class = f"{package_name}.AlarmReceiver"
             intent.setComponent(ComponentName(package_name, receiver_class))
+            intent.setAction("org.kivy.skkutimetable.doublecheck.ALARM_ACTION")  
             
             # 테스트 데이터
             intent.putExtra("class_name", "🔍 직접 호출 테스트")
