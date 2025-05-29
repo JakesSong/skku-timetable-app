@@ -3232,6 +3232,12 @@ class MainScreen(MDScreen):
                 import traceback
                 traceback.print_exc()
     
+    # MainScreen 클래스에 추가할 완전한 테스트 메서드들
+    
+    # ========================================
+    # 기존 메서드들 (수정된 버전으로 교체)
+    # ========================================
+    
     def test_alarm_now(self):
         """🧪 30초 후 테스트 알람 설정 - 수정된 버전"""
         if not self.alarm_manager:
@@ -3278,13 +3284,11 @@ class MainScreen(MDScreen):
             
             context = PythonActivity.mActivity
             alarm_manager = context.getSystemService(Context.ALARM_SERVICE)
+            package_name = context.getPackageName()
             
             # Intent 생성
             intent = Intent()
-            intent.setComponent(ComponentName(
-                "org.kivy.skkutimetable.doublecheck",
-                "org.kivy.skkutimetable.doublecheck.AlarmReceiver"
-            ))
+            intent.setComponent(ComponentName(package_name, f"{package_name}.AlarmReceiver"))
             
             # 테스트 데이터 전달
             intent.putExtra("class_name", test_class_data['name'])
@@ -3297,19 +3301,10 @@ class MainScreen(MDScreen):
             if hasattr(PendingIntent, 'FLAG_IMMUTABLE'):
                 flags |= PendingIntent.FLAG_IMMUTABLE
                 
-            pending_intent = PendingIntent.getBroadcast(
-                context, 
-                999,  # 테스트용 고유 ID
-                intent, 
-                flags
-            )
+            pending_intent = PendingIntent.getBroadcast(context, 999, intent, flags)
             
             # 🔥 핵심: setExact로 정확한 시간에 알람 설정
-            alarm_manager.setExact(
-                AlarmManager.RTC_WAKEUP, 
-                alarm_millis, 
-                pending_intent
-            )
+            alarm_manager.setExact(AlarmManager.RTC_WAKEUP, alarm_millis, pending_intent)
             
             print(f"✅ 직접 시스템 알람 설정 성공!")
             print(f"📱 정확히 30초 후에 알람이 울릴 것입니다!")
@@ -3344,13 +3339,11 @@ class MainScreen(MDScreen):
             
             context = PythonActivity.mActivity
             alarm_manager = context.getSystemService(Context.ALARM_SERVICE)
+            package_name = context.getPackageName()
             
             # Intent 생성
             intent = Intent()
-            intent.setComponent(ComponentName(
-                "org.kivy.skkutimetable.doublecheck",
-                "org.kivy.skkutimetable.doublecheck.AlarmReceiver"
-            ))
+            intent.setComponent(ComponentName(package_name, f"{package_name}.AlarmReceiver"))
             
             # 테스트 데이터 전달
             intent.putExtra("class_name", "🚀 5초 테스트")
@@ -3363,20 +3356,11 @@ class MainScreen(MDScreen):
             if hasattr(PendingIntent, 'FLAG_IMMUTABLE'):
                 flags |= PendingIntent.FLAG_IMMUTABLE
                 
-            pending_intent = PendingIntent.getBroadcast(
-                context, 
-                888,  # 다른 테스트용 ID
-                intent, 
-                flags
-            )
+            pending_intent = PendingIntent.getBroadcast(context, 888, intent, flags)
             
             # 알람 설정
             alarm_millis = int(test_time.timestamp() * 1000)
-            alarm_manager.setExact(
-                AlarmManager.RTC_WAKEUP, 
-                alarm_millis, 
-                pending_intent
-            )
+            alarm_manager.setExact(AlarmManager.RTC_WAKEUP, alarm_millis, pending_intent)
             
             print(f"🚀 5초 후 즉시 알람 설정 완료!")
             print(f"⏰ 현재: {datetime.now().strftime('%H:%M:%S')}")
@@ -3389,7 +3373,7 @@ class MainScreen(MDScreen):
             return False
     
     def test_direct_notification(self):
-        """🧪 즉시 알림 생성 테스트 (AlarmManager 우회)"""
+        """🧪 즉시 알림 생성 테스트 (AlarmManager 우회) - 기존 유지"""
         try:
             from jnius import autoclass
             
@@ -3415,62 +3399,380 @@ class MainScreen(MDScreen):
             import traceback
             traceback.print_exc()
     
+    # ========================================
+    # 새로운 진단 메서드들 (추가)
+    # ========================================
+    
+    def test_alarm_receiver_debug(self):
+        """🔍 AlarmReceiver 작동 상태 진단"""
+        try:
+            from datetime import datetime, timedelta
+            from jnius import autoclass
+            
+            # 10초 후 알람 설정 (더 긴 시간으로 확인)
+            test_time = datetime.now() + timedelta(seconds=10)
+            alarm_millis = int(test_time.timestamp() * 1000)
+            
+            print(f"🔍 AlarmReceiver 진단 시작")
+            print(f"⏰ 현재 시간: {datetime.now().strftime('%H:%M:%S')}")
+            print(f"⏰ 알람 시간: {test_time.strftime('%H:%M:%S')}")
+            print(f"📅 알람 밀리초: {alarm_millis}")
+            
+            # Android 클래스들
+            AlarmManager = autoclass('android.app.AlarmManager')
+            Intent = autoclass('android.content.Intent')
+            PendingIntent = autoclass('android.app.PendingIntent')
+            Context = autoclass('android.content.Context')
+            PythonActivity = autoclass('org.kivy.android.PythonActivity')
+            ComponentName = autoclass('android.content.ComponentName')
+            
+            context = PythonActivity.mActivity
+            alarm_manager = context.getSystemService(Context.ALARM_SERVICE)
+            
+            # 🔍 패키지명과 컴포넌트명 확인
+            package_name = context.getPackageName()
+            print(f"📦 실제 패키지명: {package_name}")
+            
+            # Intent 생성 (정확한 패키지명 사용)
+            intent = Intent()
+            receiver_class = f"{package_name}.AlarmReceiver"
+            print(f"🎯 AlarmReceiver 클래스: {receiver_class}")
+            
+            intent.setComponent(ComponentName(package_name, receiver_class))
+            
+            # 🔍 추가 디버그 정보
+            intent.putExtra("DEBUG_MODE", "true")
+            intent.putExtra("class_name", "🔍 진단 테스트")
+            intent.putExtra("class_room", "디버그 룸")
+            intent.putExtra("class_time", test_time.strftime('%H:%M'))
+            intent.putExtra("test_timestamp", str(datetime.now().timestamp()))
+            
+            # PendingIntent 생성
+            flags = PendingIntent.FLAG_UPDATE_CURRENT
+            if hasattr(PendingIntent, 'FLAG_IMMUTABLE'):
+                flags |= PendingIntent.FLAG_IMMUTABLE
+                
+            pending_intent = PendingIntent.getBroadcast(context, 777, intent, flags)
+            
+            # 🔍 알람 매니저 권한 확인
+            if hasattr(alarm_manager, 'canScheduleExactAlarms'):
+                can_schedule = alarm_manager.canScheduleExactAlarms()
+                print(f"🔒 정확한 알람 권한: {can_schedule}")
+            
+            # 알람 설정
+            alarm_manager.setExact(AlarmManager.RTC_WAKEUP, alarm_millis, pending_intent)
+            
+            print(f"✅ 진단 알람 설정 완료!")
+            print(f"📱 10초 후 AlarmReceiver 호출 예정")
+            print(f"🔍 logcat에서 'AlarmReceiver' 키워드 확인하세요")
+            
+            return True
+            
+        except Exception as e:
+            print(f"❌ 진단 테스트 실패: {e}")
+            import traceback
+            traceback.print_exc()
+            return False
+    
+    def test_broadcast_intent_direct(self):
+        """🔍 BroadcastReceiver 직접 호출 테스트"""
+        try:
+            from jnius import autoclass
+            
+            Intent = autoclass('android.content.Intent')
+            PythonActivity = autoclass('org.kivy.android.PythonActivity')
+            ComponentName = autoclass('android.content.ComponentName')
+            
+            context = PythonActivity.mActivity
+            package_name = context.getPackageName()
+            
+            print(f"🔍 BroadcastReceiver 직접 호출 테스트")
+            print(f"📦 패키지명: {package_name}")
+            
+            # Intent 생성
+            intent = Intent()
+            receiver_class = f"{package_name}.AlarmReceiver"
+            intent.setComponent(ComponentName(package_name, receiver_class))
+            
+            # 테스트 데이터
+            intent.putExtra("class_name", "🔍 직접 호출 테스트")
+            intent.putExtra("class_room", "직접 테스트 룸")
+            intent.putExtra("class_time", "지금")
+            intent.putExtra("DIRECT_CALL", "true")
+            
+            # 🔍 직접 브로드캐스트 전송
+            context.sendBroadcast(intent)
+            
+            print(f"✅ BroadcastReceiver 직접 호출 완료!")
+            print(f"📱 AlarmReceiver가 즉시 호출되어야 합니다")
+            
+            return True
+            
+        except Exception as e:
+            print(f"❌ 직접 호출 테스트 실패: {e}")
+            import traceback
+            traceback.print_exc()
+            return False
+    
+    def check_alarm_receiver_exists(self):
+        """🔍 AlarmReceiver 클래스 존재 여부 확인"""
+        try:
+            from jnius import autoclass
+            
+            PythonActivity = autoclass('org.kivy.android.PythonActivity')
+            context = PythonActivity.mActivity
+            package_name = context.getPackageName()
+            
+            print(f"🔍 AlarmReceiver 존재 여부 확인")
+            print(f"📦 패키지명: {package_name}")
+            
+            # 패키지 매니저로 컴포넌트 확인
+            try:
+                PackageManager = autoclass('android.content.pm.PackageManager')
+                ComponentName = autoclass('android.content.ComponentName')
+                
+                pm = context.getPackageManager()
+                receiver_class = f"{package_name}.AlarmReceiver"
+                component = ComponentName(package_name, receiver_class)
+                
+                # 컴포넌트 정보 가져오기 시도
+                info = pm.getReceiverInfo(component, 0)
+                print(f"✅ AlarmReceiver 발견: {info.name}")
+                return True
+                
+            except Exception as e:
+                print(f"❌ AlarmReceiver 클래스를 찾을 수 없음: {e}")
+                
+                # 대안: 다른 경로로 확인
+                try:
+                    receiver_class = autoclass(f'{package_name}.AlarmReceiver')
+                    print(f"✅ 직접 클래스 로딩 성공: {receiver_class}")
+                    return True
+                except Exception as e2:
+                    print(f"❌ 직접 클래스 로딩도 실패: {e2}")
+                    return False
+            
+        except Exception as e:
+            print(f"❌ AlarmReceiver 확인 실패: {e}")
+            return False
+    
+    def run_comprehensive_test(self):
+        """🎯 종합 진단 테스트 실행"""
+        print("\n" + "="*50)
+        print("🎯 종합 진단 테스트 시작")
+        print("="*50)
+        
+        # 1단계: AlarmReceiver 존재 확인
+        print("\n📋 1단계: AlarmReceiver 존재 확인")
+        receiver_exists = self.check_alarm_receiver_exists()
+        
+        # 2단계: 직접 BroadcastReceiver 호출
+        print("\n📋 2단계: 직접 BroadcastReceiver 호출")
+        direct_call_success = self.test_broadcast_intent_direct()
+        
+        # 3단계: 즉시 알림 테스트
+        print("\n📋 3단계: 즉시 알림 테스트")
+        notification_success = self.test_direct_notification()
+        
+        # 4단계: 10초 알람 진단
+        print("\n📋 4단계: 10초 알람 진단")
+        alarm_success = self.test_alarm_receiver_debug()
+        
+        # 결과 요약
+        print("\n" + "="*50)
+        print("🎯 종합 진단 결과 요약")
+        print("="*50)
+        print(f"📱 AlarmReceiver 존재: {'✅' if receiver_exists else '❌'}")
+        print(f"📱 직접 호출 성공: {'✅' if direct_call_success else '❌'}")
+        print(f"📱 즉시 알림 성공: {'✅' if notification_success else '❌'}")
+        print(f"📱 10초 알람 설정: {'✅' if alarm_success else '❌'}")
+        
+        if receiver_exists and direct_call_success:
+            print("\n✅ AlarmReceiver 기본 구조는 정상입니다!")
+            print("🔍 10초 후 알람이 울리는지 확인하세요")
+        else:
+            print("\n❌ AlarmReceiver에 문제가 있습니다!")
+            print("🔧 buildozer.spec 설정을 확인해주세요")
+        
+        print("="*50)
+    
     def add_test_buttons(self):
-        """테스트 버튼들을 메인 화면에 추가 - 수정된 버전"""
+        """최종 테스트 버튼들 추가 (기존 + 새로운 진단 기능)"""
         if hasattr(self, 'layout') and self.layout:
             from kivymd.uix.button import MDRaisedButton
             from kivy.uix.boxlayout import BoxLayout
             
-            # 테스트 버튼 컨테이너 (3개 버튼으로 확장)
+            # 테스트 버튼 컨테이너 (8개 버튼)
             test_container = BoxLayout(
                 orientation='vertical',
                 size_hint_y=None,
-                height='140dp',  # 높이 증가 (3개 버튼)
+                height='320dp',  # 높이 증가 (8개 버튼)
                 spacing='5dp',
-                pos_hint={'center_x': 0.5, 'y': 0.80}  # 화면 상단에 위치
+                pos_hint={'center_x': 0.5, 'y': 0.65}  # 화면 상단에 위치
             )
             
-            # 5초 알람 테스트 버튼 (새로 추가!)
+            # ===========================================
+            # 진단 테스트 버튼들 (새로운)
+            # ===========================================
+            
+            # 1. AlarmReceiver 존재 확인 버튼
+            check_receiver_btn = MDRaisedButton(
+                text="🔍 AlarmReceiver 확인",
+                size_hint_y=None,
+                height='35dp',
+                font_name=FONT_NAME,
+                md_bg_color=[0.8, 0.8, 0.2, 1]  # 노란색
+            )
+            check_receiver_btn.bind(on_release=lambda x: self.check_alarm_receiver_exists())
+            
+            # 2. 직접 BroadcastReceiver 호출 버튼
+            direct_broadcast_btn = MDRaisedButton(
+                text="🔍 직접 Receiver 호출",
+                size_hint_y=None,
+                height='35dp',
+                font_name=FONT_NAME,
+                md_bg_color=[0.8, 0.2, 0.8, 1]  # 보라색
+            )
+            direct_broadcast_btn.bind(on_release=lambda x: self.test_broadcast_intent_direct())
+            
+            # 3. 10초 알람 진단 버튼
+            debug_alarm_btn = MDRaisedButton(
+                text="🔍 10초 알람 진단",
+                size_hint_y=None,
+                height='35dp',
+                font_name=FONT_NAME,
+                md_bg_color=[1, 0.5, 0, 1]  # 주황색
+            )
+            debug_alarm_btn.bind(on_release=lambda x: self.test_alarm_receiver_debug())
+            
+            # ===========================================
+            # 기존 테스트 버튼들 (수정된 버전)
+            # ===========================================
+            
+            # 4. 5초 즉시 알람 테스트 버튼
             immediate_test_btn = MDRaisedButton(
                 text="🚀 5초 알람 테스트",
                 size_hint_y=None,
-                height='40dp',
+                height='35dp',
                 font_name=FONT_NAME,
-                md_bg_color=[1, 0.5, 0, 1]  # 주황색으로 구분
+                md_bg_color=[1, 0.2, 0.2, 1]  # 빨간색
             )
             immediate_test_btn.bind(on_release=lambda x: self.test_immediate_alarm())
             
-            # 30초 알람 테스트 버튼 (수정됨)
+            # 5. 30초 알람 테스트 버튼
             alarm_test_btn = MDRaisedButton(
                 text="🧪 30초 알람 테스트",
                 size_hint_y=None,
-                height='40dp',
+                height='35dp',
                 font_name=FONT_NAME,
                 md_bg_color=[0.2, 0.8, 0.2, 1]  # 초록색
             )
             alarm_test_btn.bind(on_release=lambda x: self.test_alarm_now())
             
-            # 즉시 알림 테스트 버튼  
+            # 6. 즉시 알림 테스트 버튼 (기존)
             notify_test_btn = MDRaisedButton(
                 text="🔔 즉시 알림 테스트", 
                 size_hint_y=None,
-                height='40dp',
+                height='35dp',
                 font_name=FONT_NAME,
                 md_bg_color=[0.2, 0.2, 0.8, 1]  # 파란색
             )
             notify_test_btn.bind(on_release=lambda x: self.test_direct_notification())
             
+            # ===========================================
+            # 종합 테스트 버튼들
+            # ===========================================
+            
+            # 7. 종합 진단 테스트 버튼
+            comprehensive_test_btn = MDRaisedButton(
+                text="🎯 종합 진단 테스트",
+                size_hint_y=None,
+                height='35dp',
+                font_name=FONT_NAME,
+                md_bg_color=[0.5, 0.5, 0.5, 1]  # 회색
+            )
+            comprehensive_test_btn.bind(on_release=lambda x: self.run_comprehensive_test())
+            
+            # 8. 테스트 버튼 숨기기 버튼
+            hide_buttons_btn = MDRaisedButton(
+                text="❌ 테스트 버튼 숨기기",
+                size_hint_y=None,
+                height='35dp',
+                font_name=FONT_NAME,
+                md_bg_color=[0.3, 0.3, 0.3, 1]  # 어두운 회색
+            )
+            hide_buttons_btn.bind(on_release=lambda x: self.hide_test_buttons(test_container))
+            
             # 버튼들을 컨테이너에 추가
-            test_container.add_widget(immediate_test_btn)  # 5초 테스트 (맨 위)
-            test_container.add_widget(alarm_test_btn)      # 30초 테스트
-            test_container.add_widget(notify_test_btn)     # 즉시 알림
+            test_container.add_widget(check_receiver_btn)      # 🔍 노란색: AlarmReceiver 확인
+            test_container.add_widget(direct_broadcast_btn)    # 🔍 보라색: 직접 호출
+            test_container.add_widget(debug_alarm_btn)         # 🔍 주황색: 10초 알람 진단
+            test_container.add_widget(immediate_test_btn)      # 🚀 빨간색: 5초 알람
+            test_container.add_widget(alarm_test_btn)          # 🧪 초록색: 30초 알람
+            test_container.add_widget(notify_test_btn)         # 🔔 파란색: 즉시 알림
+            test_container.add_widget(comprehensive_test_btn)  # 🎯 회색: 종합 진단
+            test_container.add_widget(hide_buttons_btn)        # ❌ 어두운 회색: 숨기기
             
             # 메인 레이아웃에 추가
             self.add_widget(test_container)
-            print("✅ 수정된 테스트 버튼 3개 추가 완료")
-            print("🚀 주황색 버튼: 5초 후 알람 (빠른 테스트)")  
-            print("🧪 초록색 버튼: 30초 후 알람 (정상 테스트)")
-            print("🔔 파란색 버튼: 즉시 알림 (AlarmReceiver 우회)")
+            print("✅ 테스트 버튼 8개 추가 완료")
+            print("\n📋 버튼 기능 설명:")
+            print("🔍 노란색: AlarmReceiver 존재 확인")
+            print("🔍 보라색: 직접 BroadcastReceiver 호출")  
+            print("🔍 주황색: 10초 알람 진단")
+            print("🚀 빨간색: 5초 알람 테스트")
+            print("🧪 초록색: 30초 알람 테스트")
+            print("🔔 파란색: 즉시 알림 테스트")
+            print("🎯 회색: 종합 진단 테스트")
+            print("❌ 어두운 회색: 테스트 버튼 숨기기")
+    
+    def hide_test_buttons(self, test_container):
+        """테스트 버튼 컨테이너 숨기기"""
+        try:
+            self.remove_widget(test_container)
+            print("✅ 테스트 버튼 숨김 완료")
+        except Exception as e:
+            print(f"❌ 버튼 숨기기 실패: {e}")
+    
+    def run_comprehensive_test(self):
+        """🎯 종합 진단 테스트 실행"""
+        print("\n" + "="*50)
+        print("🎯 종합 진단 테스트 시작")
+        print("="*50)
+        
+        # 1단계: AlarmReceiver 존재 확인
+        print("\n📋 1단계: AlarmReceiver 존재 확인")
+        receiver_exists = self.check_alarm_receiver_exists()
+        
+        # 2단계: 직접 BroadcastReceiver 호출
+        print("\n📋 2단계: 직접 BroadcastReceiver 호출")
+        direct_call_success = self.test_broadcast_intent_direct()
+        
+        # 3단계: 즉시 알림 테스트
+        print("\n📋 3단계: 즉시 알림 테스트")
+        notification_success = self.test_direct_notification()
+        
+        # 4단계: 10초 알람 진단
+        print("\n📋 4단계: 10초 알람 진단")
+        alarm_success = self.test_alarm_receiver_debug()
+        
+        # 결과 요약
+        print("\n" + "="*50)
+        print("🎯 종합 진단 결과 요약")
+        print("="*50)
+        print(f"📱 AlarmReceiver 존재: {'✅' if receiver_exists else '❌'}")
+        print(f"📱 직접 호출 성공: {'✅' if direct_call_success else '❌'}")
+        print(f"📱 즉시 알림 성공: {'✅' if notification_success else '❌'}")
+        print(f"📱 10초 알람 설정: {'✅' if alarm_success else '❌'}")
+        
+        if receiver_exists and direct_call_success:
+            print("\n✅ AlarmReceiver 기본 구조는 정상입니다!")
+            print("🔍 10초 후 알람이 울리는지 확인하세요")
+        else:
+            print("\n❌ AlarmReceiver에 문제가 있습니다!")
+            print("🔧 buildozer.spec 설정을 확인해주세요")
+        
+        print("="*50)
             
 class TimeTableApp(MDApp):
     def build(self):
