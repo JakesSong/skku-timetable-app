@@ -170,6 +170,48 @@ jobs:
           done
         done
         
+        # 강제로 주요 매니페스트 파일들 확인
+        MAIN_MANIFESTS=(
+          ".buildozer/android/platform/build-arm64-v8a/dists/doublecheck/src/main/AndroidManifest.xml"
+          ".buildozer/android/platform/build-arm64-v8a/dists/doublecheck/AndroidManifest.xml"
+          ".buildozer/android/platform/build-arm64-v8a/dists/doublecheck/build/intermediates/merged_manifests/debug/AndroidManifest.xml"
+        )
+        
+        echo "=== 🔍 주요 매니페스트 파일들 직접 확인 ==="
+        for manifest in "${MAIN_MANIFESTS[@]}"; do
+          if [ -f "$manifest" ]; then
+            echo ""
+            echo "📋 매니페스트 파일: $manifest"
+            echo "파일 크기: $(wc -c < "$manifest") bytes"
+            
+            echo "--- 패키지 정보 ---"
+            grep "package=" "$manifest" | head -1 || echo "패키지 정보 없음"
+            
+            echo "--- AlarmReceiver 검색 ---"
+            if grep -q "AlarmReceiver" "$manifest"; then
+              echo "✅ AlarmReceiver 발견!"
+              grep -A 5 -B 2 "AlarmReceiver" "$manifest"
+            else
+              echo "❌ AlarmReceiver 없음"
+            fi
+            
+            echo "--- receiver 태그 검색 ---"
+            receiver_count=$(grep -c "<receiver" "$manifest" 2>/dev/null || echo "0")
+            echo "receiver 개수: $receiver_count"
+            if [ "$receiver_count" -gt 0 ]; then
+              grep -A 2 "<receiver" "$manifest"
+            fi
+            
+            echo "--- application 구조 ---"
+            echo "application 태그: $(grep -c '<application' "$manifest" 2>/dev/null || echo "0")"
+            echo "activity 태그: $(grep -c '<activity' "$manifest" 2>/dev/null || echo "0")"
+            
+            echo "=========================================="
+          else
+            echo "❌ 파일 없음: $manifest"
+          fi
+        done
+        
         if [ -n "$APP_MANIFEST" ] && [ -f "$APP_MANIFEST" ]; then
           echo ""
           echo "=== 📋 앱 패키지 확인 ==="
