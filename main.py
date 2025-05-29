@@ -3595,27 +3595,204 @@ class MainScreen(MDScreen):
             print("🔧 buildozer.spec 설정을 확인해주세요")
         
         print("="*50)
+
+    def check_manifest_registration(self):
+        """🔍 AndroidManifest.xml에 AlarmReceiver가 제대로 등록되었는지 확인"""
+        try:
+            from jnius import autoclass
+            
+            PythonActivity = autoclass('org.kivy.android.PythonActivity')
+            Context = autoclass('android.content.Context')
+            PackageManager = autoclass('android.content.pm.PackageManager')
+            ComponentName = autoclass('android.content.ComponentName')
+            
+            context = PythonActivity.mActivity
+            package_name = context.getPackageName()
+            pm = context.getPackageManager()
+            
+            print(f"🔍 Manifest 등록 상태 확인")
+            print(f"📦 패키지명: {package_name}")
+            
+            try:
+                # 1. AlarmReceiver 컴포넌트 확인
+                receiver_component = ComponentName(package_name, f"{package_name}.AlarmReceiver")
+                receiver_info = pm.getReceiverInfo(receiver_component, 0)
+                
+                print(f"✅ AlarmReceiver Manifest 등록 확인됨!")
+                print(f"   - 클래스명: {receiver_info.name}")
+                print(f"   - 활성화: {receiver_info.enabled}")
+                print(f"   - Export: {receiver_info.exported}")
+                
+                return True
+                
+            except Exception as e:
+                print(f"❌ Manifest에 AlarmReceiver 등록 안됨: {e}")
+                
+                # 2. 모든 Receiver 목록 확인
+                try:
+                    package_info = pm.getPackageInfo(package_name, PackageManager.GET_RECEIVERS)
+                    receivers = package_info.receivers
+                    
+                    print(f"📋 등록된 Receiver 목록 ({len(receivers) if receivers else 0}개):")
+                    if receivers:
+                        for i in range(len(receivers)):
+                            receiver = receivers[i]
+                            print(f"   {i+1}. {receiver.name}")
+                    else:
+                        print("   (등록된 Receiver 없음)")
+                        
+                except Exception as e2:
+                    print(f"❌ Receiver 목록 조회 실패: {e2}")
+                
+                return False
+            
+        except Exception as e:
+            print(f"❌ Manifest 확인 실패: {e}")
+            return False
+    
+    def test_intent_action_matching(self):
+        """🔍 Intent 액션과 필터 매칭 테스트"""
+        try:
+            from jnius import autoclass
+            from datetime import datetime, timedelta
+            
+            PythonActivity = autoclass('org.kivy.android.PythonActivity')
+            Intent = autoclass('android.content.Intent')
+            ComponentName = autoclass('android.content.ComponentName')
+            
+            context = PythonActivity.mActivity
+            package_name = context.getPackageName()
+            
+            print(f"🔍 Intent 액션 매칭 테스트")
+            
+            # 🔥 테스트 1: 명시적 Intent (컴포넌트 직접 지정)
+            print(f"\n📋 테스트 1: 명시적 Intent")
+            intent1 = Intent()
+            intent1.setComponent(ComponentName(package_name, f"{package_name}.AlarmReceiver"))
+            intent1.putExtra("test_type", "explicit_intent")
+            intent1.putExtra("class_name", "🔍 명시적 테스트")
+            
+            context.sendBroadcast(intent1)
+            print(f"✅ 명시적 Intent 전송 완료")
+            
+            # 🔥 테스트 2: 암시적 Intent (액션 기반)
+            print(f"\n📋 테스트 2: 암시적 Intent")
+            intent2 = Intent("org.kivy.skkutimetable.doublecheck.ALARM_ACTION")
+            intent2.setPackage(package_name)  # 패키지 제한
+            intent2.putExtra("test_type", "implicit_intent")
+            intent2.putExtra("class_name", "🔍 암시적 테스트")
+            
+            context.sendBroadcast(intent2)
+            print(f"✅ 암시적 Intent 전송 완료")
+            
+            # 🔥 테스트 3: 일반 브로드캐스트
+            print(f"\n📋 테스트 3: 일반 브로드캐스트")
+            intent3 = Intent()
+            intent3.setAction("android.intent.action.USER_PRESENT")
+            intent3.setComponent(ComponentName(package_name, f"{package_name}.AlarmReceiver"))
+            intent3.putExtra("test_type", "general_broadcast")
+            intent3.putExtra("class_name", "🔍 일반 테스트")
+            
+            context.sendBroadcast(intent3)
+            print(f"✅ 일반 브로드캐스트 전송 완료")
+            
+            print(f"\n🔍 3가지 Intent 전송 완료!")
+            print(f"📱 logcat에서 AlarmReceiver 호출 확인하세요")
+            
+            return True
+            
+        except Exception as e:
+            print(f"❌ Intent 매칭 테스트 실패: {e}")
+            import traceback
+            traceback.print_exc()
+            return False
+    
+    def run_detailed_diagnosis(self):
+        """🎯 상세 진단 실행"""
+        print("\n" + "="*60)
+        print("🎯 상세 알람 시스템 진단")
+        print("="*60)
+        
+        # 1단계: Manifest 등록 확인
+        print("\n📋 1단계: AndroidManifest.xml 등록 확인")
+        manifest_ok = self.check_manifest_registration()
+        
+        # 2단계: Intent 액션 매칭 테스트
+        print("\n📋 2단계: Intent 액션 매칭 테스트")
+        intent_ok = self.test_intent_action_matching()
+        
+        # 3단계: 기존 AlarmReceiver 존재 확인
+        print("\n📋 3단계: AlarmReceiver 클래스 존재 재확인")
+        class_ok = self.check_alarm_receiver_exists()
+        
+        # 결과 요약
+        print("\n" + "="*60)
+        print("🎯 상세 진단 결과")
+        print("="*60)
+        print(f"📱 Manifest 등록: {'✅' if manifest_ok else '❌'}")
+        print(f"📱 Intent 매칭: {'✅' if intent_ok else '❌'}")
+        print(f"📱 클래스 존재: {'✅' if class_ok else '❌'}")
+        
+        if not manifest_ok:
+            print(f"\n❌ 문제: AndroidManifest.xml에 AlarmReceiver가 등록되지 않음!")
+            print(f"🔧 해결책: buildozer.spec의 android.add_src를 확인하고")
+            print(f"          AndroidManifest.tmpl.xml 파일을 생성하세요")
+        elif class_ok and intent_ok:
+            print(f"\n✅ 모든 구성요소가 정상입니다!")
+            print(f"🔍 알람이 울리지 않는 이유는 다른 곳에 있습니다")
+        
+        print("="*60)
     
     def add_test_buttons(self):
-        """최종 테스트 버튼들 추가 (기존 + 새로운 진단 기능)"""
+        """상세 진단이 포함된 테스트 버튼들 추가"""
         if hasattr(self, 'layout') and self.layout:
             from kivymd.uix.button import MDRaisedButton
             from kivy.uix.boxlayout import BoxLayout
             
-            # 테스트 버튼 컨테이너 (8개 버튼)
+            # 테스트 버튼 컨테이너 (10개 버튼)
             test_container = BoxLayout(
                 orientation='vertical',
                 size_hint_y=None,
-                height='320dp',  # 높이 증가 (8개 버튼)
+                height='400dp',  # 높이 증가 (10개 버튼)
                 spacing='5dp',
-                pos_hint={'center_x': 0.5, 'y': 0.65}  # 화면 상단에 위치
+                pos_hint={'center_x': 0.5, 'y': 0.55}  # 화면 상단에 위치
             )
             
             # ===========================================
-            # 진단 테스트 버튼들 (새로운)
+            # 🔍 진단 테스트 버튼들 (새로운)
             # ===========================================
             
-            # 1. AlarmReceiver 존재 확인 버튼
+            # 1. Manifest 등록 확인 버튼 (새로 추가!)
+            manifest_check_btn = MDRaisedButton(
+                text="🔍 Manifest 등록 확인",
+                size_hint_y=None,
+                height='35dp',
+                font_name=FONT_NAME,
+                md_bg_color=[1, 0.8, 0, 1]  # 골드색
+            )
+            manifest_check_btn.bind(on_release=lambda x: self.check_manifest_registration())
+            
+            # 2. Intent 매칭 테스트 버튼 (새로 추가!)
+            intent_test_btn = MDRaisedButton(
+                text="🔍 Intent 매칭 테스트",
+                size_hint_y=None,
+                height='35dp',
+                font_name=FONT_NAME,
+                md_bg_color=[0.8, 0.4, 1, 1]  # 라벤더색
+            )
+            intent_test_btn.bind(on_release=lambda x: self.test_intent_action_matching())
+            
+            # 3. 상세 진단 버튼 (새로 추가!)
+            detailed_diagnosis_btn = MDRaisedButton(
+                text="🎯 상세 진단 실행",
+                size_hint_y=None,
+                height='35dp',
+                font_name=FONT_NAME,
+                md_bg_color=[1, 0.2, 0.8, 1]  # 마젠타색
+            )
+            detailed_diagnosis_btn.bind(on_release=lambda x: self.run_detailed_diagnosis())
+            
+            # 4. AlarmReceiver 존재 확인 버튼
             check_receiver_btn = MDRaisedButton(
                 text="🔍 AlarmReceiver 확인",
                 size_hint_y=None,
@@ -3625,7 +3802,7 @@ class MainScreen(MDScreen):
             )
             check_receiver_btn.bind(on_release=lambda x: self.check_alarm_receiver_exists())
             
-            # 2. 직접 BroadcastReceiver 호출 버튼
+            # 5. 직접 BroadcastReceiver 호출 버튼
             direct_broadcast_btn = MDRaisedButton(
                 text="🔍 직접 Receiver 호출",
                 size_hint_y=None,
@@ -3635,7 +3812,7 @@ class MainScreen(MDScreen):
             )
             direct_broadcast_btn.bind(on_release=lambda x: self.test_broadcast_intent_direct())
             
-            # 3. 10초 알람 진단 버튼
+            # 6. 10초 알람 진단 버튼
             debug_alarm_btn = MDRaisedButton(
                 text="🔍 10초 알람 진단",
                 size_hint_y=None,
@@ -3646,10 +3823,10 @@ class MainScreen(MDScreen):
             debug_alarm_btn.bind(on_release=lambda x: self.test_alarm_receiver_debug())
             
             # ===========================================
-            # 기존 테스트 버튼들 (수정된 버전)
+            # 🧪 기존 테스트 버튼들
             # ===========================================
             
-            # 4. 5초 즉시 알람 테스트 버튼
+            # 7. 5초 즉시 알람 테스트 버튼
             immediate_test_btn = MDRaisedButton(
                 text="🚀 5초 알람 테스트",
                 size_hint_y=None,
@@ -3659,17 +3836,7 @@ class MainScreen(MDScreen):
             )
             immediate_test_btn.bind(on_release=lambda x: self.test_immediate_alarm())
             
-            # 5. 30초 알람 테스트 버튼
-            alarm_test_btn = MDRaisedButton(
-                text="🧪 30초 알람 테스트",
-                size_hint_y=None,
-                height='35dp',
-                font_name=FONT_NAME,
-                md_bg_color=[0.2, 0.8, 0.2, 1]  # 초록색
-            )
-            alarm_test_btn.bind(on_release=lambda x: self.test_alarm_now())
-            
-            # 6. 즉시 알림 테스트 버튼 (기존)
+            # 8. 즉시 알림 테스트 버튼  
             notify_test_btn = MDRaisedButton(
                 text="🔔 즉시 알림 테스트", 
                 size_hint_y=None,
@@ -3680,10 +3847,10 @@ class MainScreen(MDScreen):
             notify_test_btn.bind(on_release=lambda x: self.test_direct_notification())
             
             # ===========================================
-            # 종합 테스트 버튼들
+            # 🎯 종합 테스트 버튼들
             # ===========================================
             
-            # 7. 종합 진단 테스트 버튼
+            # 9. 종합 진단 테스트 버튼
             comprehensive_test_btn = MDRaisedButton(
                 text="🎯 종합 진단 테스트",
                 size_hint_y=None,
@@ -3693,7 +3860,7 @@ class MainScreen(MDScreen):
             )
             comprehensive_test_btn.bind(on_release=lambda x: self.run_comprehensive_test())
             
-            # 8. 테스트 버튼 숨기기 버튼
+            # 10. 테스트 버튼 숨기기 버튼
             hide_buttons_btn = MDRaisedButton(
                 text="❌ 테스트 버튼 숨기기",
                 size_hint_y=None,
@@ -3704,24 +3871,29 @@ class MainScreen(MDScreen):
             hide_buttons_btn.bind(on_release=lambda x: self.hide_test_buttons(test_container))
             
             # 버튼들을 컨테이너에 추가
-            test_container.add_widget(check_receiver_btn)      # 🔍 노란색: AlarmReceiver 확인
-            test_container.add_widget(direct_broadcast_btn)    # 🔍 보라색: 직접 호출
-            test_container.add_widget(debug_alarm_btn)         # 🔍 주황색: 10초 알람 진단
-            test_container.add_widget(immediate_test_btn)      # 🚀 빨간색: 5초 알람
-            test_container.add_widget(alarm_test_btn)          # 🧪 초록색: 30초 알람
-            test_container.add_widget(notify_test_btn)         # 🔔 파란색: 즉시 알림
-            test_container.add_widget(comprehensive_test_btn)  # 🎯 회색: 종합 진단
-            test_container.add_widget(hide_buttons_btn)        # ❌ 어두운 회색: 숨기기
+            test_container.add_widget(manifest_check_btn)     # 🔍 골드: Manifest 등록 확인
+            test_container.add_widget(intent_test_btn)        # 🔍 라벤더: Intent 매칭 테스트
+            test_container.add_widget(detailed_diagnosis_btn) # 🎯 마젠타: 상세 진단
+            test_container.add_widget(check_receiver_btn)     # 🔍 노란색: AlarmReceiver 확인
+            test_container.add_widget(direct_broadcast_btn)   # 🔍 보라색: 직접 호출
+            test_container.add_widget(debug_alarm_btn)        # 🔍 주황색: 10초 알람 진단
+            test_container.add_widget(immediate_test_btn)     # 🚀 빨간색: 5초 알람
+            test_container.add_widget(notify_test_btn)        # 🔔 파란색: 즉시 알림
+            test_container.add_widget(comprehensive_test_btn) # 🎯 회색: 종합 진단
+            test_container.add_widget(hide_buttons_btn)       # ❌ 어두운 회색: 숨기기
             
             # 메인 레이아웃에 추가
             self.add_widget(test_container)
-            print("✅ 테스트 버튼 8개 추가 완료")
-            print("\n📋 버튼 기능 설명:")
+            print("✅ 상세 진단 테스트 버튼 10개 추가 완료")
+            print("\n📋 새로 추가된 진단 버튼들:")
+            print("🔍 골드색: AndroidManifest.xml 등록 확인")
+            print("🔍 라벤더색: Intent 액션 매칭 테스트")
+            print("🎯 마젠타색: 상세 진단 실행")
+            print("\n📋 기존 버튼들:")
             print("🔍 노란색: AlarmReceiver 존재 확인")
             print("🔍 보라색: 직접 BroadcastReceiver 호출")  
             print("🔍 주황색: 10초 알람 진단")
             print("🚀 빨간색: 5초 알람 테스트")
-            print("🧪 초록색: 30초 알람 테스트")
             print("🔔 파란색: 즉시 알림 테스트")
             print("🎯 회색: 종합 진단 테스트")
             print("❌ 어두운 회색: 테스트 버튼 숨기기")
