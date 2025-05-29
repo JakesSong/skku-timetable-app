@@ -123,7 +123,7 @@ jobs:
                 os.environ['NDK_ROOT'] = android_ndk
                 print(f"🔧 NDK 25로 강제 변경: {android_ndk}")
             
-            # p4a 명령어 구성
+            # p4a 명령어 구성 (수정된 버전)
             cmd = [
                 'p4a', 'apk',
                 '--private', '.',
@@ -132,7 +132,6 @@ jobs:
                 '--version', '1.0',
                 '--bootstrap', 'sdl2',
                 '--requirements', 'python3,kivy==2.1.0,kivymd==1.1.1,requests,pillow,certifi,urllib3,charset-normalizer,plyer',
-                '--permissions', 'INTERNET,WRITE_EXTERNAL_STORAGE,READ_EXTERNAL_STORAGE,SCHEDULE_EXACT_ALARM,USE_EXACT_ALARM,VIBRATE,WAKE_LOCK,RECEIVE_BOOT_COMPLETED,FOREGROUND_SERVICE,POST_NOTIFICATIONS,ACCESS_NOTIFICATION_POLICY,SYSTEM_ALERT_WINDOW',
                 '--arch', 'arm64-v8a',
                 '--ndk-api', '21',
                 '--sdk-dir', android_sdk,
@@ -140,9 +139,30 @@ jobs:
                 '--release'
             ]
             
-            # 선택적 파일들 추가
+            # 권한들을 개별적으로 추가 (수정됨 🔧)
+            permissions = [
+                'INTERNET',
+                'WRITE_EXTERNAL_STORAGE', 
+                'READ_EXTERNAL_STORAGE',
+                'SCHEDULE_EXACT_ALARM',
+                'USE_EXACT_ALARM',
+                'VIBRATE',
+                'WAKE_LOCK',
+                'RECEIVE_BOOT_COMPLETED',
+                'FOREGROUND_SERVICE',
+                'POST_NOTIFICATIONS',
+                'ACCESS_NOTIFICATION_POLICY',
+                'SYSTEM_ALERT_WINDOW'
+            ]
+            
+            for permission in permissions:
+                cmd.extend(['--permission', permission])
+            
+            print(f"✅ {len(permissions)}개 권한 추가됨")
+            
+            # 선택적 파일들 추가 (수정됨 🔧)
             if Path('AndroidManifest.tmpl.xml').exists():
-                cmd.extend(['--add-manifest-template', 'AndroidManifest.tmpl.xml'])
+                cmd.extend(['--private-manifest', 'AndroidManifest.tmpl.xml'])
                 print("✅ AndroidManifest.tmpl.xml 추가됨")
             
             if Path('android/src/main/java').exists():
@@ -150,9 +170,12 @@ jobs:
                 print("✅ Java 소스 디렉토리 추가됨")
             
             if Path('android/libs').exists():
+                jar_count = 0
                 for jar_file in Path('android/libs').glob('*.jar'):
                     cmd.extend(['--add-jar', str(jar_file)])
+                    jar_count += 1
                     print(f"✅ JAR 파일 추가됨: {jar_file}")
+                print(f"✅ 총 {jar_count}개 JAR 파일 추가됨")
             
             print("\n=== 🔨 p4a 명령어 ===")
             print(' '.join(cmd))
@@ -168,9 +191,25 @@ jobs:
                     
                     # APK 파일 찾기
                     apk_files = list(Path('.').glob('*.apk'))
-                    for apk in apk_files:
-                        print(f"📱 생성된 APK: {apk}")
-                        print(f"📊 파일 크기: {apk.stat().st_size // (1024*1024)} MB")
+                    if not apk_files:
+                        # dist 폴더에서도 찾아보기
+                        dist_apks = list(Path('.').glob('dist/*.apk'))
+                        apk_files.extend(dist_apks)
+                    
+                    if apk_files:
+                        for apk in apk_files:
+                            print(f"📱 생성된 APK: {apk}")
+                            print(f"📊 파일 크기: {apk.stat().st_size // (1024*1024)} MB")
+                    else:
+                        print("⚠️ APK 파일을 찾을 수 없습니다.")
+                        # p4a 출력 디렉토리에서 찾기
+                        print("📂 p4a 출력 디렉토리 확인 중...")
+                        p4a_dirs = list(Path.home().glob('.local/share/python-for-android/dists/*/bin/*.apk'))
+                        for apk in p4a_dirs:
+                            print(f"📱 p4a 디렉토리에서 발견: {apk}")
+                            # 현재 디렉토리로 복사
+                            shutil.copy2(apk, f"./{apk.name}")
+                            print(f"📋 복사 완료: {apk.name}")
                     
                     return True
                 else:
@@ -229,6 +268,10 @@ jobs:
         if [ -n "$P4A_BUILD_DIR" ]; then
           echo "빌드 디렉토리: $P4A_BUILD_DIR"
           ls -la "$P4A_BUILD_DIR/" || true
+          
+          # APK 파일 찾기 및 복사
+          echo "p4a 디렉토리에서 APK 파일 찾는 중..."
+          find "$P4A_BUILD_DIR" -name "*.apk" -type f -exec cp {} . \; -exec echo "📱 복사됨: {}" \;
         fi
         
         # 매니페스트 확인
@@ -241,6 +284,11 @@ jobs:
           echo "서비스 개수: $(grep -c 'service' "$MANIFEST_FILE" 2>/dev/null || echo "0")"
           echo "리시버 개수: $(grep -c 'receiver' "$MANIFEST_FILE" 2>/dev/null || echo "0")"
         fi
+        
+        # 최종 APK 파일 목록
+        echo ""
+        echo "=== 📱 최종 APK 파일 목록 ==="
+        ls -lh *.apk 2>/dev/null || echo "❌ APK 파일이 없습니다."
     
     - name: Upload APK artifact
       if: success()
