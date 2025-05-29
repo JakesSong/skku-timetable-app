@@ -79,7 +79,8 @@ jobs:
         pip install python-for-android==2024.1.21
         pip install kivy==2.1.0
         pip install kivymd==1.1.1
-        pip install requests pillow plyer sqlite3
+        pip install requests pillow plyer
+        # sqlite3는 내장 모듈이므로 제외
         
         echo "=== ✅ 설치된 패키지 확인 ==="
         pip list | grep -E "(kivy|p4a|python-for-android|cython)"
@@ -130,7 +131,7 @@ jobs:
                 '--name', 'DoubleCheck',
                 '--version', '1.0',
                 '--bootstrap', 'sdl2',
-                '--requirements', 'python3,kivy==2.1.0,kivymd==1.1.1,requests,pillow,certifi,urllib3,charset-normalizer,plyer,sqlite3',
+                '--requirements', 'python3,kivy==2.1.0,kivymd==1.1.1,requests,pillow,certifi,urllib3,charset-normalizer,plyer',
                 '--permissions', 'INTERNET,WRITE_EXTERNAL_STORAGE,READ_EXTERNAL_STORAGE,SCHEDULE_EXACT_ALARM,USE_EXACT_ALARM,VIBRATE,WAKE_LOCK,RECEIVE_BOOT_COMPLETED,FOREGROUND_SERVICE,POST_NOTIFICATIONS,ACCESS_NOTIFICATION_POLICY,SYSTEM_ALERT_WINDOW',
                 '--arch', 'arm64-v8a',
                 '--ndk-api', '21',
