@@ -64,8 +64,6 @@ jobs:
         echo ""
         echo "--- buildozer/p4a 버전 정보 ---"
         buildozer --version || echo "buildozer 버전 확인 실패"
-        
-        # 4. 빌드 로그에서 매니페스트 처리 과정 추출 (빌드 후 실행될 예정)
 
     # ✅ Java 및 jar 파일 업로드
     - name: Upload Java and jar files
