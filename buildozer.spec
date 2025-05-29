@@ -7,7 +7,6 @@ source.dir = .
 source.filename = main.py
 source.include_exts = py,png,jpg,kv,atlas,ttf
 source.include_patterns = fonts/*.ttf
-source.include_exts = py,png,jpg,kv,atlas,ttf,java
 
 # 🔥 중요: androidx.core 의존성 추가 (NotificationCompat 때문에 필요)
 android.gradle_dependencies = androidx.core:core:1.6.0, androidx.appcompat:appcompat:1.3.1
