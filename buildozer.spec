@@ -11,7 +11,7 @@ source.include_patterns = fonts/*.ttf
 # 🔥 중요: androidx.core 의존성 추가 (NotificationCompat 때문에 필요)
 android.gradle_dependencies = androidx.core:core:1.6.0, androidx.appcompat:appcompat:1.3.1
 
-requirements = python3,kivy==2.1.0,kivymd==1.1.1,requests,pillow,certifi,urllib3,charset-normalizer,plyer,sqlite3
+requirements = python3,kivy==2.1.0,kivymd==1.1.1,requests,pillow,certifi,urllib3,charset-normalizer,plyer,sqlite3,android
 version = 0.1
 orientation = portrait
 fullscreen = 0
