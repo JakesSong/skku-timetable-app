@@ -113,6 +113,26 @@ jobs:
           echo "✅ 빌드 성공!"
         fi
 
+    - name: Check Java compilation results
+      run: |
+        echo "=== 🔍 .class 파일 생성 여부 확인 ==="
+        
+        # .class 파일 검색
+        find .buildozer -type f -name "*.class" || echo "❌ .class 파일 없음"
+    
+        echo ""
+        echo "=== 🔍 AlarmReceiver 관련 .class 파일 존재 여부 ==="
+        find .buildozer -type f -name "*AlarmReceiver*.class" || echo "❌ AlarmReceiver .class 파일 없음"
+    
+        echo ""
+        echo "=== 🔍 Java 컴파일 로그 추적 (javac 호출 확인) ==="
+        grep -i "javac" build_full.log | tail -20 || echo "❌ javac 호출 로그 없음"
+    
+        echo ""
+        echo "=== 🔍 Java 소스가 포함된 컴파일 대상 목록 (javaCompile)" 
+        grep -i "javaCompile" build_full.log | tail -20 || echo "❌ javaCompile 관련 로그 없음"
+    
+
     # ✅ APK 디켜폴 및 AlarmReceiver 확인
     - name: Decompile APK and check AlarmReceiver
       run: |
