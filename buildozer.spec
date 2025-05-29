@@ -25,7 +25,7 @@ android.permissions = INTERNET,WRITE_EXTERNAL_STORAGE,READ_EXTERNAL_STORAGE,SCHE
 # android.manifest_template = AndroidManifest.tmpl.xml
 
 # 🔥 기존 설정 주석 처리 (문제가 있었음)
-android.add_manifest_xml = android/manifest_additions.xml
+android.manifest_additions = android/manifest_additions.xml
 
 # 🔥 중요: Java 소스 경로 (기존 설정 유지)
 android.add_src = android/src/main/java
