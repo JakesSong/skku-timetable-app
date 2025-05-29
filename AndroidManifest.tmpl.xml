@@ -19,6 +19,7 @@
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY" />
 
     <!-- Android 버전별 호환성 -->
     <uses-sdk android:minSdkVersion="{{ args.min_sdk_version }}" android:targetSdkVersion="{{ android_api }}" />
@@ -45,8 +46,8 @@
             </intent-filter>
         </activity>
 
-        <!-- 🔥 핵심: AlarmReceiver 등록 -->
-        <receiver android:name="{{ args.package }}.AlarmReceiver"
+        <!-- 🔥 핵심: AlarmReceiver 등록 (전체 클래스명) -->
+        <receiver android:name="org.kivy.skkutimetable.doublecheck.AlarmReceiver"
             android:enabled="true"
             android:exported="true"
             android:directBootAware="true">
@@ -68,15 +69,22 @@
             
             <!-- 커스텀 알람 액션 -->
             <intent-filter>
-                <action android:name="{{ args.package }}.ALARM_ACTION" />
+                <action android:name="org.kivy.skkutimetable.doublecheck.ALARM_ACTION" />
+            </intent-filter>
+            
+            <!-- 일반 브로드캐스트 -->
+            <intent-filter>
+                <action android:name="android.intent.action.USER_PRESENT" />
             </intent-filter>
             
         </receiver>
 
-        <!-- 🔥 NotificationChannel 생성용 서비스 (선택사항) -->
-        <service android:name="{{ args.package }}.AlarmService"
+        <!-- 🔥 AlarmService 등록 -->
+        <service android:name="org.kivy.skkutimetable.doublecheck.AlarmService"
             android:enabled="true"
-            android:exported="false" />
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+        </service>
 
     </application>
     
