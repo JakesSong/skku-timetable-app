@@ -50,6 +50,12 @@
             android:enabled="true"
             android:exported="true"
             android:directBootAware="true">
+
+        <!-- 🔥 핵심: AlarmReceiver 등록 (전체 클래스명) -->
+        <receiver android:name="org.kivy.skkutimetable.doublecheck.AlarmReceiver"
+            android:enabled="true"
+            android:exported="true"
+            android:directBootAware="true">
             
             <!-- 부팅 완료시 알람 복원 -->
             <intent-filter android:priority="1000">
