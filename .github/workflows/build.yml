@@ -123,12 +123,12 @@ jobs:
                 os.environ['NDK_ROOT'] = android_ndk
                 print(f"🔧 NDK 25로 강제 변경: {android_ndk}")
             
-            # p4a 명령어 구성 (수정된 버전)
+            # p4a 명령어 구성 (buildozer.spec과 일치하도록 수정)
             cmd = [
                 'p4a', 'apk',
                 '--private', '.',
-                '--package', 'com.skku.timetable.doublecheck',
-                '--name', 'DoubleCheck',
+                '--package', 'org.kivy.skkutimetable.doublecheck',  # 🔧 buildozer.spec과 일치
+                '--name', 'DoubleCheck',  # 🔧 buildozer.spec과 일치
                 '--version', '1.0',
                 '--bootstrap', 'sdl2',
                 '--requirements', 'python3,kivy==2.1.0,kivymd==1.1.1,requests,pillow,certifi,urllib3,charset-normalizer,plyer',
@@ -138,6 +138,16 @@ jobs:
                 '--ndk-dir', android_ndk,
                 '--release'
             ]
+            
+            # 🔧 아이콘 추가 (있을 경우)
+            if Path('icon.png').exists():
+                cmd.extend(['--icon', 'icon.png'])
+                print("✅ 아이콘 추가됨: icon.png")
+            elif Path('assets/icon.png').exists():
+                cmd.extend(['--icon', 'assets/icon.png'])
+                print("✅ 아이콘 추가됨: assets/icon.png")
+            else:
+                print("⚠️ 아이콘 파일을 찾을 수 없습니다 (icon.png)")
             
             # 권한들을 개별적으로 추가 (수정됨 🔧)
             permissions = [
