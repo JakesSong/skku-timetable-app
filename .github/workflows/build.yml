@@ -30,7 +30,7 @@ jobs:
           libffi-dev libssl-dev build-essential libsqlite3-dev sqlite3 \
           bzip2 libbz2-dev libreadline-dev llvm \
           xz-utils tk-dev libxml2-dev libxmlsec1-dev liblzma-dev \
-          libandroid-tool openjdk-17-jdk-headless \
+          openjdk-17-jdk-headless \
           libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev \
           libportmidi-dev libswscale-dev libavformat-dev libavcodec-dev \
           libfreetype6-dev libpng-dev libjpeg-dev
