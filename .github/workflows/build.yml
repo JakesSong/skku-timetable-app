@@ -171,13 +171,16 @@ jobs:
                 cmd.extend(['--add-source', 'android/src/main/java'])
                 print("✅ Java 소스 디렉토리 추가됨")
             
-            if Path('android/libs').exists():
-                jar_count = 0
-                for jar_file in Path('android/libs').glob('*.jar'):
-                    cmd.extend(['--add-jar', str(jar_file)])
-                    jar_count += 1
-                    print(f"✅ JAR 파일 추가됨: {jar_file}")
-                print(f"✅ 총 {jar_count}개 JAR 파일 추가됨")
+            # JAR 파일 추가 (중복 클래스 방지를 위해 주석 처리)
+            # AlarmReceiver가 Java 소스와 JAR에 모두 있어서 중복 오류 발생
+            # if Path('android/libs').exists():
+            #     jar_count = 0
+            #     for jar_file in Path('android/libs').glob('*.jar'):
+            #         cmd.extend(['--add-jar', str(jar_file)])
+            #         jar_count += 1
+            #         print(f"✅ JAR 파일 추가됨: {jar_file}")
+            #     print(f"✅ 총 {jar_count}개 JAR 파일 추가됨")
+            print("📋 JAR 파일 생략 (중복 클래스 방지, Java 소스 사용)")
             
             print("\n=== 🔨 p4a 명령어 ===")
             print(' '.join(cmd))
