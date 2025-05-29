@@ -22,10 +22,10 @@ android.wakelock = True
 android.permissions = INTERNET,WRITE_EXTERNAL_STORAGE,READ_EXTERNAL_STORAGE,SCHEDULE_EXACT_ALARM,USE_EXACT_ALARM,VIBRATE,WAKE_LOCK,RECEIVE_BOOT_COMPLETED,FOREGROUND_SERVICE,POST_NOTIFICATIONS,ACCESS_NOTIFICATION_POLICY
 
 # 🔥 핵심 변경: AndroidManifest.tmpl.xml 사용 (더 확실한 방법)
-android.manifest_template = AndroidManifest.tmpl.xml
+# android.manifest_template = AndroidManifest.tmpl.xml
 
 # 🔥 기존 설정 주석 처리 (문제가 있었음)
-# android.manifest_additions = android/manifest_additions.xml
+android.manifest_additions = android/manifest_additions.xml
 
 # 🔥 중요: Java 소스 경로 (기존 설정 유지)
 android.add_src = android/src/main/java
