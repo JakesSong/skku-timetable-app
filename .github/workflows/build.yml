@@ -1,4 +1,4 @@
-name: Build Android APK
+name: Build Android APK with Direct p4a
 on:
   workflow_dispatch:
   push:
@@ -9,85 +9,18 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
+    
     - name: Set up Python 3.9
       uses: actions/setup-python@v5
       with:
         python-version: '3.9'
     
-    # ✅ .jar 및 .java 파일 경로 확인
-    - name: Check jar and java file visibility
-      run: |
-        echo "=== 🔍 jar 파일 확인 시작 ==="
-        ls -la android
-        ls -la android/libs
-        if [ -f "android/libs/alarmreceiver.jar" ]; then
-          echo "✅ alarmreceiver.jar 발견됨"
-        else
-          echo "❌ alarmreceiver.jar 없음"
-        fi
-        echo "=== 🔍 java 파일 경로 확인 ==="
-        find android/src -type f -name "*.java" || echo "❌ java 파일 없음"
-        if [ -d "android/src/main/java/org/kivy/skkutimetable/doublecheck" ]; then
-          echo "✅ java 소스 디렉토리 존재함"
-          ls -R android/src/main/java/org/kivy/skkutimetable/doublecheck
-        else
-          echo "❌ java 소스 디렉토리 없음"
-        fi
-
-    # 🔥 NEW: 매니페스트 처리 과정 완전 추적
-    - name: Deep manifest processing debug
-      run: |
-        echo "=== 🔍 매니페스트 파일들 존재 확인 ==="
-        
-        # 1. 소스 매니페스트 파일들 확인
-        echo "--- 소스 매니페스트 파일들 ---"
-        if [ -f "AndroidManifest.tmpl.xml" ]; then
-          echo "✅ AndroidManifest.tmpl.xml 존재 ($(wc -c < AndroidManifest.tmpl.xml) bytes)"
-          echo "AlarmReceiver 포함: $(grep -c "AlarmReceiver" AndroidManifest.tmpl.xml)"
-        else
-          echo "❌ AndroidManifest.tmpl.xml 없음"
-        fi
-        
-        if [ -f "android/manifest_additions.xml" ]; then
-          echo "✅ android/manifest_additions.xml 존재 ($(wc -c < android/manifest_additions.xml) bytes)"
-          echo "AlarmReceiver 포함: $(grep -c "AlarmReceiver" android/manifest_additions.xml)"
-        else
-          echo "❌ android/manifest_additions.xml 없음"
-        fi
-        
-        # 2. buildozer.spec 설정 확인
-        echo ""
-        echo "--- buildozer.spec 매니페스트 설정 ---"
-        grep -n "android.manifest" buildozer.spec || echo "매니페스트 설정 없음"
-        
-        # 3. buildozer 버전 및 p4a 버전 확인
-        echo ""
-        echo "--- buildozer/p4a 버전 정보 ---"
-        buildozer --version || echo "buildozer 버전 확인 실패"
-        
-        # 4. 빌드 로그에서 매니페스트 처리 과정 추출 (빌드 후 실행될 예정)
-
-    # ✅ Java 및 jar 파일 업로드
-    - name: Upload Java and jar files
-      uses: actions/upload-artifact@v4
-      if: always()
-      with:
-        name: java-jar-check-${{ github.run_number }}
-        path: |
-          android/libs/alarmreceiver.jar
-          android/src/main/java/org/kivy/skkutimetable/doublecheck/*.java
-          AndroidManifest.tmpl.xml
-        retention-days: 7
-        if-no-files-found: warn
-
-    # ✅ Java 17 세팅
-    - name: Set up Java 17 for buildozer
+    - name: Set up Java 17
       uses: actions/setup-java@v4
       with:
         distribution: 'temurin'
         java-version: '17'
-
-    # ✅ 시스템 종속 패키지 설치
+    
     - name: Install system dependencies
       run: |
         sudo apt-get update -qq
@@ -97,218 +30,151 @@ jobs:
           libffi-dev libssl-dev build-essential libsqlite3-dev sqlite3 \
           bzip2 libbz2-dev libreadline-dev llvm \
           xz-utils tk-dev libxml2-dev libxmlsec1-dev liblzma-dev \
+          libandroid-tool openjdk-17-jdk-headless \
           libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev \
           libportmidi-dev libswscale-dev libavformat-dev libavcodec-dev \
           libfreetype6-dev libpng-dev libjpeg-dev
-
-    # ✅ 파이썬 의존성 설치
+    
     - name: Install Python dependencies
       run: |
         python -m pip install --upgrade pip
         pip install --upgrade setuptools wheel
         pip install Cython==0.29.33
-        pip install buildozer==1.5.0
-
-    # ✅ 환경 변수 설정
-    - name: Set environment variables
+        # p4a 직접 설치
+        pip install python-for-android==2023.4.2
+        pip install kivy==2.1.0
+        pip install kivymd==1.1.1
+    
+    - name: Setup Android SDK and NDK
       run: |
-        echo "P4A_NUM_PROCS=1" >> $GITHUB_ENV
-        echo "GRADLE_OPTS=-Dorg.gradle.daemon=false -Dorg.gradle.jvmargs='-Xmx3072m -XX:MaxMetaspaceSize=768m' -Dorg.gradle.parallel=false" >> $GITHUB_ENV
-        echo "P4A_GRADLE_OPTS=--stacktrace --info" >> $GITHUB_ENV
-
-    # ✅ 클린 빌드
-    - name: Complete clean build
+        # Android SDK 설치
+        mkdir -p ~/.android
+        cd ~/.android
+        wget https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip
+        unzip commandlinetools-linux-9477386_latest.zip
+        mkdir -p sdk/cmdline-tools
+        mv cmdline-tools sdk/cmdline-tools/latest
+        
+        export ANDROID_SDK_ROOT=~/.android/sdk
+        export PATH=$PATH:$ANDROID_SDK_ROOT/cmdline-tools/latest/bin
+        
+        # SDK 컴포넌트 설치
+        yes | sdkmanager --licenses
+        sdkmanager "platforms;android-33" "build-tools;32.0.0" "ndk;25.2.9519653"
+        
+        # 환경변수 설정
+        echo "ANDROID_SDK_ROOT=~/.android/sdk" >> $GITHUB_ENV
+        echo "ANDROID_NDK_ROOT=~/.android/sdk/ndk/25.2.9519653" >> $GITHUB_ENV
+        echo "PATH=$PATH:~/.android/sdk/cmdline-tools/latest/bin:~/.android/sdk/platform-tools" >> $GITHUB_ENV
+    
+    - name: Create p4a build script
       run: |
-        echo "=== Completely cleaning build environment ==="
-        rm -rf .buildozer
-        rm -rf bin
-        rm -rf ~/.buildozer
-        rm -rf ~/.gradle
-        rm -rf ~/.android
-
-    # 🔥 NEW: 빌드 전 최종 파일 확인
-    - name: Final pre-build verification
+        cat > build_with_p4a.py << 'EOF'
+        #!/usr/bin/env python3
+        import os
+        import sys
+        import subprocess
+        import shutil
+        
+        # 환경변수 설정
+        os.environ['ANDROID_SDK_ROOT'] = os.path.expanduser('~/.android/sdk')
+        os.environ['ANDROID_NDK_ROOT'] = os.path.expanduser('~/.android/sdk/ndk/25.2.9519653')
+        os.environ['JAVA_HOME'] = '/opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/17.0.15-6/x64'
+        
+        # p4a 명령어 구성
+        cmd = [
+            'p4a', 'apk',
+            '--private', '.',
+            '--package', 'org.kivy.skkutimetable.doublecheck',
+            '--name', 'DoubleCheck',
+            '--version', '0.1',
+            '--bootstrap', 'sdl2',
+            '--requirements', 'python3,kivy==2.1.0,kivymd==1.1.1,requests,pillow,certifi,urllib3,charset-normalizer,plyer,sqlite3',
+            '--permissions', 'INTERNET,WRITE_EXTERNAL_STORAGE,READ_EXTERNAL_STORAGE,SCHEDULE_EXACT_ALARM,USE_EXACT_ALARM,VIBRATE,WAKE_LOCK,RECEIVE_BOOT_COMPLETED,FOREGROUND_SERVICE,POST_NOTIFICATIONS,ACCESS_NOTIFICATION_POLICY',
+            '--arch', 'arm64-v8a',
+            '--release',
+            # 🔥 핵심: 커스텀 매니페스트 및 Java 소스 추가
+            '--add-source', 'android/src/main/java',
+            '--add-jar', 'android/libs/alarmreceiver.jar',
+        ]
+        
+        # AndroidManifest.tmpl.xml이 있으면 추가
+        if os.path.exists('AndroidManifest.tmpl.xml'):
+            cmd.extend(['--manifest-template', 'AndroidManifest.tmpl.xml'])
+            print("✅ AndroidManifest.tmpl.xml 사용")
+        else:
+            print("❌ AndroidManifest.tmpl.xml 없음")
+        
+        print("🚀 p4a 명령어:")
+        print(' '.join(cmd))
+        
+        # p4a 실행
+        try:
+            result = subprocess.run(cmd, capture_output=True, text=True)
+            print("📋 p4a stdout:")
+            print(result.stdout)
+            if result.stderr:
+                print("⚠️ p4a stderr:")
+                print(result.stderr)
+            
+            if result.returncode != 0:
+                print(f"❌ p4a 실패, 종료 코드: {result.returncode}")
+                sys.exit(1)
+            else:
+                print("✅ p4a 빌드 성공!")
+                
+        except Exception as e:
+            print(f"❌ p4a 실행 오류: {e}")
+            sys.exit(1)
+        
+        EOF
+        
+        chmod +x build_with_p4a.py
+    
+    - name: Check required files
       run: |
-        echo "=== 🔍 빌드 전 최종 확인 ==="
-        echo "현재 디렉토리:"
-        pwd
-        echo "파일 목록:"
-        ls -la
-        echo "AndroidManifest.tmpl.xml 존재 여부:"
-        [ -f "AndroidManifest.tmpl.xml" ] && echo "✅ 존재" || echo "❌ 없음"
-        echo "buildozer.spec 설정:"
-        grep "android.manifest_template" buildozer.spec
-
-    # ✅ 빌드 수행 및 로그 저장
-    - name: Build APK
+        echo "=== 🔍 필수 파일 확인 ==="
+        echo "AndroidManifest.tmpl.xml: $([ -f "AndroidManifest.tmpl.xml" ] && echo "✅" || echo "❌")"
+        echo "android/libs/alarmreceiver.jar: $([ -f "android/libs/alarmreceiver.jar" ] && echo "✅" || echo "❌")"
+        echo "Java 소스:"
+        find android/src -name "*.java" || echo "❌ Java 파일 없음"
+    
+    - name: Build APK with p4a
       run: |
-        echo "=== Build start ==="
-        buildozer android debug --verbose > build_full.log 2>&1 || BUILD_FAILED=true
-        if [ "$BUILD_FAILED" = "true" ]; then
-          echo "❌ 빌드 실패!"
-          echo "=== 빌드 로그 마지막 100줄 ==="
-          tail -100 build_full.log
-          echo "=== AndroidManifest 관련 로그 검색 ==="
-          grep -i "manifest" build_full.log | tail -20 || echo "manifest 관련 로그 없음"
-          exit 1
-        else
-          echo "✅ 빌드 성공!"
-        fi
-
-    # 🔥 NEW: 빌드 후 생성된 AndroidManifest.xml 확인 (올바른 경로)
-    - name: Check generated AndroidManifest.xml
-      if: always()
+        python build_with_p4a.py
+    
+    - name: Check generated APK and manifest
       run: |
-        echo "=== 🔍 생성된 AndroidManifest.xml 확인 ==="
-        echo "모든 AndroidManifest.xml 파일 찾기:"
-        find .buildozer -name "AndroidManifest.xml" 2>/dev/null || echo "AndroidManifest.xml 없음"
+        echo "=== 🔍 생성된 APK 확인 ==="
+        find . -name "*.apk" -type f
         
         echo ""
-        echo "=== 🎯 실제 앱의 AndroidManifest.xml 찾기 ==="
-        # 일반적인 앱 매니페스트 경로들
-        POSSIBLE_PATHS=(
-          ".buildozer/android/platform/build-arm64-v8a/dists/doublecheck/src/main/AndroidManifest.xml"
-          ".buildozer/android/platform/build-arm64-v8a/dists/*/src/main/AndroidManifest.xml"
-          ".buildozer/android/platform/build-*/dists/*/src/main/AndroidManifest.xml"
-        )
-        
-        APP_MANIFEST=""
-        for path_pattern in "${POSSIBLE_PATHS[@]}"; do
-          for manifest_path in $path_pattern; do
-            if [ -f "$manifest_path" ] && grep -q "org.kivy.skkutimetable.doublecheck" "$manifest_path" 2>/dev/null; then
-              APP_MANIFEST="$manifest_path"
-              echo "✅ 앱의 AndroidManifest.xml 발견: $APP_MANIFEST"
-              break 2
-            fi
-          done
-        done
-        
-        # 강제로 주요 매니페스트 파일들 확인
-        MAIN_MANIFESTS=(
-          ".buildozer/android/platform/build-arm64-v8a/dists/doublecheck/src/main/AndroidManifest.xml"
-          ".buildozer/android/platform/build-arm64-v8a/dists/doublecheck/AndroidManifest.xml"
-          ".buildozer/android/platform/build-arm64-v8a/dists/doublecheck/build/intermediates/merged_manifests/debug/AndroidManifest.xml"
-        )
-        
-        echo "=== 🔍 주요 매니페스트 파일들 직접 확인 ==="
-        for manifest in "${MAIN_MANIFESTS[@]}"; do
-          if [ -f "$manifest" ]; then
-            echo ""
-            echo "📋 매니페스트 파일: $manifest"
-            echo "파일 크기: $(wc -c < "$manifest") bytes"
-            
-            echo "--- 패키지 정보 ---"
-            grep "package=" "$manifest" | head -1 || echo "패키지 정보 없음"
-            
-            echo "--- AlarmReceiver 검색 ---"
-            if grep -q "AlarmReceiver" "$manifest"; then
-              echo "✅ AlarmReceiver 발견!"
-              grep -A 5 -B 2 "AlarmReceiver" "$manifest"
+        echo "=== 🔍 p4a 생성 매니페스트 확인 ==="
+        P4A_DIST=$(find ~/.local/share/python-for-android/dists -name "*doublecheck*" -type d | head -1)
+        if [ -n "$P4A_DIST" ]; then
+          echo "p4a dist 디렉토리: $P4A_DIST"
+          MANIFEST="$P4A_DIST/AndroidManifest.xml"
+          if [ -f "$MANIFEST" ]; then
+            echo "✅ p4a 매니페스트 발견: $MANIFEST"
+            echo "AlarmReceiver 포함: $(grep -c "AlarmReceiver" "$MANIFEST" || echo "0")"
+            if grep -q "AlarmReceiver" "$MANIFEST"; then
+              echo "🎉 AlarmReceiver 등록됨!"
+              grep -A 5 -B 2 "AlarmReceiver" "$MANIFEST"
             else
-              echo "❌ AlarmReceiver 없음"
+              echo "❌ AlarmReceiver 여전히 없음"
             fi
-            
-            echo "--- receiver 태그 검색 ---"
-            receiver_count=$(grep -c "<receiver" "$manifest" 2>/dev/null || echo "0")
-            echo "receiver 개수: $receiver_count"
-            if [ "$receiver_count" -gt 0 ]; then
-              grep -A 2 "<receiver" "$manifest"
-            fi
-            
-            echo "--- application 구조 ---"
-            echo "application 태그: $(grep -c '<application' "$manifest" 2>/dev/null || echo "0")"
-            echo "activity 태그: $(grep -c '<activity' "$manifest" 2>/dev/null || echo "0")"
-            
-            echo ""
-        echo "=== 🔍 빌드 과정 중 매니페스트 변화 추적 ==="
-        
-        # buildozer가 생성하는 초기 매니페스트 확인
-        INITIAL_MANIFEST=".buildozer/android/platform/build-arm64-v8a/dists/doublecheck/templates/AndroidManifest.tmpl"
-        if [ -f "$INITIAL_MANIFEST" ]; then
-          echo "✅ buildozer 생성 초기 템플릿: $INITIAL_MANIFEST"
-          grep -q "AlarmReceiver" "$INITIAL_MANIFEST" && echo "  → AlarmReceiver 포함됨" || echo "  → AlarmReceiver 없음"
-        else
-          echo "❌ buildozer 초기 템플릿 없음"
-        fi
-        
-        # p4a가 생성하는 매니페스트 확인
-        P4A_MANIFEST=".buildozer/android/platform/build-arm64-v8a/dists/doublecheck/AndroidManifest.xml"
-        if [ -f "$P4A_MANIFEST" ]; then
-          echo "✅ p4a 생성 매니페스트: $P4A_MANIFEST"
-          grep -q "AlarmReceiver" "$P4A_MANIFEST" && echo "  → AlarmReceiver 포함됨" || echo "  → AlarmReceiver 없음"
-        else
-          echo "❌ p4a 매니페스트 없음"
-        fi
-        
-        # gradle이 처리하는 최종 매니페스트 확인
-        FINAL_MANIFEST=".buildozer/android/platform/build-arm64-v8a/dists/doublecheck/build/intermediates/merged_manifests/debug/AndroidManifest.xml" 
-        if [ -f "$FINAL_MANIFEST" ]; then
-          echo "✅ gradle 최종 매니페스트: $FINAL_MANIFEST"
-          grep -q "AlarmReceiver" "$FINAL_MANIFEST" && echo "  → AlarmReceiver 포함됨" || echo "  → AlarmReceiver 없음"
-          echo "  → 패키지명: $(grep 'package=' "$FINAL_MANIFEST" | cut -d'"' -f2)"
-        else
-          echo "❌ gradle 최종 매니페스트 없음"
-        fi
           else
-            echo "❌ 파일 없음: $manifest"
+            echo "❌ p4a 매니페스트 없음"
           fi
-        done
-        
-        if [ -n "$APP_MANIFEST" ] && [ -f "$APP_MANIFEST" ]; then
-          echo ""
-          echo "=== 📋 앱 패키지 확인 ==="
-          grep "package=" "$APP_MANIFEST" || echo "패키지 정보 없음"
-          
-          echo ""
-          echo "=== 🔍 AlarmReceiver 등록 확인 ==="
-          if grep -q "AlarmReceiver" "$APP_MANIFEST"; then
-            echo "✅ AlarmReceiver 발견됨!"
-            grep -A 10 -B 2 "AlarmReceiver" "$APP_MANIFEST"
-          else
-            echo "❌ AlarmReceiver 없음"
-          fi
-          
-          echo ""
-          echo "=== 📱 전체 receiver 목록 ==="
-          if grep -q "<receiver" "$APP_MANIFEST"; then
-            grep -A 3 "<receiver" "$APP_MANIFEST"
-          else
-            echo "❌ receiver 없음"
-          fi
-          
-          echo ""
-          echo "=== 🔥 매니페스트 전체 구조 확인 ==="
-          echo "application 태그 존재: $(grep -c '<application' "$APP_MANIFEST")"
-          echo "activity 태그 개수: $(grep -c '<activity' "$APP_MANIFEST")"
-          echo "receiver 태그 개수: $(grep -c '<receiver' "$APP_MANIFEST")"
-          
         else
-          echo "❌ 앱의 AndroidManifest.xml을 찾을 수 없음"
-          echo ""
-          echo "=== 🔍 디렉토리 구조 분석 ==="
-          find .buildozer -type d -name "*doublecheck*" 2>/dev/null || echo "doublecheck 디렉토리 없음"
-          find .buildozer -type d -name "*dists*" 2>/dev/null | head -5 || echo "dists 디렉토리 없음"
+          echo "❌ p4a dist 디렉토리 없음"
         fi
-
-    # ✅ 빌드 로그 업로드
-    - name: Upload build logs
-      uses: actions/upload-artifact@v4
-      if: always()
-      with:
-        name: build-logs-${{ github.run_number }}
-        path: |
-          build_full.log
-          .buildozer/**/*.log
-          .buildozer/**/AndroidManifest.xml
-        retention-days: 30
-        if-no-files-found: warn
-
-    # ✅ APK 업로드
+    
     - name: Upload APK
       if: success()
       uses: actions/upload-artifact@v4
       with:
-        name: skku-timetable-apk
-        path: bin/*.apk
+        name: p4a-direct-build-apk
+        path: "*.apk"
         retention-days: 7
-        if-no-files-found: error
+        if-no-files-found: warn
