@@ -1,75 +1,26 @@
-<?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="org.kivy.skkutimetable.doublecheck">
+<receiver android:name="org.kivy.skkutimetable.doublecheck.AlarmReceiver"
+    android:enabled="true"
+    android:exported="true"
+    android:directBootAware="true">
     
-    <!-- 기존 권한들 -->
-    <uses-permission android:name="android.permission.INTERNET" />
-    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
-    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+    <intent-filter android:priority="1000">
+        <action android:name="android.intent.action.BOOT_COMPLETED" />
+        <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+        <action android:name="android.intent.action.PACKAGE_REPLACED" />
+        <data android:scheme="package" />
+    </intent-filter>
     
-    <!-- 🔥 알람 관련 권한들 (강화) -->
-    <uses-permission android:name="android.permission.WAKE_LOCK" />
-    <uses-permission android:name="android.permission.VIBRATE" />
-    <uses-permission android:name="android.permission.SET_ALARM" />
-    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
-    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
-    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <intent-filter>
+        <action android:name="org.kivy.skkutimetable.doublecheck.ALARM_ACTION" />
+    </intent-filter>
     
-    <application
-        android:label="@string/app_name"
-        android:icon="@mipmap/icon"
-        android:allowBackup="true"
-        android:theme="@android:style/Theme.NoTitleBar"
-        android:hardwareAccelerated="true"
-        android:extractNativeLibs="true"
-        android:requestLegacyExternalStorage="true">
-        
-        <!-- 기존 PythonActivity -->
-        <activity android:name="org.kivy.android.PythonActivity"
-            android:exported="true"
-            android:label="@string/app_name"
-            android:theme="@android:style/Theme.NoTitleBar.Fullscreen"
-            android:configChanges="keyboardHidden|orientation|screenSize"
-            android:screenOrientation="portrait">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-        </activity>
-        
-        <!-- 🔥 핵심 수정: 전체 클래스명 사용 -->
-        <receiver android:name="org.kivy.skkutimetable.doublecheck.AlarmReceiver"
-            android:enabled="true"
-            android:exported="true"
-            android:directBootAware="true">
-            
-            <!-- 🔥 다양한 Intent 필터 추가 -->
-            <intent-filter android:priority="1000">
-                <action android:name="android.intent.action.BOOT_COMPLETED" />
-                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
-                <action android:name="android.intent.action.PACKAGE_REPLACED" />
-                <data android:scheme="package" />
-            </intent-filter>
-            
-            <!-- 🔥 커스텀 알람 액션 -->
-            <intent-filter>
-                <action android:name="org.kivy.skkutimetable.doublecheck.ALARM_ACTION" />
-            </intent-filter>
-            
-            <!-- 🔥 일반 브로드캐스트 -->
-            <intent-filter>
-                <action android:name="android.intent.action.USER_PRESENT" />
-            </intent-filter>
-        </receiver>
-        
-        <!-- 🔥 AlarmService도 전체 클래스명 사용 -->
-        <service android:name="org.kivy.skkutimetable.doublecheck.AlarmService"
-            android:enabled="true"
-            android:exported="false"
-            android:foregroundServiceType="specialUse">
-        </service>
-        
-    </application>
-</manifest>
+    <intent-filter>
+        <action android:name="android.intent.action.USER_PRESENT" />
+    </intent-filter>
+</receiver>
+
+<service android:name="org.kivy.skkutimetable.doublecheck.AlarmService"
+    android:enabled="true"
+    android:exported="false"
+    android:foregroundServiceType="specialUse">
+</service>
