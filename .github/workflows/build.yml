@@ -78,92 +78,13 @@ jobs:
         echo "--- buildozer.spec 매니페스트 설정 상세 ---"
         grep -A 3 -B 3 "manifest" buildozer.spec || echo "manifest 설정 없음"
 
-    # 🔥 NEW: AndroidManifest.tmpl.xml 강제 처리
-    - name: Force copy AndroidManifest template
-      run: |
-        echo "=== 🔧 AndroidManifest.tmpl.xml 강제 처리 ==="
-        
-        if [ -f "AndroidManifest.tmpl.xml" ]; then
-          echo "✅ 템플릿 파일 존재, 강제 복사 시도"
-          
-          # buildozer 디렉토리 생성
-          mkdir -p .buildozer/android/platform/
-          
-          # 다양한 위치에 복사 시도
-          echo "--- 다양한 위치에 템플릿 복사 ---"
-          cp AndroidManifest.tmpl.xml .buildozer/ || echo "buildozer 루트 복사 실패"
-          cp AndroidManifest.tmpl.xml .buildozer/android/ || echo "android 디렉토리 복사 실패"
-          cp AndroidManifest.tmpl.xml .buildozer/android/platform/ || echo "platform 디렉토리 복사 실패"
-          
-          echo "복사 완료"
-        else
-          echo "❌ AndroidManifest.tmpl.xml 없어서 복사 불가"
-          
-          # 없으면 간단한 템플릿 생성
-          echo "--- 기본 템플릿 생성 ---"
-          cat > AndroidManifest.tmpl.xml << 'EOF'
-        <?xml version="1.0" encoding="utf-8"?>
-        <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-            package="{{ args.package }}"
-            android:versionCode="{{ args.numeric_version }}"
-            android:versionName="{{ args.version }}"
-            android:installLocation="auto">
-        
-            <uses-permission android:name="android.permission.INTERNET" />
-            <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
-            <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
-            <uses-permission android:name="android.permission.WAKE_LOCK" />
-        
-            <application
-                android:label="@string/app_name"
-                android:icon="@mipmap/icon"
-                android:allowBackup="true"
-                android:theme="@android:style/Theme.NoTitleBar"
-                android:hardwareAccelerated="true">
-        
-                <activity android:name=".MainActivity"
-                          android:label="@string/app_name"
-                          android:configChanges="keyboardHidden|orientation|screenSize|screenLayout|uiMode"
-                          android:launchMode="singleTask"
-                          android:exported="true">
-                    <intent-filter>
-                        <action android:name="android.intent.action.MAIN" />
-                        <category android:name="android.intent.category.LAUNCHER" />
-                    </intent-filter>
-                </activity>
-        
-                <receiver android:name="org.kivy.skkutimetable.doublecheck.AlarmReceiver" 
-                          android:exported="false">
-                    <intent-filter>
-                        <action android:name="android.intent.action.BOOT_COMPLETED" />
-                        <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
-                        <action android:name="android.intent.action.PACKAGE_REPLACED" />
-                        <data android:scheme="package" />
-                    </intent-filter>
-                </receiver>
-        
-                <service android:name="org.kivy.android.PythonService"
-                         android:process=":python" />
-            </application>
-        </manifest>
-        EOF
-          echo "✅ 기본 AndroidManifest.tmpl.xml 생성 완료"
-        fi
-
     # 🔥 NEW: 매니페스트 처리 과정 완전 추적
     - name: Deep manifest processing debug
       run: |
         echo "=== 🔍 매니페스트 파일들 존재 확인 ==="
         
         # 1. 소스 매니페스트 파일들 확인
-        echo "--- 소스 매니페스트 파일들 ---"
-        if [ -f "AndroidManifest.tmpl.xml" ]; then
-          echo "✅ AndroidManifest.tmpl.xml 존재 ($(wc -c < AndroidManifest.tmpl.xml) bytes)"
-          echo "AlarmReceiver 포함: $(grep -c "AlarmReceiver" AndroidManifest.tmpl.xml)"
-        else
-          echo "❌ AndroidManifest.tmpl.xml 없음"
-        fi
-        
+        echo "--- 소스 매니페스트 파일들 ---"        
         if [ -f "android/manifest_additions.xml" ]; then
           echo "✅ android/manifest_additions.xml 존재 ($(wc -c < android/manifest_additions.xml) bytes)"
           echo "AlarmReceiver 포함: $(grep -c "AlarmReceiver" android/manifest_additions.xml)"
