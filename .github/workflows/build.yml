@@ -278,7 +278,7 @@ EOF
           echo "✅ 빌드 성공!"
         fi
 
-    # 🔥 NEW: 빌드 후 생성된 AndroidManifest.xml 확인 (올바른 경로)
+    # 🔥 NEW: 빌드 후 생성된 AndroidManifest.xml 확인
     - name: Check generated AndroidManifest.xml
       if: always()
       run: |
@@ -287,33 +287,15 @@ EOF
         find .buildozer -name "AndroidManifest.xml" 2>/dev/null || echo "AndroidManifest.xml 없음"
         
         echo ""
-        echo "=== 🎯 실제 앱의 AndroidManifest.xml 찾기 ==="
-        # 일반적인 앱 매니페스트 경로들
-        POSSIBLE_PATHS=(
-          ".buildozer/android/platform/build-arm64-v8a/dists/doublecheck/src/main/AndroidManifest.xml"
-          ".buildozer/android/platform/build-arm64-v8a/dists/*/src/main/AndroidManifest.xml"
-          ".buildozer/android/platform/build-*/dists/*/src/main/AndroidManifest.xml"
-        )
+        echo "=== 🔍 주요 매니페스트 파일들 직접 확인 ==="
         
-        APP_MANIFEST=""
-        for path_pattern in "${POSSIBLE_PATHS[@]}"; do
-          for manifest_path in $path_pattern; do
-            if [ -f "$manifest_path" ] && grep -q "org.kivy.skkutimetable.doublecheck" "$manifest_path" 2>/dev/null; then
-              APP_MANIFEST="$manifest_path"
-              echo "✅ 앱의 AndroidManifest.xml 발견: $APP_MANIFEST"
-              break 2
-            fi
-          done
-        done
-        
-        # 강제로 주요 매니페스트 파일들 확인
+        # 주요 매니페스트 파일들 목록
         MAIN_MANIFESTS=(
           ".buildozer/android/platform/build-arm64-v8a/dists/doublecheck/src/main/AndroidManifest.xml"
           ".buildozer/android/platform/build-arm64-v8a/dists/doublecheck/AndroidManifest.xml"
           ".buildozer/android/platform/build-arm64-v8a/dists/doublecheck/build/intermediates/merged_manifests/debug/AndroidManifest.xml"
         )
         
-        echo "=== 🔍 주요 매니페스트 파일들 직접 확인 ==="
         for manifest in "${MAIN_MANIFESTS[@]}"; do
           if [ -f "$manifest" ]; then
             echo ""
@@ -341,9 +323,13 @@ EOF
             echo "--- application 구조 ---"
             echo "application 태그: $(grep -c '<application' "$manifest" 2>/dev/null || echo "0")"
             echo "activity 태그: $(grep -c '<activity' "$manifest" 2>/dev/null || echo "0")"
-            
-            echo ""
-            echo "=== 🔍 빌드 과정 중 매니페스트 변화 추적 ==="
+          else
+            echo "❌ 파일 없음: $manifest"
+          fi
+        done
+        
+        echo ""
+        echo "=== 🔍 빌드 과정 중 매니페스트 변화 추적 ==="
         
         # buildozer가 생성하는 초기 매니페스트 확인
         INITIAL_MANIFEST=".buildozer/android/platform/build-arm64-v8a/dists/doublecheck/templates/AndroidManifest.tmpl"
@@ -371,46 +357,6 @@ EOF
           echo "  → 패키지명: $(grep 'package=' "$FINAL_MANIFEST" | cut -d'"' -f2)"
         else
           echo "❌ gradle 최종 매니페스트 없음"
-        fi
-          else
-            echo "❌ 파일 없음: $manifest"
-          fi
-        done
-        
-        if [ -n "$APP_MANIFEST" ] && [ -f "$APP_MANIFEST" ]; then
-          echo ""
-          echo "=== 📋 앱 패키지 확인 ==="
-          grep "package=" "$APP_MANIFEST" || echo "패키지 정보 없음"
-          
-          echo ""
-          echo "=== 🔍 AlarmReceiver 등록 확인 ==="
-          if grep -q "AlarmReceiver" "$APP_MANIFEST"; then
-            echo "✅ AlarmReceiver 발견됨!"
-            grep -A 10 -B 2 "AlarmReceiver" "$APP_MANIFEST"
-          else
-            echo "❌ AlarmReceiver 없음"
-          fi
-          
-          echo ""
-          echo "=== 📱 전체 receiver 목록 ==="
-          if grep -q "<receiver" "$APP_MANIFEST"; then
-            grep -A 3 "<receiver" "$APP_MANIFEST"
-          else
-            echo "❌ receiver 없음"
-          fi
-          
-          echo ""
-          echo "=== 🔥 매니페스트 전체 구조 확인 ==="
-          echo "application 태그 존재: $(grep -c '<application' "$APP_MANIFEST")"
-          echo "activity 태그 개수: $(grep -c '<activity' "$APP_MANIFEST")"
-          echo "receiver 태그 개수: $(grep -c '<receiver' "$APP_MANIFEST")"
-          
-        else
-          echo "❌ 앱의 AndroidManifest.xml을 찾을 수 없음"
-          echo ""
-          echo "=== 🔍 디렉토리 구조 분석 ==="
-          find .buildozer -type d -name "*doublecheck*" 2>/dev/null || echo "doublecheck 디렉토리 없음"
-          find .buildozer -type d -name "*dists*" 2>/dev/null | head -5 || echo "dists 디렉토리 없음"
         fi
 
     # ✅ 빌드 로그 업로드
