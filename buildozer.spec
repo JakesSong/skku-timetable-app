@@ -31,7 +31,7 @@ android.manifest_additions = android/manifest_additions.xml
 android.add_src = android/src/main/java
 
 # 🔥 Java 파일 확장자 포함 (명시적 선언 필요)
-android.source.include_exts = java
+android.source.include_exts = py,png,jpg,kv,atlas,ttf,java
 android.api = 33
 android.minapi = 21
 android.sdk = 33
