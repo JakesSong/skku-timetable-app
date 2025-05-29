@@ -3231,23 +3231,28 @@ class MainScreen(MDScreen):
                 print(f"❌ 과목 알림 생성 실패: {e}")
                 import traceback
                 traceback.print_exc()
-
+    
     def test_alarm_now(self):
-        """🧪 30초 후 테스트 알람 설정"""
+        """🧪 30초 후 테스트 알람 설정 - 수정된 버전"""
         if not self.alarm_manager:
             print("❌ alarm_manager가 없습니다")
             return
         
         from datetime import datetime, timedelta
         
-        # 30초 후 알람 설정
+        # 🔥 핵심 수정: 30초 후 시간을 정확히 계산
         test_time = datetime.now() + timedelta(seconds=30)
+        
+        # 🔥 오늘 날짜와 요일을 정확히 사용
+        today_weekday = test_time.weekday()  # 0=월요일, 1=화요일, ...
+        day_names = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+        today_day_name = day_names[today_weekday]
         
         test_class_data = {
             'id': 999,
             'name': '🧪 테스트 알람',
-            'day': 'Monday',  # 임시로 고정
-            'start_time': test_time.strftime('%H:%M'),
+            'day': today_day_name,  # 🔥 오늘 날짜의 실제 요일 사용
+            'start_time': test_time.strftime('%H:%M'),  # 🔥 30초 후의 실제 시간 사용
             'room': '테스트 강의실',
             'professor': '테스트 교수'
         }
@@ -3255,9 +3260,133 @@ class MainScreen(MDScreen):
         print(f"🧪 테스트 알람 설정 중...")
         print(f"⏰ 현재 시간: {datetime.now().strftime('%H:%M:%S')}")
         print(f"⏰ 알람 시간: {test_time.strftime('%H:%M:%S')}")
+        print(f"📅 오늘 요일: {today_day_name}")
+        print(f"🎯 예상 알람 발생: {test_time.strftime('%Y-%m-%d %H:%M:%S')}")
         
-        success = self.alarm_manager.schedule_alarm(999, test_class_data, 0)
-        print(f"✅ 테스트 알람 설정 결과: {success}")
+        # 🔥 AlarmManager의 schedule_alarm 직접 호출 (parse_class_time 우회)
+        try:
+            # 직접 시스템 알람 설정
+            alarm_millis = int(test_time.timestamp() * 1000)
+            
+            from jnius import autoclass
+            AlarmManager = autoclass('android.app.AlarmManager')
+            Intent = autoclass('android.content.Intent')
+            PendingIntent = autoclass('android.app.PendingIntent')
+            Context = autoclass('android.content.Context')
+            PythonActivity = autoclass('org.kivy.android.PythonActivity')
+            ComponentName = autoclass('android.content.ComponentName')
+            
+            context = PythonActivity.mActivity
+            alarm_manager = context.getSystemService(Context.ALARM_SERVICE)
+            
+            # Intent 생성
+            intent = Intent()
+            intent.setComponent(ComponentName(
+                "org.kivy.skkutimetable.doublecheck",
+                "org.kivy.skkutimetable.doublecheck.AlarmReceiver"
+            ))
+            
+            # 테스트 데이터 전달
+            intent.putExtra("class_name", test_class_data['name'])
+            intent.putExtra("class_room", test_class_data['room'])
+            intent.putExtra("class_time", test_class_data['start_time'])
+            intent.putExtra("class_professor", test_class_data['professor'])
+            
+            # PendingIntent 생성
+            flags = PendingIntent.FLAG_UPDATE_CURRENT
+            if hasattr(PendingIntent, 'FLAG_IMMUTABLE'):
+                flags |= PendingIntent.FLAG_IMMUTABLE
+                
+            pending_intent = PendingIntent.getBroadcast(
+                context, 
+                999,  # 테스트용 고유 ID
+                intent, 
+                flags
+            )
+            
+            # 🔥 핵심: setExact로 정확한 시간에 알람 설정
+            alarm_manager.setExact(
+                AlarmManager.RTC_WAKEUP, 
+                alarm_millis, 
+                pending_intent
+            )
+            
+            print(f"✅ 직접 시스템 알람 설정 성공!")
+            print(f"📱 정확히 30초 후에 알람이 울릴 것입니다!")
+            
+            return True
+            
+        except Exception as e:
+            print(f"❌ 직접 시스템 알람 설정 실패: {e}")
+            import traceback
+            traceback.print_exc()
+            return False
+    
+    def test_immediate_alarm(self):
+        """🧪 5초 후 즉시 테스트 알람 - 더 빠른 테스트용"""
+        if not self.alarm_manager:
+            print("❌ alarm_manager가 없습니다")
+            return
+        
+        from datetime import datetime, timedelta
+        
+        # 🔥 5초 후 알람 설정
+        test_time = datetime.now() + timedelta(seconds=5)
+        
+        try:
+            from jnius import autoclass
+            AlarmManager = autoclass('android.app.AlarmManager')
+            Intent = autoclass('android.content.Intent')
+            PendingIntent = autoclass('android.app.PendingIntent')
+            Context = autoclass('android.content.Context')
+            PythonActivity = autoclass('org.kivy.android.PythonActivity')
+            ComponentName = autoclass('android.content.ComponentName')
+            
+            context = PythonActivity.mActivity
+            alarm_manager = context.getSystemService(Context.ALARM_SERVICE)
+            
+            # Intent 생성
+            intent = Intent()
+            intent.setComponent(ComponentName(
+                "org.kivy.skkutimetable.doublecheck",
+                "org.kivy.skkutimetable.doublecheck.AlarmReceiver"
+            ))
+            
+            # 테스트 데이터 전달
+            intent.putExtra("class_name", "🚀 5초 테스트")
+            intent.putExtra("class_room", "즉시 테스트")
+            intent.putExtra("class_time", test_time.strftime('%H:%M'))
+            intent.putExtra("class_professor", "긴급 테스트")
+            
+            # PendingIntent 생성
+            flags = PendingIntent.FLAG_UPDATE_CURRENT
+            if hasattr(PendingIntent, 'FLAG_IMMUTABLE'):
+                flags |= PendingIntent.FLAG_IMMUTABLE
+                
+            pending_intent = PendingIntent.getBroadcast(
+                context, 
+                888,  # 다른 테스트용 ID
+                intent, 
+                flags
+            )
+            
+            # 알람 설정
+            alarm_millis = int(test_time.timestamp() * 1000)
+            alarm_manager.setExact(
+                AlarmManager.RTC_WAKEUP, 
+                alarm_millis, 
+                pending_intent
+            )
+            
+            print(f"🚀 5초 후 즉시 알람 설정 완료!")
+            print(f"⏰ 현재: {datetime.now().strftime('%H:%M:%S')}")
+            print(f"⏰ 알람: {test_time.strftime('%H:%M:%S')}")
+            
+            return True
+            
+        except Exception as e:
+            print(f"❌ 즉시 알람 설정 실패: {e}")
+            return False
     
     def test_direct_notification(self):
         """🧪 즉시 알림 생성 테스트 (AlarmManager 우회)"""
@@ -3287,44 +3416,61 @@ class MainScreen(MDScreen):
             traceback.print_exc()
     
     def add_test_buttons(self):
-        """테스트 버튼들을 메인 화면에 추가"""
+        """테스트 버튼들을 메인 화면에 추가 - 수정된 버전"""
         if hasattr(self, 'layout') and self.layout:
             from kivymd.uix.button import MDRaisedButton
             from kivy.uix.boxlayout import BoxLayout
             
-            # 테스트 버튼 컨테이너
+            # 테스트 버튼 컨테이너 (3개 버튼으로 확장)
             test_container = BoxLayout(
-                orientation='horizontal',
+                orientation='vertical',
                 size_hint_y=None,
-                height='48dp',
-                spacing='10dp',
-                pos_hint={'center_x': 0.5, 'y': 0.85}  # 화면 상단에 위치
+                height='140dp',  # 높이 증가 (3개 버튼)
+                spacing='5dp',
+                pos_hint={'center_x': 0.5, 'y': 0.80}  # 화면 상단에 위치
             )
             
-            # 30초 알람 테스트 버튼
+            # 5초 알람 테스트 버튼 (새로 추가!)
+            immediate_test_btn = MDRaisedButton(
+                text="🚀 5초 알람 테스트",
+                size_hint_y=None,
+                height='40dp',
+                font_name=FONT_NAME,
+                md_bg_color=[1, 0.5, 0, 1]  # 주황색으로 구분
+            )
+            immediate_test_btn.bind(on_release=lambda x: self.test_immediate_alarm())
+            
+            # 30초 알람 테스트 버튼 (수정됨)
             alarm_test_btn = MDRaisedButton(
                 text="🧪 30초 알람 테스트",
-                size_hint=(0.45, None),
+                size_hint_y=None,
                 height='40dp',
-                font_name=FONT_NAME
+                font_name=FONT_NAME,
+                md_bg_color=[0.2, 0.8, 0.2, 1]  # 초록색
             )
             alarm_test_btn.bind(on_release=lambda x: self.test_alarm_now())
             
             # 즉시 알림 테스트 버튼  
             notify_test_btn = MDRaisedButton(
                 text="🔔 즉시 알림 테스트", 
-                size_hint=(0.45, None),
+                size_hint_y=None,
                 height='40dp',
-                font_name=FONT_NAME
+                font_name=FONT_NAME,
+                md_bg_color=[0.2, 0.2, 0.8, 1]  # 파란색
             )
             notify_test_btn.bind(on_release=lambda x: self.test_direct_notification())
             
-            test_container.add_widget(alarm_test_btn)
-            test_container.add_widget(notify_test_btn)
+            # 버튼들을 컨테이너에 추가
+            test_container.add_widget(immediate_test_btn)  # 5초 테스트 (맨 위)
+            test_container.add_widget(alarm_test_btn)      # 30초 테스트
+            test_container.add_widget(notify_test_btn)     # 즉시 알림
             
             # 메인 레이아웃에 추가
             self.add_widget(test_container)
-            print("✅ 테스트 버튼 추가 완료")
+            print("✅ 수정된 테스트 버튼 3개 추가 완료")
+            print("🚀 주황색 버튼: 5초 후 알람 (빠른 테스트)")  
+            print("🧪 초록색 버튼: 30초 후 알람 (정상 테스트)")
+            print("🔔 파란색 버튼: 즉시 알림 (AlarmReceiver 우회)")
             
 class TimeTableApp(MDApp):
     def build(self):
