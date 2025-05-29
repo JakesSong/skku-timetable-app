@@ -1,23 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <application>
-
         <!-- 알람 리시버 등록 -->
         <receiver
             android:name="org.kivy.skkutimetable.doublecheck.AlarmReceiver"
             android:enabled="true"
-            android:exported="true">
+            android:exported="false">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
-                <action android:name="org.kivy.ALARM_TRIGGERED" />
+                <!-- 🔥 중요: 액션명을 AlarmManager에서 사용하는 것과 동일하게 맞춤 -->
+                <action android:name="org.kivy.skkutimetable.TIMETABLE_ALARM" />
             </intent-filter>
         </receiver>
-
+        
         <!-- 알람 서비스 등록 -->
         <service
             android:name="org.kivy.skkutimetable.doublecheck.AlarmService"
             android:enabled="true"
-            android:exported="true"
-            android:foregroundServiceType="dataSync" />
+            android:exported="false"
+            android:foregroundServiceType="shortService" />
             
     </application>
 </manifest>
