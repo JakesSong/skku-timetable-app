@@ -82,6 +82,18 @@ public class AlarmReceiver extends BroadcastReceiver {
                 Log.e(TAG, "❌ NotificationManager가 null입니다");
                 return;
             }
+
+            // ✅ 여기에 알림 채널 생성 코드 추가!
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                NotificationChannel channel = new NotificationChannel(
+                    CHANNEL_ID,
+                    "TimeTable Alarm Channel",  // 사용자에게 보일 이름
+                    NotificationManager.IMPORTANCE_HIGH
+                );
+                channel.setDescription("수업 알림용 채널입니다");
+                notificationManager.createNotificationChannel(channel);
+                Log.i(TAG, "✅ NotificationChannel 생성됨");
+            }
             
             // 🔥 전자출결 앱 Intent 생성 (개선된 버전)
             Intent attendanceIntent = createAttendanceIntent(context);
