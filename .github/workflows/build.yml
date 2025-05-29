@@ -77,24 +77,14 @@ jobs:
           echo "❌ buildozer.spec 파일 없음"
         fi
 
-    # 🔥 NEW: buildozer가 템플릿을 어떻게 처리하는지 확인
-    - name: Debug buildozer manifest processing
+    # 🔥 NEW: buildozer 매니페스트 템플릿 처리 확인
+    - name: Debug buildozer manifest template processing
       run: |
-        echo "=== 🔍 buildozer manifest 처리 과정 디버깅 ==="
+        echo "=== 🔍 buildozer 매니페스트 템플릿 처리 디버깅 ==="
         
-        # buildozer 설정 확인
-        echo "--- buildozer 설정 덤프 ---"
-        buildozer android debug --verbose 2>&1 | head -50 | grep -i manifest || echo "manifest 관련 로그 없음"
-        
-        # 템플릿 파일이 buildozer 디렉토리로 복사되는지 확인
-        echo ""
-        echo "--- .buildozer 초기 상태 확인 ---"
-        if [ -d ".buildozer" ]; then
-          echo ".buildozer 디렉토리 존재"
-          find .buildozer -name "*manifest*" -o -name "*Manifest*" | head -10 || echo "manifest 파일 없음"
-        else
-          echo ".buildozer 디렉토리 없음"
-        fi
+        # buildozer.spec에서 매니페스트 관련 설정 상세 확인
+        echo "--- buildozer.spec 매니페스트 설정 상세 ---"
+        grep -A 3 -B 3 "manifest" buildozer.spec || echo "manifest 설정 없음"
 
     # 🔥 NEW: AndroidManifest.tmpl.xml 강제 처리
     - name: Force copy AndroidManifest template
@@ -353,7 +343,7 @@ EOF
             echo "activity 태그: $(grep -c '<activity' "$manifest" 2>/dev/null || echo "0")"
             
             echo ""
-        echo "=== 🔍 빌드 과정 중 매니페스트 변화 추적 ==="
+            echo "=== 🔍 빌드 과정 중 매니페스트 변화 추적 ==="
         
         # buildozer가 생성하는 초기 매니페스트 확인
         INITIAL_MANIFEST=".buildozer/android/platform/build-arm64-v8a/dists/doublecheck/templates/AndroidManifest.tmpl"
@@ -364,13 +354,13 @@ EOF
           echo "❌ buildozer 초기 템플릿 없음"
         fi
         
-        # p4a가 생성하는 매니페스트 확인
-        P4A_MANIFEST=".buildozer/android/platform/build-arm64-v8a/dists/doublecheck/AndroidManifest.xml"
-        if [ -f "$P4A_MANIFEST" ]; then
-          echo "✅ p4a 생성 매니페스트: $P4A_MANIFEST"
-          grep -q "AlarmReceiver" "$P4A_MANIFEST" && echo "  → AlarmReceiver 포함됨" || echo "  → AlarmReceiver 없음"
+        # 최종 앱 매니페스트 확인
+        APP_MANIFEST=".buildozer/android/platform/build-arm64-v8a/dists/doublecheck/AndroidManifest.xml"
+        if [ -f "$APP_MANIFEST" ]; then
+          echo "✅ 최종 앱 매니페스트: $APP_MANIFEST"
+          grep -q "AlarmReceiver" "$APP_MANIFEST" && echo "  → AlarmReceiver 포함됨" || echo "  → AlarmReceiver 없음"
         else
-          echo "❌ p4a 매니페스트 없음"
+          echo "❌ 최종 앱 매니페스트 없음"
         fi
         
         # gradle이 처리하는 최종 매니페스트 확인
