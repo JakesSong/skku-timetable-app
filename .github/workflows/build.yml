@@ -14,17 +14,9 @@ jobs:
       with:
         python-version: '3.9'
     
-    # ✅ .jar 및 .java 파일 경로 확인
-    - name: Check jar and java file visibility
+    # ✅ .java 파일 경로 확인
+    - name: Check java file visibility
       run: |
-        echo "=== 🔍 jar 파일 확인 시작 ==="
-        ls -la android
-        ls -la android/libs
-        if [ -f "android/libs/alarmreceiver.jar" ]; then
-          echo "✅ alarmreceiver.jar 발견됨"
-        else
-          echo "❌ alarmreceiver.jar 없음"
-        fi
         echo "=== 🔍 java 파일 경로 확인 ==="
         find android/src -type f -name "*.java" || echo "❌ java 파일 없음"
         if [ -d "android/src/main/java/org/kivy/skkutimetable/doublecheck" ]; then
@@ -189,18 +181,6 @@ jobs:
         echo "--- buildozer/p4a 버전 정보 ---"
         buildozer --version || echo "buildozer 버전 확인 실패"
 
-    # ✅ Java 및 jar 파일 업로드
-    - name: Upload Java and jar files
-      uses: actions/upload-artifact@v4
-      if: always()
-      with:
-        name: java-jar-check-${{ github.run_number }}
-        path: |
-          android/libs/alarmreceiver.jar
-          android/src/main/java/org/kivy/skkutimetable/doublecheck/*.java
-          AndroidManifest.tmpl.xml
-        retention-days: 7
-        if-no-files-found: warn
 
     # ✅ Java 17 세팅
     - name: Set up Java 17 for buildozer
