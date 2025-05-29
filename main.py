@@ -3871,12 +3871,12 @@ class MainScreen(MDScreen):
             hide_buttons_btn.bind(on_release=lambda x: self.hide_test_buttons(test_container))
             
             # 버튼들을 컨테이너에 추가
+            test_container.add_widget(direct_broadcast_btn)   # 🔍 보라색: 직접 호출
+            test_container.add_widget(debug_alarm_btn)        # 🔍 주황색: 10초 알람 진단
             test_container.add_widget(manifest_check_btn)     # 🔍 골드: Manifest 등록 확인
             test_container.add_widget(intent_test_btn)        # 🔍 라벤더: Intent 매칭 테스트
             test_container.add_widget(detailed_diagnosis_btn) # 🎯 마젠타: 상세 진단
             test_container.add_widget(check_receiver_btn)     # 🔍 노란색: AlarmReceiver 확인
-            test_container.add_widget(direct_broadcast_btn)   # 🔍 보라색: 직접 호출
-            test_container.add_widget(debug_alarm_btn)        # 🔍 주황색: 10초 알람 진단
             test_container.add_widget(immediate_test_btn)     # 🚀 빨간색: 5초 알람
             test_container.add_widget(notify_test_btn)        # 🔔 파란색: 즉시 알림
             test_container.add_widget(comprehensive_test_btn) # 🎯 회색: 종합 진단
