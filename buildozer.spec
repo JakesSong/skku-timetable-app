@@ -30,6 +30,8 @@ android.manifest_additions = android/manifest_additions.xml
 # 🔥 중요: Java 소스 경로 (기존 설정 유지)
 android.add_src = android/src/main/java
 
+# 🔥 Java 파일 확장자 포함 (명시적 선언 필요)
+android.source.include_exts = java
 android.api = 33
 android.minapi = 21
 android.sdk = 33
