@@ -280,13 +280,12 @@ jobs:
         echo "📋 aapt 정보:"
         aapt version
 
-        # 단계별 aapt 실행 (AndroidManifest.xml 이름 사용!)
-        echo "🚀 aapt 실행 - AndroidManifest.xml 이름으로 변경"
+        # 최종 aapt 해결책: 4가지 방법으로 총공격!
+        echo "🔧 최종 aapt 해결책 - 4가지 방법으로 시도"
         
         # 임시 APK 생성 (매니페스트만)
         mkdir -p temp_res/values
         echo '<?xml version="1.0" encoding="utf-8"?><resources><string name="app_name">DoubleCheck</string></resources>' > temp_res/values/strings.xml
-        echo "  리소스 디렉토리 절대경로: $(realpath temp_res)"
         
         # 원본 AndroidManifest.xml 백업
         cp AndroidManifest.xml AndroidManifest_original.xml
@@ -295,62 +294,99 @@ jobs:
         cp new_manifest_text.xml AndroidManifest.xml
         echo "✅ 수정된 매니페스트를 AndroidManifest.xml로 복사"
         
-        # aapt 실행 (이제 -M 옵션 없이!)
+        # 현재 위치 확인
+        WORK_DIR=$(pwd)
+        echo "작업 디렉토리: $WORK_DIR"
+
+        # 파일들 절대경로 확인
+        MANIFEST_PATH="$WORK_DIR/AndroidManifest.xml"
+        RESOURCE_PATH="$WORK_DIR/temp_res"
+        OUTPUT_PATH="$WORK_DIR/temp_with_manifest.apk"
+
+        echo "매니페스트 절대경로: $MANIFEST_PATH"
+        echo "매니페스트 존재: $([ -f "$MANIFEST_PATH" ] && echo "✅" || echo "❌")"
+        echo "리소스 절대경로: $RESOURCE_PATH"
+        echo "리소스 존재: $([ -d "$RESOURCE_PATH" ] && echo "✅" || echo "❌")"
+
+        # 방법 1: -M 옵션으로 절대경로 명시
+        echo "🚀 시도 1: -M 옵션으로 절대경로 명시"
         aapt package -f \
-          -S temp_res \
+          -M "$MANIFEST_PATH" \
+          -S "$RESOURCE_PATH" \
           -I "$ANDROID_HOME/platforms/android-33/android.jar" \
-          -F temp_with_manifest.apk \
-          -v 2>&1 | tee aapt_output.log
+          -F "$OUTPUT_PATH" \
+          -v 2>&1 | tee aapt_try1.log
 
-        RESULT1=$?
-        echo "결과 코드: $RESULT1"
-
-        # 성공 체크: 결과 코드 0이고 APK 파일이 생성되었으면 성공!
-        if [ $RESULT1 -eq 0 ] && [ -f "temp_with_manifest.apk" ]; then
-          echo "✅ aapt 실행 성공! AndroidManifest.xml 방식"
+        if [ -f "$OUTPUT_PATH" ]; then
+          echo "✅ 시도 1 성공!"
           echo "APK 크기: $(du -h temp_with_manifest.apk | cut -f1)"
           APK_SUCCESS=true
         else
-          echo "🚀 aapt 실행 시도 2: 절대경로 사용"
+          echo "❌ 시도 1 실패, 시도 2..."
+          
+          # 방법 2: aapt를 AndroidManifest.xml 디렉토리에서 실행
+          echo "🚀 시도 2: 매니페스트 디렉토리에서 실행"
+          cd "$WORK_DIR"
+          
           aapt package -f \
-            -S "$(pwd)/temp_res" \
+            -M "./AndroidManifest.xml" \
+            -S "./temp_res" \
             -I "$ANDROID_HOME/platforms/android-33/android.jar" \
-            -F "$(pwd)/temp_with_manifest.apk" \
-            -v 2>&1 | tee aapt_output2.log
+            -F "./temp_with_manifest.apk" \
+            -v 2>&1 | tee aapt_try2.log
           
-          RESULT2=$?
-          echo "결과 코드: $RESULT2"
-          
-          if [ $RESULT2 -eq 0 ] && [ -f "temp_with_manifest.apk" ]; then
-            echo "✅ aapt 실행 성공! (시도 2)"
+          if [ -f "temp_with_manifest.apk" ]; then
+            echo "✅ 시도 2 성공!"
             echo "APK 크기: $(du -h temp_with_manifest.apk | cut -f1)"
             APK_SUCCESS=true
           else
-            echo "🚀 aapt 실행 시도 3: 디버그 모드"
+            echo "❌ 시도 2 실패, 시도 3..."
+            
+            # 방법 3: 매니페스트를 temp_res 안으로 복사
+            echo "🚀 시도 3: 매니페스트를 리소스 디렉토리 안으로"
+            cp AndroidManifest.xml temp_res/
             
             aapt package -f \
-              -S "$(pwd)/temp_res" \
+              -S "./temp_res" \
               -I "$ANDROID_HOME/platforms/android-33/android.jar" \
-              -F "$(pwd)/temp_with_manifest.apk" \
-              --debug-mode \
-              -v 2>&1 | tee aapt_output3.log
+              -F "./temp_with_manifest.apk" \
+              -v 2>&1 | tee aapt_try3.log
             
-            RESULT3=$?
-            echo "결과 코드: $RESULT3"
-            
-            if [ $RESULT3 -eq 0 ] && [ -f "temp_with_manifest.apk" ]; then
-              echo "✅ aapt 실행 성공! (시도 3)"
+            if [ -f "temp_with_manifest.apk" ]; then
+              echo "✅ 시도 3 성공!"
               echo "APK 크기: $(du -h temp_with_manifest.apk | cut -f1)"
               APK_SUCCESS=true
             else
-              APK_SUCCESS=false
+              echo "❌ 시도 3 실패, 시도 4..."
+              
+              # 방법 4: 리소스 디렉토리로 이동해서 실행
+              echo "🚀 시도 4: 리소스 디렉토리에서 실행"
+              cd temp_res
+              cp ../AndroidManifest.xml ./
+              
+              aapt package -f \
+                -S . \
+                -I "$ANDROID_HOME/platforms/android-33/android.jar" \
+                -F ../temp_with_manifest.apk \
+                -v 2>&1 | tee ../aapt_try4.log
+              
+              cd ..
+              
+              if [ -f "temp_with_manifest.apk" ]; then
+                echo "✅ 시도 4 성공!"
+                echo "APK 크기: $(du -h temp_with_manifest.apk | cut -f1)"
+                APK_SUCCESS=true
+              else
+                echo "❌ 모든 시도 실패"
+                APK_SUCCESS=false
+              fi
             fi
           fi
         fi
 
-        # 성공한 경우 계속 진행
+        # 최종 결과 확인 및 로그 출력
         if [ "$APK_SUCCESS" = "true" ]; then
-          echo "🎉 aapt로 APK 생성 성공!"
+          echo "🎉 aapt로 APK 생성 최종 성공!"
           echo "📊 생성된 APK 정보:"
           ls -la temp_with_manifest.apk
           
@@ -396,15 +432,17 @@ jobs:
             exit 1
           fi
         else
-          echo "❌ 모든 aapt 시도 실패"
-          echo "📄 aapt 출력 로그들:"
-          echo "=== aapt_output.log ==="
-          cat aapt_output.log 2>/dev/null || echo "로그 없음"
-          echo "=== aapt_output2.log ==="  
-          cat aapt_output2.log 2>/dev/null || echo "로그 없음"
-          echo "=== aapt_output3.log ==="
-          cat aapt_output3.log 2>/dev/null || echo "로그 없음"
-          echo "📁 현재 디렉토리 최종 상태:"
+          echo "💥 모든 aapt 시도 완전 실패"
+          echo "📄 모든 시도 로그들:"
+          echo "=== 시도 1 로그 ==="
+          cat aapt_try1.log 2>/dev/null || echo "로그 없음"
+          echo "=== 시도 2 로그 ==="  
+          cat aapt_try2.log 2>/dev/null || echo "로그 없음"
+          echo "=== 시도 3 로그 ==="
+          cat aapt_try3.log 2>/dev/null || echo "로그 없음"
+          echo "=== 시도 4 로그 ==="
+          cat aapt_try4.log 2>/dev/null || echo "로그 없음"
+          echo "📁 최종 디렉토리 상태:"
           ls -la
           exit 1
         fi
