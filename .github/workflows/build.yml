@@ -183,10 +183,10 @@ jobs:
         echo -e "\n✅ Build completed at: $(date)"
       timeout-minutes: 50
 
-    - name: Verify AlarmReceiver in generated APK
+    - name: Verify AlarmReceiver in generated APK (상세 분석)
       if: success()
       run: |
-        echo "🔍 === VERIFYING ALARMRECEIVER IN APK ==="
+        echo "🔍 === AndroidManifest.xml 완전 분석 ==="
         
         # APK 파일 찾기
         APK_FILE=$(find . -name "*.apk" -type f | head -1)
@@ -196,10 +196,50 @@ jobs:
         fi
         
         echo "📱 Found APK: $APK_FILE"
+        echo "📏 APK Size: $(ls -lh "$APK_FILE" | awk '{print $5}')"
         
-        # APK 내용 확인 (aapt 사용)
-        echo -e "\n📄 Checking AndroidManifest.xml in APK..."
-        $ANDROID_SDK_ROOT/build-tools/32.0.0/aapt dump xmltree "$APK_FILE" AndroidManifest.xml | grep -A 5 -B 5 "AlarmReceiver\|BOOT_COMPLETED" || echo "⚠️ AlarmReceiver not found in manifest"
+        # AndroidManifest.xml 전체 덤프
+        echo -e "\n📄 Dumping complete AndroidManifest.xml..."
+        $ANDROID_SDK_ROOT/build-tools/32.0.0/aapt dump xmltree "$APK_FILE" AndroidManifest.xml > full_manifest.txt
+        
+        echo "🔎 1. receiver 요소 검색:"
+        grep -n -A 15 -B 2 "E: receiver" full_manifest.txt || echo "❌ No receiver found"
+        
+        echo -e "\n🔎 2. BOOT_COMPLETED 액션 검색:"
+        grep -n -A 5 -B 5 "BOOT_COMPLETED" full_manifest.txt || echo "❌ No BOOT_COMPLETED found"
+        
+        echo -e "\n🔎 3. AlarmReceiver 클래스 검색:"
+        grep -n -A 10 -B 5 -i "alarmreceiver" full_manifest.txt || echo "❌ No AlarmReceiver found"
+        
+        echo -e "\n🔎 4. 커스텀 알람 액션 검색:"
+        grep -n "ALARM_ACTION" full_manifest.txt || echo "❌ No custom alarm action found"
+        
+        echo -e "\n🔎 5. AlarmService 검색:"
+        grep -n -A 5 -B 2 -i "alarmservice\|service.*alarm" full_manifest.txt || echo "❌ No AlarmService found"
+        
+        echo -e "\n📊 === 분석 결과 요약 ==="
+        RECEIVER_COUNT=$(grep -c "E: receiver" full_manifest.txt 2>/dev/null || echo "0")
+        BOOT_COUNT=$(grep -c "BOOT_COMPLETED" full_manifest.txt 2>/dev/null || echo "0")
+        ALARM_ACTION_COUNT=$(grep -c "ALARM_ACTION" full_manifest.txt 2>/dev/null || echo "0")
+        SERVICE_COUNT=$(grep -c "E: service" full_manifest.txt 2>/dev/null || echo "0")
+        
+        echo "📈 Detection Results:"
+        echo "   - Receiver 요소: $RECEIVER_COUNT"
+        echo "   - BOOT_COMPLETED 액션: $BOOT_COUNT"  
+        echo "   - 커스텀 ALARM_ACTION: $ALARM_ACTION_COUNT"
+        echo "   - Service 요소: $SERVICE_COUNT"
+        
+        if [ "$RECEIVER_COUNT" -gt 0 ] && [ "$BOOT_COUNT" -gt 0 ]; then
+          echo "✅ SUCCESS: AlarmReceiver가 성공적으로 AndroidManifest.xml에 삽입됨!"
+          if [ "$ALARM_ACTION_COUNT" -gt 0 ]; then
+            echo "🎯 BONUS: 커스텀 알람 액션도 포함됨!"
+          fi
+          if [ "$SERVICE_COUNT" -gt 0 ]; then
+            echo "🎯 BONUS: AlarmService도 포함됨!"
+          fi
+        else
+          echo "❌ FAILED: AlarmReceiver 삽입 실패"
+        fi
 
     - name: Debug build results
       if: always()
@@ -221,6 +261,17 @@ jobs:
         name: custom-buildozer-apk
         path: ./bin/*.apk
         if-no-files-found: warn
+
+    - name: Upload AndroidManifest analysis
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: manifest-analysis
+        path: |
+          full_manifest.txt
+          buildozer.spec
+        if-no-files-found: ignore
+        retention-days: 30
 
     - name: Upload build logs on failure
       if: failure()
