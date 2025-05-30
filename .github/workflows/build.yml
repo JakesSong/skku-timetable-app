@@ -9,7 +9,7 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
 
     steps:
     - name: Checkout repository
@@ -45,6 +45,7 @@ jobs:
           unzip \
           libncurses5-dev \
           libncursesw5-dev \
+          libtinfo5 \
           cmake \
           libffi-dev \
           libssl-dev
