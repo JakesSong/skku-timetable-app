@@ -21,7 +21,7 @@ android.wakelock = True
 android.permissions = INTERNET,WRITE_EXTERNAL_STORAGE,READ_EXTERNAL_STORAGE,SCHEDULE_EXACT_ALARM,WAKE_LOCK,RECEIVE_BOOT_COMPLETED,POST_NOTIFICATIONS,VIBRATE
 
 # 🔥 AlarmReceiver 설정 (하나만 사용!)
-android.extra_manifest_application_arguments = %(source.dir)s/xml/receivers.xml
+android.extra_manifest_application_entry = %(source.dir)s/xml/receivers.xml
 
 # 🔥 Java 소스 경로 (AlarmReceiver.java 포함하기 위해 필요!)
 android.add_src = android/src/main/java
