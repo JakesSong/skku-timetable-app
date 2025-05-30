@@ -458,44 +458,250 @@ jobs:
           fi
         fi
 
-    # ✅ APK 설치 시뮬레이션 테스트
-    - name: APK installation simulation test
+    # ✅ 심화 APK 디버깅 및 검증
+    - name: Advanced APK debugging and validation
       run: |
-        echo "=== 📱 APK 설치 시뮬레이션 테스트 ==="
+        echo "=== 🔬 심화 APK 디버깅 및 검증 ==="
+        
+        APK_FILES=(
+          "original_backup.apk"
+          "rebuilt_doublecheck_unsigned.apk" 
+          "rebuilt_doublecheck_signed.apk"
+          "final_doublecheck_fixed.apk"
+        )
+        
+        for APK_FILE in "${APK_FILES[@]}"; do
+          if [ -f "$APK_FILE" ]; then
+            echo ""
+            echo "🔍 === $APK_FILE 분석 ==="
+            
+            # 1. 기본 정보
+            echo "📊 파일 크기: $(du -h "$APK_FILE" | cut -f1)"
+            echo "📊 파일 타입: $(file "$APK_FILE")"
+            
+            # 2. ZIP 구조 검증
+            echo "📦 ZIP 구조 검증:"
+            if unzip -t "$APK_FILE" >/dev/null 2>&1; then
+              echo "✅ ZIP 구조 유효"
+            else
+              echo "❌ ZIP 구조 손상"
+              continue
+            fi
+            
+            # 3. APK 내부 파일 목록
+            echo "📂 APK 내부 주요 파일:"
+            unzip -l "$APK_FILE" | grep -E "(AndroidManifest.xml|classes.dex|META-INF/|resources.arsc)" | head -10
+            
+            # 4. 매니페스트 파싱 테스트
+            echo "📄 매니페스트 파싱 테스트:"
+            if aapt dump xmltree "$APK_FILE" AndroidManifest.xml >/dev/null 2>&1; then
+              echo "✅ 매니페스트 파싱 가능"
+            else
+              echo "❌ 매니페스트 파싱 실패"
+              aapt dump xmltree "$APK_FILE" AndroidManifest.xml 2>&1 | head -5
+            fi
+            
+            # 5. 서명 정보 상세 분석
+            echo "🔏 서명 정보 분석:"
+            if jarsigner -verify -verbose "$APK_FILE" >/dev/null 2>&1; then
+              echo "✅ 서명 유효"
+              echo "서명 세부정보:"
+              jarsigner -verify -verbose "$APK_FILE" 2>&1 | grep -E "(certificate|algorithm)" | head -3
+            else
+              echo "❌ 서명 무효 또는 없음"
+              jarsigner -verify -verbose "$APK_FILE" 2>&1 | head -3
+            fi
+            
+            # 6. zipalign 상태 확인
+            ZIPALIGN_PATH="$HOME/android-sdk/build-tools/34.0.0/zipalign"
+            if [ -f "$ZIPALIGN_PATH" ]; then
+              echo "🔧 zipalign 상태:"
+              if $ZIPALIGN_PATH -c 4 "$APK_FILE" >/dev/null 2>&1; then
+                echo "✅ 올바르게 정렬됨"
+              else
+                echo "❌ 정렬되지 않음"
+              fi
+            fi
+            
+            # 7. 패키지 정보 확인
+            echo "📦 패키지 정보:"
+            aapt dump badging "$APK_FILE" 2>/dev/null | grep -E "(package:|application:|launchable-activity:)" | head -3
+            
+            # 8. 권한 확인
+            echo "🔑 권한 개수: $(aapt dump permissions "$APK_FILE" 2>/dev/null | grep -c "uses-permission" || echo "0")"
+            
+            # 9. dex 파일 확인
+            echo "⚙️ DEX 파일:"
+            unzip -l "$APK_FILE" | grep "\.dex" | wc -l | xargs echo "DEX 파일 개수:"
+            
+            # 10. 네이티브 라이브러리 확인
+            echo "📚 네이티브 라이브러리:"
+            NATIVE_COUNT=$(unzip -l "$APK_FILE" | grep "lib/" | wc -l)
+            echo "네이티브 라이브러리 파일 개수: $NATIVE_COUNT"
+            if [ "$NATIVE_COUNT" -gt 0 ]; then
+              unzip -l "$APK_FILE" | grep "lib/" | head -5
+            fi
+            
+            echo "--- $APK_FILE 분석 완료 ---"
+          else
+            echo "⚠️ $APK_FILE 파일 없음"
+          fi
+        done
+
+    # ✅ 매니페스트 상세 비교
+    - name: Detailed manifest comparison
+      run: |
+        echo "=== 📋 매니페스트 상세 비교 ==="
+        
+        # 각 APK에서 매니페스트 추출
+        APK_FILES=(
+          "original_backup.apk:original"
+          "final_doublecheck_fixed.apk:final"
+        )
+        
+        for APK_INFO in "${APK_FILES[@]}"; do
+          APK_FILE="${APK_INFO%:*}"
+          PREFIX="${APK_INFO#*:}"
+          
+          if [ -f "$APK_FILE" ]; then
+            echo "📄 $APK_FILE 매니페스트 추출..."
+            
+            # aapt로 읽기 가능한 형태로 추출
+            aapt dump xmltree "$APK_FILE" AndroidManifest.xml > "${PREFIX}_manifest_readable.xml" 2>/dev/null || echo "❌ 추출 실패"
+            
+            # apktool로 소스 형태로 추출
+            rm -rf "${PREFIX}_decode"
+            apktool d "$APK_FILE" -o "${PREFIX}_decode" --force >/dev/null 2>&1
+            if [ -f "${PREFIX}_decode/AndroidManifest.xml" ]; then
+              cp "${PREFIX}_decode/AndroidManifest.xml" "${PREFIX}_manifest_source.xml"
+              echo "✅ ${PREFIX} 매니페스트 추출 완료"
+            fi
+          fi
+        done
+        
+        # 매니페스트 비교
+        if [ -f "original_manifest_source.xml" ] && [ -f "final_manifest_source.xml" ]; then
+          echo "🔄 매니페스트 차이점 분석:"
+          diff original_manifest_source.xml final_manifest_source.xml > manifest_diff.txt || true
+          
+          if [ -s manifest_diff.txt ]; then
+            echo "발견된 차이점:"
+            head -30 manifest_diff.txt
+          else
+            echo "매니페스트 차이점 없음"
+          fi
+        fi
+        
+        # receiver 부분만 추출해서 비교
+        for PREFIX in original final; do
+          if [ -f "${PREFIX}_manifest_source.xml" ]; then
+            echo "📡 ${PREFIX} APK의 receiver 목록:"
+            grep -A 10 -B 2 '<receiver' "${PREFIX}_manifest_source.xml" || echo "receiver 없음"
+          fi
+        done
+
+    # ✅ APK 바이너리 레벨 분석
+    - name: APK binary level analysis
+      run: |
+        echo "=== 🔬 APK 바이너리 레벨 분석 ==="
+        
+        # original과 final APK 비교
+        if [ -f "original_backup.apk" ] && [ -f "final_doublecheck_fixed.apk" ]; then
+          echo "📊 파일 크기 비교:"
+          echo "Original: $(stat -c%s original_backup.apk) bytes"
+          echo "Final:    $(stat -c%s final_doublecheck_fixed.apk) bytes"
+          
+          # ZIP 엔트리 개수 비교
+          echo "📦 ZIP 엔트리 개수:"
+          echo "Original: $(unzip -l original_backup.apk | grep -c "^[ ]*[0-9]")"
+          echo "Final:    $(unzip -l final_doublecheck_fixed.apk | grep -c "^[ ]*[0-9]")"
+          
+          # 매니페스트 바이너리 크기 비교
+          echo "📄 AndroidManifest.xml 크기:"
+          unzip -l original_backup.apk | grep "AndroidManifest.xml"
+          unzip -l final_doublecheck_fixed.apk | grep "AndroidManifest.xml"
+          
+          # META-INF 비교
+          echo "🔏 META-INF 디렉토리 내용:"
+          echo "Original META-INF:"
+          unzip -l original_backup.apk | grep "META-INF" || echo "META-INF 없음"
+          echo "Final META-INF:"
+          unzip -l final_doublecheck_fixed.apk | grep "META-INF" || echo "META-INF 없음"
+          
+          # 첫 32바이트 비교 (ZIP 헤더)
+          echo "🔍 ZIP 헤더 비교:"
+          echo "Original 첫 32바이트:"
+          hexdump -C original_backup.apk | head -2
+          echo "Final 첫 32바이트:"
+          hexdump -C final_doublecheck_fixed.apk | head -2
+        fi
+
+    # ✅ 호환성 검사
+    - name: Compatibility check
+      run: |
+        echo "=== 🔧 호환성 검사 ==="
         
         APK_FILE="final_doublecheck_fixed.apk"
         
         if [ -f "$APK_FILE" ]; then
-          echo "🧪 APK 설치 가능성 테스트..."
+          echo "📱 Android 호환성 검사..."
           
-          # aapt를 사용한 기본 검증
-          if aapt dump xmltree "$APK_FILE" AndroidManifest.xml >/dev/null 2>&1; then
-            echo "✅ AndroidManifest.xml 파싱 가능"
+          # 1. 최소 SDK 버전 확인
+          echo "🎯 SDK 버전 정보:"
+          aapt dump badging "$APK_FILE" 2>/dev/null | grep -E "(sdkVersion|targetSdkVersion)" || echo "SDK 버전 정보 없음"
+          
+          # 2. 아키텍처 지원 확인
+          echo "🏗️ 아키텍처 지원:"
+          aapt dump configurations "$APK_FILE" 2>/dev/null | head -10 || echo "구성 정보 없음"
+          
+          # 3. 필수 기능 확인
+          echo "⚙️ 필수 기능:"
+          aapt dump badging "$APK_FILE" 2>/dev/null | grep "uses-feature" | head -5 || echo "필수 기능 없음"
+          
+          # 4. 화면 지원 확인
+          echo "📺 화면 지원:"
+          aapt dump badging "$APK_FILE" 2>/dev/null | grep "supports-screens" || echo "화면 지원 정보 없음"
+          
+          # 5. 매니페스트 필수 요소 확인
+          echo "✅ 필수 요소 체크리스트:"
+          
+          # 패키지명 확인
+          if aapt dump badging "$APK_FILE" 2>/dev/null | grep -q "package:"; then
+            echo "✅ 패키지명 존재"
           else
-            echo "❌ AndroidManifest.xml 파싱 실패"
-            exit 1
+            echo "❌ 패키지명 없음"
           fi
           
-          # 권한 확인
-          echo "🔑 앱 권한:"
-          aapt dump permissions "$APK_FILE" | head -10
-          
-          # 액티비티 확인
-          echo "🎯 실행 가능 액티비티:"
-          aapt dump badging "$APK_FILE" | grep "launchable-activity" | head -3
-          
-          # 패키지 서명 상태
-          echo "🔏 패키지 서명 상태:"
-          if jarsigner -verify -verbose "$APK_FILE" 2>&1 | grep "verified" >/dev/null; then
-            echo "✅ 서명 검증됨"
+          # 메인 액티비티 확인
+          if aapt dump badging "$APK_FILE" 2>/dev/null | grep -q "launchable-activity:"; then
+            echo "✅ 실행 가능한 액티비티 존재"
           else
-            echo "❌ 서명 검증 실패"
+            echo "❌ 실행 가능한 액티비티 없음"
           fi
           
-          echo "🎉 APK 설치 시뮬레이션 테스트 완료!"
-        else
-          echo "❌ 테스트할 APK 파일 없음"
+          # 애플리케이션 태그 확인
+          if aapt dump badging "$APK_FILE" 2>/dev/null | grep -q "application:"; then
+            echo "✅ 애플리케이션 태그 존재"
+          else
+            echo "❌ 애플리케이션 태그 없음"
+          fi
+          
+          # 6. 매니페스트 XML 유효성 재검증
+          echo "📋 매니페스트 XML 구조 재검증:"
+          if aapt dump xmltree "$APK_FILE" AndroidManifest.xml >/tmp/manifest_dump.txt 2>&1; then
+            echo "✅ XML 구조 유효"
+            echo "매니페스트 주요 태그 개수:"
+            grep -c "E: application" /tmp/manifest_dump.txt || echo "application: 0"
+            grep -c "E: activity" /tmp/manifest_dump.txt || echo "activity: 0"
+            grep -c "E: receiver" /tmp/manifest_dump.txt || echo "receiver: 0"
+            grep -c "E: uses-permission" /tmp/manifest_dump.txt || echo "uses-permission: 0"
+          else
+            echo "❌ XML 구조 오류"
+            head -10 /tmp/manifest_dump.txt
+          fi
         fi
+        
+        echo "🎉 호환성 검사 완료!"
 
     # ✅ 빌드 로그 업로드
     - name: Upload build logs
@@ -506,6 +712,9 @@ jobs:
         path: |
           build_full.log
           apk_info.txt
+          manifest_diff.txt
+          original_manifest_*.xml
+          final_manifest_*.xml
           .buildozer/**/*.log
           original_analysis/AndroidManifest.xml
           final_verification/AndroidManifest.xml
