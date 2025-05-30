@@ -59,7 +59,7 @@ jobs:
         echo "GRADLE_OPTS=-Dorg.gradle.daemon=false -Dorg.gradle.jvmargs='-Xmx3072m -XX:MaxMetaspaceSize=768m' -Dorg.gradle.parallel=false" >> $GITHUB_ENV
         echo "P4A_GRADLE_OPTS=--stacktrace --info" >> $GITHUB_ENV
 
-    # ✅ APK 수정 도구 설치 (개선된 버전)
+    # ✅ APK 수정 도구 설치
     - name: Install APK modification tools
       run: |
         echo "=== 🛠️ APK 수정 도구 설치 ==="
@@ -163,7 +163,7 @@ jobs:
           exit 1
         fi
 
-    # ✅ APK 수정 (AlarmReceiver 추가) - 개선된 버전
+    # ✅ APK 수정 (AlarmReceiver 추가)
     - name: Modify APK to add AlarmReceiver
       run: |
         echo "=== 🔧 APK 수정 (AlarmReceiver 추가) ==="
@@ -182,7 +182,7 @@ jobs:
         # 작업 공간 정리
         rm -rf decoded_apk_clean
         
-        # APK 디컴파일 (더 안전한 옵션 사용)
+        # APK 디컴파일
         echo "📦 APK 디컴파일..."
         if apktool d "$ORIGINAL_APK" -o decoded_apk_clean --force --no-debug-info; then
           echo "✅ APK 디컴파일 성공"
@@ -191,7 +191,7 @@ jobs:
           exit 1
         fi
         
-        # AndroidManifest.xml 수정 (더 정교한 방식)
+        # AndroidManifest.xml 수정
         MANIFEST="decoded_apk_clean/AndroidManifest.xml"
         cp "$MANIFEST" "${MANIFEST}.backup"
         
@@ -205,18 +205,7 @@ jobs:
         else
           echo "➕ AlarmReceiver 추가 중..."
           
-          # 더 안전한 XML 수정 방식
           if grep -q "</application>" "$MANIFEST"; then
-            # 백슬래시 이스케이프 문제 해결
-            cat >> temp_receiver.xml << 'EOF'
-        <receiver android:name="org.kivy.skkutimetable.doublecheck.AlarmReceiver" android:enabled="true" android:exported="true">
-            <intent-filter>
-                <action android:name="android.intent.action.BOOT_COMPLETED" />
-            </intent-filter>
-        </receiver>
-EOF
-            
-            # </application> 바로 앞에 receiver 삽입
             sed -i '/<\/application>/i\        <receiver android:name="org.kivy.skkutimetable.doublecheck.AlarmReceiver" android:enabled="true" android:exported="true">\
             <intent-filter>\
                 <action android:name="android.intent.action.BOOT_COMPLETED" />\
@@ -250,19 +239,18 @@ EOF
           fi
         fi
 
-    # ✅ 수정된 APK 리빌드 및 서명 (대폭 개선)
+    # ✅ 수정된 APK 리빌드 및 서명
     - name: Rebuild and sign modified APK
       run: |
         echo "=== 🔨 수정된 APK 리빌드 및 서명 ==="
         
-        # APK 리빌드 (최적화된 옵션)
+        # APK 리빌드
         echo "📦 APK 리빌드..."
         if apktool b decoded_apk_clean -o rebuilt_doublecheck_unsigned.apk --force-all --no-debug-info; then
           echo "✅ APK 리빌드 성공"
           echo "📊 리빌드 APK 크기: $(du -h rebuilt_doublecheck_unsigned.apk | cut -f1)"
         else
           echo "❌ APK 리빌드 실패"
-          # 디버그 정보 출력
           echo "=== 리빌드 오류 디버깅 ==="
           apktool b decoded_apk_clean -o rebuilt_doublecheck_unsigned.apk --force-all --verbose || true
           exit 1
@@ -277,7 +265,7 @@ EOF
           exit 1
         fi
         
-        # 디버그 키스토어 생성 (개선된 파라미터)
+        # 디버그 키스토어 생성
         if [ ! -f "debug.keystore" ]; then
           echo "🔑 디버그 키스토어 생성..."
           keytool -genkey -v \
@@ -296,7 +284,7 @@ EOF
         echo "🗑️ 기존 서명 제거..."
         zip -d rebuilt_doublecheck_unsigned.apk 'META-INF/*' 2>/dev/null || echo "기존 서명 없음"
         
-        # APK 서명 (더 안전한 방식)
+        # APK 서명
         echo "🔏 APK 서명..."
         cp rebuilt_doublecheck_unsigned.apk rebuilt_doublecheck_signed.apk
         
@@ -318,7 +306,7 @@ EOF
           exit 1
         fi
         
-        # zipalign 정렬 (필수!)
+        # zipalign 정렬
         ZIPALIGN_PATH="$HOME/android-sdk/build-tools/34.0.0/zipalign"
         if [ -f "$ZIPALIGN_PATH" ]; then
           echo "🔧 APK 정렬..."
@@ -337,7 +325,7 @@ EOF
           cp rebuilt_doublecheck_signed.apk final_doublecheck_fixed.apk
         fi
 
-    # ✅ 최종 APK 검증 (강화된 버전)
+    # ✅ 최종 APK 검증
     - name: Final APK validation
       run: |
         echo "=== 🎯 최종 APK 검증 ==="
@@ -353,7 +341,7 @@ EOF
         echo "파일명: $APK_TO_TEST"
         echo "크기: $(du -h "$APK_TO_TEST" | cut -f1)"
         
-        # 1. APK 구조 검증
+        # APK 구조 검증
         echo "🔍 APK 구조 검증..."
         if aapt dump badging "$APK_TO_TEST" > apk_info.txt 2>&1; then
           echo "✅ APK 구조 유효"
@@ -370,7 +358,7 @@ EOF
           exit 1
         fi
         
-        # 2. 서명 검증
+        # 서명 검증
         echo "🔏 서명 검증..."
         if jarsigner -verify "$APK_TO_TEST" 2>/dev/null; then
           echo "✅ 서명 유효"
@@ -379,7 +367,7 @@ EOF
           jarsigner -verify -verbose "$APK_TO_TEST" || true
         fi
         
-        # 3. zipalign 검증
+        # zipalign 검증
         ZIPALIGN_PATH="$HOME/android-sdk/build-tools/34.0.0/zipalign"
         if [ -f "$ZIPALIGN_PATH" ]; then
           if $ZIPALIGN_PATH -c 4 "$APK_TO_TEST" >/dev/null 2>&1; then
@@ -389,7 +377,7 @@ EOF
           fi
         fi
         
-        # 4. 매니페스트 검증
+        # 매니페스트 검증
         echo "📄 매니페스트 검증..."
         rm -rf final_verification
         apktool d "$APK_TO_TEST" -o final_verification --force >/dev/null 2>&1
@@ -398,7 +386,8 @@ EOF
           FINAL_MANIFEST="final_verification/AndroidManifest.xml"
           
           echo "🔍 매니페스트 정보:"
-          echo "- package: $(grep 'package=' "$FINAL_MANIFEST" | head -1 | sed 's/.*package="//;s/".*//')"
+          PACKAGE_NAME=$(grep 'package=' "$FINAL_MANIFEST" | head -1 | sed 's/.*package="//;s/".*//')
+          echo "- package: $PACKAGE_NAME"
           echo "- activity: $(grep -c '<activity' "$FINAL_MANIFEST" 2>/dev/null || echo "0")개"
           echo "- receiver: $(grep -c '<receiver' "$FINAL_MANIFEST" 2>/dev/null || echo "0")개"
           echo "- service: $(grep -c '<service' "$FINAL_MANIFEST" 2>/dev/null || echo "0")개"
@@ -419,7 +408,7 @@ EOF
           fi
         fi
         
-        # 5. 파일 무결성 검증
+        # 파일 무결성 검증
         echo "🔐 파일 무결성 검증..."
         unzip -t "$APK_TO_TEST" >/dev/null 2>&1
         if [ $? -eq 0 ]; then
