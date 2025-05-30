@@ -479,99 +479,120 @@ jobs:
     
     # === 7단계: 디버그 키스토어 생성 ===
     - name: Create debug keystore
-      run: |
-        echo "=== 🔑 디버그 키스토어 생성 ==="
-        
-        # 디버그 키스토어 생성
-        keytool -genkey -v \
-          -keystore debug.keystore \
-          -alias androiddebugkey \
-          -keyalg RSA \
-          -keysize 2048 \
-          -validity 10000 \
-          -dname "CN=Android Debug,O=Android,C=US" \
-          -storepass android \
-          -keypass android
-        
-        echo "✅ 디버그 키스토어 생성 완료"
-        ls -la debug.keystore
+     run: |
+       echo "=== 🔑 디버그 키스토어 생성 ==="
+       
+       # 디버그 키스토어 생성
+       keytool -genkey -v \
+         -keystore debug.keystore \
+         -alias androiddebugkey \
+         -keyalg RSA \
+         -keysize 2048 \
+         -validity 10000 \
+         -dname "CN=Android Debug,O=Android,C=US" \
+         -storepass android \
+         -keypass android
+       
+       echo "✅ 디버그 키스토어 생성 완료"
+       ls -la debug.keystore
     
     # === 8단계: APK 리빌드 ===
     - name: Rebuild APK
-      run: |
-        echo "=== 🔨 APK 리빌드 ==="
-        
-        # APK 리빌드
-        echo "📦 APK 리빌드 중..."
-        apktool b decoded_apk -o modified_doublecheck.apk
-        
-        # 리빌드 결과 확인
-        if [ -f "modified_doublecheck.apk" ]; then
-          echo "✅ APK 리빌드 성공"
-          echo "📊 수정된 APK 크기: $(du -h modified_doublecheck.apk | cut -f1)"
-        else
-          echo "❌ APK 리빌드 실패"
-          exit 1
-        fi
+     run: |
+       echo "=== 🔨 APK 리빌드 ==="
+       
+       # APK 리빌드
+       echo "📦 APK 리빌드 중..."
+       apktool b decoded_apk -o unsigned_doublecheck.apk
+       
+       # 리빌드 결과 확인
+       if [ -f "unsigned_doublecheck.apk" ]; then
+         echo "✅ APK 리빌드 성공"
+         echo "📊 리빌드된 APK 크기: $(du -h unsigned_doublecheck.apk | cut -f1)"
+       else
+         echo "❌ APK 리빌드 실패"
+         exit 1
+       fi
     
     # === 9단계: APK 서명 ===
     - name: Sign modified APK
-      run: |
-        echo "=== ✍️ APK 서명 ==="
-        
-        # APK 서명
-        echo "🔏 APK 서명 중..."
-        jarsigner -verbose \
-          -sigalg SHA1withRSA \
-          -digestalg SHA1 \
-          -keystore debug.keystore \
-          -storepass android \
-          -keypass android \
-          modified_doublecheck.apk \
-          androiddebugkey
-        
-        # 서명 검증
-        echo ""
-        echo "🔍 서명 검증:"
-        jarsigner -verify -verbose modified_doublecheck.apk
-        
-        echo ""
-        echo "✅ APK 서명 완료"
+     run: |
+       echo "=== ✍️ APK 서명 ==="
+       
+       # APK 서명
+       echo "🔏 APK 서명 중..."
+       jarsigner -verbose \
+         -sigalg SHA256withRSA \
+         -digestalg SHA-256 \
+         -keystore debug.keystore \
+         -storepass android \
+         -keypass android \
+         unsigned_doublecheck.apk \
+         androiddebugkey
+       
+       # 서명된 APK를 최종 이름으로 복사
+       cp unsigned_doublecheck.apk signed_doublecheck.apk
+       
+       # 서명 검증
+       echo ""
+       echo "🔍 서명 검증:"
+       jarsigner -verify -verbose signed_doublecheck.apk
+       
+       echo ""
+       echo "✅ APK 서명 완료"
     
-    # === 10단계: 최종 검증 ===
+    # === 10단계: APK 정렬 (zipalign) ===
+    - name: Align APK
+     run: |
+       echo "=== 🔧 APK 정렬 ==="
+       
+       # zipalign으로 APK 최적화
+       echo "🎯 APK 정렬 중..."
+       zipalign -v 4 signed_doublecheck.apk final_doublecheck.apk
+       
+       # 정렬 결과 확인
+       if [ -f "final_doublecheck.apk" ]; then
+         echo "✅ APK 정렬 성공"
+         echo "📊 최종 APK 크기: $(du -h final_doublecheck.apk | cut -f1)"
+       else
+         echo "❌ APK 정렬 실패"
+         exit 1
+       fi
+    
+    # === 11단계: 최종 검증 ===
     - name: Final verification of modified APK
-      run: |
-        echo "=== 🎯 최종 검증 ==="
-        
-        # 최종 APK 정보
-        echo "📱 최종 수정된 APK 정보:"
-        ls -la modified_doublecheck.apk
-        
-        # APK 내용 확인 (AndroidManifest.xml 추출)
-        echo ""
-        echo "🔍 수정된 APK에서 AndroidManifest.xml 추출 검증:"
-        unzip -p modified_doublecheck.apk AndroidManifest.xml > extracted_manifest.xml
-        
-        # 바이너리 매니페스트를 다시 디컴파일해서 확인
-        echo "📋 최종 매니페스트에서 AlarmReceiver 확인:"
-        apktool d modified_doublecheck.apk -o final_check --force
-        
-        if grep -q "AlarmReceiver" final_check/AndroidManifest.xml; then
-          echo "✅ 최종 확인: AlarmReceiver 정상 포함됨!"
-          grep -A 6 -B 2 "AlarmReceiver" final_check/AndroidManifest.xml
-        else
-          echo "❌ 최종 확인: AlarmReceiver 없음"
-          exit 1
-        fi
-        
-        echo ""
-        echo "🎉 APK 수정 작업 완료!"
+     run: |
+       echo "=== 🎯 최종 검증 ==="
+       
+       # 최종 APK 정보
+       echo "📱 최종 수정된 APK 정보:"
+       ls -la final_doublecheck.apk
+       
+       # APK 내용 확인 (AndroidManifest.xml 추출)
+       echo ""
+       echo "🔍 수정된 APK에서 AndroidManifest.xml 추출 검증:"
+       unzip -p final_doublecheck.apk AndroidManifest.xml > extracted_manifest.xml
+       
+       # 바이너리 매니페스트를 다시 디컴파일해서 확인
+       echo "📋 최종 매니페스트에서 AlarmReceiver 확인:"
+       apktool d final_doublecheck.apk -o final_check --force
+       
+       if grep -q "AlarmReceiver" final_check/AndroidManifest.xml; then
+         echo "✅ 최종 확인: AlarmReceiver 정상 포함됨!"
+         grep -A 6 -B 2 "AlarmReceiver" final_check/AndroidManifest.xml
+       else
+         echo "❌ 최종 확인: AlarmReceiver 없음"
+         exit 1
+       fi
+       
+       echo ""
+       echo "🎉 서명된 APK 생성 완료!"
     
-    # === 11단계: 아티팩트 업로드 ===
-    - name: Upload modified APK
-      uses: actions/upload-artifact@v4
-      with:
-        name: modified-apk
-        path: |
-          modified_doublecheck.apk
-          final_check/AndroidManifest.xml
+    # === 12단계: 아티팩트 업로드 ===
+    - name: Upload final APK
+     uses: actions/upload-artifact@v4
+     with:
+       name: final-signed-apk
+       path: |
+         final_doublecheck.apk
+         final_check/AndroidManifest.xml
