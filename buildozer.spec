@@ -8,8 +8,8 @@ source.filename = main.py
 source.include_exts = py,png,jpg,kv,atlas,ttf,java
 source.include_patterns = fonts/*.ttf
 
-# 🔥 워크플로우와 동일한 버전으로 통일
-requirements = python3,kivy==2.3.0,kivymd==2.0.1.dev0,requests,pillow,certifi,urllib3,charset-normalizer,plyer,sqlite3,android
+# 🔥 검증된 버전으로 유지 (이미 성공한 버전들)
+requirements = python3,kivy==2.1.0,kivymd==1.1.1,requests,pillow,certifi,urllib3,charset-normalizer,plyer,sqlite3,android
 
 version = 0.1
 orientation = portrait
@@ -23,7 +23,8 @@ android.permissions = INTERNET,WRITE_EXTERNAL_STORAGE,READ_EXTERNAL_STORAGE,SCHE
 # 🔥 AlarmReceiver 설정 (하나만 사용!)
 android.extra_manifest_application_arguments = %(source.dir)s/xml/receivers.xml
 
-# 🔥 Android 설정
+# 🔥 Java 소스 경로 (AlarmReceiver.java 포함하기 위해 필요!)
+android.add_src = android/src/main/java
 android.api = 33
 android.minapi = 21
 android.sdk = 33
