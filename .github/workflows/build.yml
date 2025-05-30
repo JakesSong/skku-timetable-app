@@ -346,8 +346,38 @@ jobs:
         # Java 설치 확인
         java -version
         
+        # Android SDK 명령줄 도구 설치
+        echo "📥 Android SDK 명령줄 도구 다운로드..."
+        mkdir -p ~/android-sdk
+        cd ~/android-sdk
+        
+        # Android SDK Command Line Tools 다운로드
+        wget -q https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip
+        unzip -q commandlinetools-linux-11076708_latest.zip
+        mkdir -p cmdline-tools/latest
+        mv cmdline-tools/* cmdline-tools/latest/ 2>/dev/null || true
+        
+        # 환경 변수 설정
+        export ANDROID_SDK_ROOT=~/android-sdk
+        export PATH=$PATH:$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$ANDROID_SDK_ROOT/build-tools/33.0.2
+        echo "ANDROID_SDK_ROOT=~/android-sdk" >> $GITHUB_ENV
+        echo "~/android-sdk/cmdline-tools/latest/bin" >> $GITHUB_PATH
+        echo "~/android-sdk/build-tools/33.0.2" >> $GITHUB_PATH
+        
+        # SDK 라이센스 자동 동의
+        yes | sdkmanager --licenses
+        
+        # build-tools 설치 (zipalign 포함)
+        echo "🔧 Android Build Tools 설치..."
+        sdkmanager "build-tools;33.0.2"
+        
+        # zipalign 설치 확인
+        echo "✅ zipalign 설치 확인:"
+        ~/android-sdk/build-tools/33.0.2/zipalign --help | head -5
+        
         # apktool 다운로드 및 설치
         echo "📥 apktool 다운로드..."
+        cd ~
         wget -q https://raw.githubusercontent.com/iBotPeaches/Apktool/master/scripts/linux/apktool
         wget -q https://bitbucket.org/iBotPeaches/apktool/downloads/apktool_2.9.3.jar
         
@@ -358,7 +388,8 @@ jobs:
         
         # 설치 확인
         apktool --version
-        echo "✅ apktool 설치 완료"
+        echo "✅ 모든 도구 설치 완료"
+
     
     # === 3단계: APK 파일 확인 ===
     - name: Locate and verify APK file
@@ -541,24 +572,37 @@ jobs:
         echo ""
         echo "✅ APK 서명 완료"
 
-    # === 10단계: APK 정렬 (zipalign) ===
+    # === 10단계: APK 정렬 (zipalign) - 수정된 버전 ===
     - name: Align APK
       run: |
         echo "=== 🔧 APK 정렬 ==="
         
-        # zipalign으로 APK 최적화
-        echo "🎯 APK 정렬 중..."
-        zipalign -v 4 signed_doublecheck.apk final_doublecheck.apk
+        # zipalign 경로 확인
+        ZIPALIGN_PATH="$HOME/android-sdk/build-tools/33.0.2/zipalign"
+        echo "🔍 zipalign 경로: $ZIPALIGN_PATH"
         
-        # 정렬 결과 확인
-        if [ -f "final_doublecheck.apk" ]; then
-          echo "✅ APK 정렬 성공"
-          echo "📊 최종 APK 크기: $(du -h final_doublecheck.apk | cut -f1)"
+        if [ -f "$ZIPALIGN_PATH" ]; then
+          echo "✅ zipalign 발견"
+          
+          # zipalign으로 APK 최적화
+          echo "🎯 APK 정렬 중..."
+          $ZIPALIGN_PATH -v 4 signed_doublecheck.apk final_doublecheck.apk
+          
+          # 정렬 결과 확인
+          if [ -f "final_doublecheck.apk" ]; then
+            echo "✅ APK 정렬 성공"
+            echo "📊 최종 APK 크기: $(du -h final_doublecheck.apk | cut -f1)"
+          else
+            echo "❌ APK 정렬 실패"
+            exit 1
+          fi
         else
-          echo "❌ APK 정렬 실패"
+          echo "❌ zipalign을 찾을 수 없음: $ZIPALIGN_PATH"
+          echo "🔍 build-tools 디렉토리 확인:"
+          ls -la $HOME/android-sdk/build-tools/ || echo "build-tools 없음"
           exit 1
         fi
-
+        
     # === 11단계: 최종 검증 ===
     - name: Final verification of modified APK
       run: |
