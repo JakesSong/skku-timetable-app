@@ -162,10 +162,42 @@ jobs:
         rm -rf .buildozer
         rm -rf bin
 
-    - name: Accept Android SDK licenses
+    - name: Verify project structure and configuration
       run: |
-        echo "🔑 === SDK LICENSES ==="
-        yes | $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager --licenses || true
+        echo "🔍 === PROJECT VERIFICATION ==="
+        echo "📁 Root directory contents:"
+        ls -la
+        
+        echo -e "\n📁 Checking xml directory:"
+        if [ -d xml ]; then
+          echo "✅ xml directory exists"
+          ls -la xml/
+          if [ -f xml/receivers.xml ]; then
+            echo "✅ receivers.xml exists"
+            echo "📄 receivers.xml content:"
+            cat xml/receivers.xml
+          else
+            echo "❌ receivers.xml NOT found"
+          fi
+        else
+          echo "❌ xml directory NOT found"
+        fi
+        
+        echo -e "\n📄 buildozer.spec relevant sections:"
+        echo "🔧 Extra manifest entry:"
+        grep -n "android.extra_manifest_application_entry" buildozer.spec || echo "❌ No extra manifest entry found"
+        echo "🔧 Android permissions:"
+        grep -n "android.permissions" buildozer.spec || echo "❌ No permissions found"
+        echo "🔧 Java source path:"
+        grep -n "android.add_src" buildozer.spec || echo "❌ No Java source path found"
+        
+        echo -e "\n📁 Checking Java source directory:"
+        if [ -d android/src/main/java ]; then
+          echo "✅ Java source directory exists"
+          find android/src/main/java -name "*.java" -type f || echo "No Java files found"
+        else
+          echo "❌ Java source directory NOT found"
+        fi
 
     - name: Build APK with Buildozer (Enhanced Debug)
       run: |
