@@ -1,4 +1,4 @@
-name: 🔧 Multiple APK Modification Methods
+name: 🔧 Modify APK and Inject AlarmReceiver
 
 on:
   workflow_dispatch:
@@ -6,501 +6,65 @@ on:
       apk_url:
         description: 'APK 다운로드 URL'
         required: true
-        default: 'https://github.com/user/repo/releases/download/v1.0/app.apk'
+        default: 'https://example.com/app.apk'
 
 env:
   ORIGINAL_APK: original_backup.apk
 
 jobs:
-  modify-apk-multiple-methods:
+  modify-apk:
     runs-on: ubuntu-latest
-    
     steps:
-    # ✅ 환경 설정
     - name: Checkout code
       uses: actions/checkout@v4
-
-    - name: Setup Android SDK
-      uses: android-actions/setup-android@v3
-      with:
-        api-level: 33
-        build-tools: 34.0.0
 
     - name: Install dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y unzip zip openjdk-11-jdk wget curl xxd
-        
-        # 필수 도구 설치
-        echo "📥 필수 도구 설치 중..."
-        
-        # apktool 설치
+        sudo apt-get install -y unzip openjdk-11-jdk wget
         wget https://raw.githubusercontent.com/iBotPeaches/Apktool/master/scripts/linux/apktool -O apktool
         wget https://bitbucket.org/iBotPeaches/apktool/downloads/apktool_2.9.3.jar -O apktool.jar
         chmod +x apktool
         sudo mv apktool apktool.jar /usr/local/bin/
-        
-        echo "✅ 환경 설정 완료"
 
-    # ✅ 원본 APK 다운로드
     - name: Download original APK
       run: |
-        echo "=== 📥 원본 APK 다운로드 ==="
         wget "${{ github.event.inputs.apk_url }}" -O "$ORIGINAL_APK"
-        
-        if [ -f "$ORIGINAL_APK" ]; then
-          echo "✅ APK 다운로드 성공"
-          echo "📊 파일 크기: $(du -h $ORIGINAL_APK | cut -f1)"
-          echo "📋 파일 정보: $(file $ORIGINAL_APK)"
-        else
-          echo "❌ APK 다운로드 실패"
-          exit 1
-        fi
 
-    # ✅ 방법 1: aapt2 사용한 정교한 APK 수정
-    - name: Method 1 - Precise APK modification with aapt2
+    - name: Decode APK using apktool
       run: |
-        echo "=== 🔧 방법 1: aapt2를 사용한 정교한 APK 수정 ==="
-        
-        if [ -f "${ORIGINAL_APK:-}" ]; then
-          echo "🎯 aapt2로 정교하게 수정해보겠습니다..."
-          
-          # aapt2 설치 확인
-          if command -v aapt2 >/dev/null 2>&1; then
-            echo "✅ aapt2 이미 설치됨"
-          else
-            echo "📥 aapt2 설치 중..."
-            # Android SDK의 aapt2 사용
-            AAPT2_PATH="$HOME/android-sdk/build-tools/34.0.0/aapt2"
-            if [ -f "$AAPT2_PATH" ]; then
-              echo "✅ aapt2 발견: $AAPT2_PATH"
-              sudo ln -sf "$AAPT2_PATH" /usr/local/bin/aapt2 || true
-            else
-              echo "❌ aapt2 없음 - 설치 시도"
-              echo "aapt2 설치를 위해 build-tools 재설치..."
-            fi
-          fi
-          
-          # 1단계: 원본 APK 분해 (aapt2 방식)
-          echo "📦 1단계: APK 리소스 추출 (aapt2)..."
-          mkdir -p aapt2_work
-          cd aapt2_work
-          
-          # APK를 ZIP으로 처리해서 파일들 추출
-          cp "../$ORIGINAL_APK" original.apk
-          unzip -q original.apk
-          
-          echo "✅ APK 파일 추출 완료"
-          ls -la | head -10
-          
-          # 2단계: 매니페스트를 텍스트로 변환 (aapt2 dump)
-          echo "📄 2단계: 매니페스트 텍스트 변환..."
-          if aapt2 dump badging original.apk > package_info.txt 2>&1; then
-            echo "✅ aapt2 dump 성공"
-            head -5 package_info.txt
-          else
-            echo "❌ aapt2 dump 실패"
-            cat package_info.txt | head -5
-          fi
-          
-          # aapt로 매니페스트 XML 형태로 추출
-          echo "📋 매니페스트 XML 추출..."
-          if aapt dump xmltree original.apk AndroidManifest.xml > manifest_readable.xml 2>&1; then
-            echo "✅ 매니페스트 XML 추출 성공"
-            echo "현재 receiver 개수: $(grep -c "receiver" manifest_readable.xml || echo "0")"
-          else
-            echo "❌ 매니페스트 XML 추출 실패"
-          fi
-          
-          # 3단계: 바이너리 매니페스트 직접 분석
-          echo "🔍 3단계: 바이너리 매니페스트 분석..."
-          echo "매니페스트 파일 정보:"
-          ls -la AndroidManifest.xml
-          echo "매니페스트 헥스 덤프 (처음 64바이트):"
-          hexdump -C AndroidManifest.xml | head -4
-          
-          cd ..
-          echo "aapt2 방법 1단계 완료"
-        fi
+        apktool d "$ORIGINAL_APK" -o decoded_apk --force
 
-    # ✅ 방법 2: 바이너리 헥스 에디터 방식
-    - name: Method 2 - Binary hex editor approach
+    - name: Inject AlarmReceiver into AndroidManifest.xml
       run: |
-        echo "=== 🔬 방법 2: 바이너리 헥스 에디터 방식 ==="
-        
-        if [ -f "${ORIGINAL_APK:-}" ]; then
-          echo "🎯 매니페스트 바이너리를 직접 분석하고 수정해보겠습니다..."
-          
-          mkdir -p hex_work
-          cd hex_work
-          
-          # APK에서 매니페스트 추출
-          unzip -j "../$ORIGINAL_APK" AndroidManifest.xml
-          
-          if [ -f "AndroidManifest.xml" ]; then
-            echo "✅ 매니페스트 추출 완료"
-            
-            # 바이너리 분석
-            echo "📊 매니페스트 바이너리 정보:"
-            echo "크기: $(wc -c < AndroidManifest.xml) bytes"
-            echo "파일 타입: $(file AndroidManifest.xml)"
-            
-            # 문자열 테이블 찾기
-            echo "🔍 매니페스트 내 문자열 검색:"
-            strings AndroidManifest.xml | grep -E "(receiver|activity|AlarmReceiver)" | head -10 || echo "관련 문자열 없음"
-            
-            # receiver 패턴 검색
-            echo "📡 receiver 관련 바이너리 패턴 검색:"
-            xxd AndroidManifest.xml | grep -i "receiver" || echo "receiver 바이너리 패턴 없음"
-            
-            # application 태그 위치 찾기
-            echo "📱 application 태그 위치 검색:"
-            xxd AndroidManifest.xml | grep -i "application" | head -3 || echo "application 태그 찾기 실패"
-            
-            # 매니페스트 구조 분석을 위한 바이너리 덤프
-            echo "🗂️ 매니페스트 구조 분석:"
-            echo "첫 32바이트 (헤더):"
-            xxd AndroidManifest.xml | head -2
-            echo "마지막 32바이트:"
-            xxd AndroidManifest.xml | tail -2
-            
-            # 백업 생성
-            cp AndroidManifest.xml AndroidManifest.xml.backup
-            echo "✅ 매니페스트 백업 완료"
-            
-          else
-            echo "❌ 매니페스트 추출 실패"
-          fi
-          
-          cd ..
-        fi
+        sed -i '/<\/application>/i \
+        <receiver android:name="org.kivy.skkutimetable.doublecheck.AlarmReceiver" android:enabled="true" android:exported="true">\n            <intent-filter>\n                <action android:name="android.intent.action.BOOT_COMPLETED" />\n            </intent-filter>\n        </receiver>' decoded_apk/AndroidManifest.xml
 
-    # ✅ 방법 3: baksmali/smali (DEX 레벨 수정)
-    - name: Method 3 - baksmali/smali DEX level modification
+    - name: Rebuild APK
       run: |
-        echo "=== ⚙️ 방법 3: baksmali/smali DEX 레벨 수정 ==="
-        
-        if [ -f "${ORIGINAL_APK:-}" ]; then
-          echo "🎯 DEX 파일 레벨에서 수정을 시도해보겠습니다..."
-          
-          # baksmali/smali 도구 다운로드
-          echo "📥 baksmali/smali 도구 다운로드..."
-          wget -q https://bitbucket.org/JesusFreke/smali/downloads/baksmali-2.5.2.jar -O baksmali.jar
-          wget -q https://bitbucket.org/JesusFreke/smali/downloads/smali-2.5.2.jar -O smali.jar
-          
-          if [ -f "baksmali.jar" ] && [ -f "smali.jar" ]; then
-            echo "✅ baksmali/smali 다운로드 완료"
-            
-            mkdir -p dex_work
-            cd dex_work
-            
-            # APK에서 classes.dex 추출
-            unzip -j "../$ORIGINAL_APK" "classes*.dex"
-            
-            if [ -f "classes.dex" ]; then
-              echo "✅ classes.dex 추출 완료"
-              echo "DEX 파일 크기: $(du -h classes.dex | cut -f1)"
-              
-              # DEX를 smali 코드로 디컴파일
-              echo "🔧 DEX → smali 디컴파일..."
-              java -jar ../baksmali.jar disassemble classes.dex -o smali_out
-              
-              if [ -d "smali_out" ]; then
-                echo "✅ smali 디컴파일 성공"
-                echo "생성된 smali 파일 개수: $(find smali_out -name "*.smali" | wc -l)"
-                
-                # 메인 액티비티 찾기
-                echo "🔍 메인 액티비티 파일 찾기:"
-                find smali_out -name "*Activity*.smali" | head -5
-                
-                # PythonActivity 찾기
-                PYTHON_ACTIVITY=$(find smali_out -name "*PythonActivity*.smali" | head -1)
-                if [ -n "$PYTHON_ACTIVITY" ]; then
-                  echo "✅ PythonActivity 발견: $PYTHON_ACTIVITY"
-                  echo "파일 크기: $(wc -l < "$PYTHON_ACTIVITY") 줄"
-                  
-                  # Activity 내용 일부 확인
-                  echo "📄 PythonActivity 일부 내용:"
-                  head -20 "$PYTHON_ACTIVITY"
-                  
-                else
-                  echo "❌ PythonActivity 없음"
-                fi
-                
-                # BroadcastReceiver 클래스 추가 준비
-                echo "📡 BroadcastReceiver 클래스 생성 준비..."
-                mkdir -p smali_out/org/kivy/skkutimetable/doublecheck
-                
-                # 간단한 AlarmReceiver smali 코드 생성
-                cat > smali_out/org/kivy/skkutimetable/doublecheck/AlarmReceiver.smali << 'SMALI_EOF'
-.class public Lorg/kivy/skkutimetable/doublecheck/AlarmReceiver;
-.super Landroid/content/BroadcastReceiver;
+        apktool b decoded_apk -o rebuilt.apk --force-all
 
-.method public constructor init()V
-    .locals 0
-    invoke-direct {p0}, Landroid/content/BroadcastReceiver;->init()V
-    return-void
-.end method
-
-.method public onReceive(Landroid/content/Context;Landroid/content/Intent;)V
-    .locals 2
-    const-string v0, "AlarmReceiver"
-    const-string v1, "Boot completed - alarm restore needed"
-    invoke-static {v0, v1}, Landroid/util/Log;->d(Ljava/lang/String;Ljava/lang/String;)I
-    return-void
-.end method
-SMALI_EOF
-                
-                echo "✅ AlarmReceiver.smali 생성 완료"
-                
-                # smali → DEX 재컴파일
-                echo "🔨 smali → DEX 재컴파일..."
-                java -jar ../smali.jar assemble smali_out -o classes_modified.dex
-                
-                if [ -f "classes_modified.dex" ]; then
-                  echo "✅ DEX 재컴파일 성공"
-                  echo "수정된 DEX 크기: $(du -h classes_modified.dex | cut -f1)"
-                else
-                  echo "❌ DEX 재컴파일 실패"
-                fi
-                
-              else
-                echo "❌ smali 디컴파일 실패"
-              fi
-              
-            else
-              echo "❌ classes.dex 추출 실패"
-            fi
-            
-            cd ..
-          else
-            echo "❌ baksmali/smali 다운로드 실패"
-          fi
-        fi
-
-    # ✅ 방법 4: APK 합성 (파일 교체)
-    - name: Method 4 - APK synthesis (file replacement)
+    - name: Remove existing signatures
       run: |
-        echo "=== 🔄 방법 4: APK 합성 (파일 교체) ==="
-        
-        if [ -f "${ORIGINAL_APK:-}" ]; then
-          echo "🎯 ZIP 레벨에서 파일을 교체해보겠습니다..."
-          
-          mkdir -p synthesis_work
-          cd synthesis_work
-          
-          # 1. 원본 APK 복사
-          cp "../$ORIGINAL_APK" base.apk
-          
-          # 2. 간단한 매니페스트 생성 (텍스트)
-          echo "📝 수정된 매니페스트 생성..."
-          cat > AndroidManifest_text.xml << 'MANIFEST_EOF'
-<?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="org.kivy.skkutimetable.doublecheck"
-    android:versionCode="10211"
-    android:versionName="0.1">
-    
-    <uses-permission android:name="android.permission.INTERNET" />
-    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
-    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
-    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
-    <uses-permission android:name="android.permission.WAKE_LOCK" />
-    <uses-permission android:name="android.permission.VIBRATE" />
-    
-    <application android:label="DoubleCheck" android:icon="@mipmap/icon">
-        <activity android:name="org.kivy.android.PythonActivity"
-                  android:label="DoubleCheck"
-                  android:exported="true">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-        </activity>
-        
-        <service android:name="org.kivy.android.PythonService" android:process=":pythonservice" />
-        
-        <receiver android:name="org.kivy.skkutimetable.doublecheck.AlarmReceiver"
-                  android:enabled="true"
-                  android:exported="true">
-            <intent-filter>
-                <action android:name="android.intent.action.BOOT_COMPLETED" />
-            </intent-filter>
-        </receiver>
-        
-    </application>
-</manifest>
-MANIFEST_EOF
-          
-          # 3. aapt를 사용해서 텍스트 매니페스트를 바이너리로 변환
-          echo "🔄 텍스트 매니페스트 → 바이너리 변환..."
-          
-          # 임시 리소스 디렉토리 생성
-          mkdir -p temp_resources/res/values
-          echo '<?xml version="1.0" encoding="utf-8"?><resources></resources>' > temp_resources/res/values/strings.xml
-          
-          # aapt로 바이너리 매니페스트 생성 시도
-          if aapt package -f -M AndroidManifest_text.xml -S temp_resources/res -I "$ANDROID_HOME/platforms/android-33/android.jar" -F temp.apk 2>/dev/null; then
-            echo "✅ 바이너리 매니페스트 생성 성공"
-            
-            # 생성된 매니페스트 추출
-            unzip -j temp.apk AndroidManifest.xml -d .
-            if [ -f "AndroidManifest.xml" ]; then
-              echo "✅ 새 매니페스트 추출 완료"
-              echo "새 매니페스트 크기: $(wc -c < AndroidManifest.xml) bytes"
-              
-              # 4. 원본 APK에 새 매니페스트 삽입
-              echo "🔧 원본 APK에 새 매니페스트 삽입..."
-              zip base.apk AndroidManifest.xml
-              
-              # 5. 결과 APK 검증
-              echo "✅ 합성 APK 생성 완료"
-              mv base.apk synthesis_fixed.apk
-              
-              # 검증
-              if aapt dump badging synthesis_fixed.apk >/dev/null 2>&1; then
-                echo "✅ 합성 APK 구조 유효"
-                echo "📋 합성 APK 정보:"
-                aapt dump badging synthesis_fixed.apk | head -5
-              else
-                echo "❌ 합성 APK 구조 오류"
-              fi
-              
-            else
-              echo "❌ 새 매니페스트 추출 실패"
-            fi
-          else
-            echo "❌ 바이너리 매니페스트 생성 실패"
-          fi
-          
-          cd ..
-        fi
+        zip -d rebuilt.apk META-INF/* || true
 
-    # ✅ 방법 5: Android Studio 프로젝트 변환
-    - name: Method 5 - Convert to Android Studio project
+    - name: Generate debug keystore if needed
       run: |
-        echo "=== 🏗️ 방법 5: Android Studio 프로젝트 변환 ==="
-        
-        if [ -f "${ORIGINAL_APK:-}" ]; then
-          echo "🎯 APK → Android Studio 프로젝트 변환 시도..."
-          
-          mkdir -p studio_work
-          cd studio_work
-          
-          # jadx 도구 다운로드 (APK → Java 소스 변환)
-          echo "📥 jadx 도구 다운로드..."
-          wget -q https://github.com/skylot/jadx/releases/download/v1.4.7/jadx-1.4.7.zip -O jadx.zip
-          
-          if [ -f "jadx.zip" ]; then
-            unzip -q jadx.zip
-            chmod +x jadx-1.4.7/bin/jadx
-            
-            echo "✅ jadx 설치 완료"
-            
-            # APK를 Java 프로젝트로 변환
-            echo "🔄 APK → Java 소스 변환..."
-            ./jadx-1.4.7/bin/jadx "../$ORIGINAL_APK" -d java_project
-            
-            if [ -d "java_project" ]; then
-              echo "✅ Java 프로젝트 변환 성공"
-              
-              # 매니페스트 확인
-              if [ -f "java_project/resources/AndroidManifest.xml" ]; then
-                echo "✅ 매니페스트 발견"
-                echo "📄 현재 매니페스트 내용:"
-                head -20 java_project/resources/AndroidManifest.xml
-                
-                # 매니페스트에 receiver 추가
-                echo "📡 receiver 추가 중..."
-                cp java_project/resources/AndroidManifest.xml java_project/resources/AndroidManifest.xml.backup
-                
-                # receiver 태그 삽입
-                sed -i '/<\/application>/i\        <receiver android:name="org.kivy.skkutimetable.doublecheck.AlarmReceiver" android:enabled="true" android:exported="true">\
-            <intent-filter>\
-                <action android:name="android.intent.action.BOOT_COMPLETED" />\
-            </intent-filter>\
-        </receiver>' java_project/resources/AndroidManifest.xml
-                
-                echo "✅ 매니페스트 수정 완료"
-                echo "📋 수정된 매니페스트:"
-                grep -A 10 -B 5 "AlarmReceiver" java_project/resources/AndroidManifest.xml || echo "추가 실패"
-                
-              else
-                echo "❌ 매니페스트 없음"
-              fi
-              
-              # 프로젝트 구조 확인
-              echo "📁 프로젝트 구조:"
-              find java_project -type f -name "*.xml" | head -10
-              
-            else
-              echo "❌ Java 프로젝트 변환 실패"
-            fi
-          else
-            echo "❌ jadx 다운로드 실패"
-          fi
-          
-          cd ..
+        if [ ! -f debug.keystore ]; then
+          keytool -genkey -v -keystore debug.keystore \
+            -alias androiddebugkey -keyalg RSA -keysize 2048 -validity 10000 \
+            -dname "CN=Android Debug,O=Android,C=US" \
+            -storepass android -keypass android
         fi
 
-    # ✅ 모든 방법 결과 비교
-    - name: Compare all methods results
+    - name: Sign APK
       run: |
-        echo "=== 📊 모든 방법 결과 비교 ==="
-        
-        echo "🎯 생성된 APK 파일들:"
-        find . -name "*.apk" -exec echo "{}:" \; -exec du -h {} \; 2>/dev/null || echo "APK 파일 없음"
-        
-        echo ""
-        echo "📋 각 방법별 성공/실패 상태:"
-        
-        # 방법 1: aapt2
-        if [ -d "aapt2_work" ]; then
-          echo "✅ 방법 1 (aapt2): 시도됨"
-        else
-          echo "❌ 방법 1 (aapt2): 실패"
-        fi
-        
-        # 방법 2: 헥스 에디터
-        if [ -f "hex_work/AndroidManifest.xml" ]; then
-          echo "✅ 방법 2 (헥스): 매니페스트 추출됨"
-        else
-          echo "❌ 방법 2 (헥스): 실패"
-        fi
-        
-        # 방법 3: baksmali
-        if [ -f "dex_work/classes_modified.dex" ]; then
-          echo "✅ 방법 3 (baksmali): DEX 수정됨"
-        else
-          echo "❌ 방법 3 (baksmali): 실패"
-        fi
-        
-        # 방법 4: 합성
-        if [ -f "synthesis_work/synthesis_fixed.apk" ]; then
-          echo "✅ 방법 4 (합성): APK 생성됨"
-        else
-          echo "❌ 방법 4 (합성): 실패"
-        fi
-        
-        # 방법 5: Studio
-        if [ -f "studio_work/java_project/resources/AndroidManifest.xml" ]; then
-          echo "✅ 방법 5 (Studio): 프로젝트 변환됨"
-        else
-          echo "❌ 방법 5 (Studio): 실패"
-        fi
-        
-        echo ""
-        echo "💡 다음 단계: 가장 성공한 방법으로 최종 APK 생성"
+        jarsigner -verbose -sigalg SHA256withRSA -digestalg SHA-256 \
+          -keystore debug.keystore -storepass android -keypass android \
+          rebuilt.apk androiddebugkey
 
-    # ✅ 결과물 업로드
-    - name: Upload results
+    - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
-        name: apk-modification-results
-        path: |
-          *.apk
-          */AndroidManifest.xml
-          */manifest_readable.xml
-          */classes_modified.dex
-          */synthesis_fixed.apk
-        retention-days: 7
+        name: alarmreceiver-injected-apk
+        path: rebuilt.apk
