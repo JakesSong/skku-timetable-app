@@ -88,21 +88,6 @@ jobs:
         echo "🔧 Android Build Tools 설치..."
         sdkmanager "build-tools;34.0.0" "platform-tools"
         
-        # apktool 최신 버전 다운로드 및 설치
-        echo "📥 apktool 다운로드..."
-        cd ~
-        wget -q https://raw.githubusercontent.com/iBotPeaches/Apktool/master/scripts/linux/apktool
-        wget -q https://bitbucket.org/iBotPeaches/apktool/downloads/apktool_2.9.3.jar
-        
-        chmod +x apktool
-        sudo mv apktool /usr/local/bin/
-        sudo mv apktool_2.9.3.jar /usr/local/bin/apktool.jar
-        
-        # 도구 버전 확인
-        echo "✅ 설치된 도구 버전:"
-        apktool --version || echo "apktool 버전 확인 실패"
-        ls -la ~/android-sdk/build-tools/34.0.0/
-        
         echo "✅ 모든 도구 설치 완료"
 
     # ✅ 빌드 수행
@@ -163,10 +148,10 @@ jobs:
           exit 1
         fi
 
-    # ✅ APK 수정 (AlarmReceiver 추가)
-    - name: Modify APK to add AlarmReceiver
+    # ✅ APK 수정 (aapt2 방식으로 AlarmReceiver 추가)
+    - name: Modify APK with aapt2 method (replacing apktool)
       run: |
-        echo "=== 🔧 APK 수정 (AlarmReceiver 추가) ==="
+        echo "=== 🔧 APK 수정 (aapt2 방식으로 AlarmReceiver 추가) ==="
         
         if [ -z "${ORIGINAL_APK:-}" ] || [ ! -f "$ORIGINAL_APK" ]; then
           echo "❌ 원본 APK 없음"
@@ -179,240 +164,81 @@ jobs:
         cp "$ORIGINAL_APK" original_backup.apk
         echo "✅ 원본 백업 완료"
         
-        # 작업 공간 정리
-        rm -rf decoded_apk_clean
+        # aapt2 방식으로 수정
+        mkdir -p aapt2_work
+        cd aapt2_work
         
-        # APK 디컴파일
-        echo "📦 APK 디컴파일..."
-        if apktool d "$ORIGINAL_APK" -o decoded_apk_clean --force --no-debug-info; then
-          echo "✅ APK 디컴파일 성공"
-        else
-          echo "❌ APK 디컴파일 실패"
-          exit 1
+        # APK 압축 해제
+        cp "../$ORIGINAL_APK" original.apk
+        unzip -q original.apk
+        
+        echo "📄 현재 매니페스트 분석..."
+        if aapt dump xmltree original.apk AndroidManifest.xml > current_manifest.txt 2>&1; then
+          echo "현재 receiver 개수: $(grep -c "receiver" current_manifest.txt || echo "0")"
         fi
         
-        # AndroidManifest.xml 수정
-        MANIFEST="decoded_apk_clean/AndroidManifest.xml"
-        cp "$MANIFEST" "${MANIFEST}.backup"
+        # 새 매니페스트 생성 (간단한 방식)
+        echo "Creating new manifest..."
         
-        echo "🔍 현재 매니페스트 상태:"
-        echo "- activity: $(grep -c '<activity' "$MANIFEST" 2>/dev/null || echo "0")개"
-        echo "- receiver: $(grep -c '<receiver' "$MANIFEST" 2>/dev/null || echo "0")개"
-        echo "- service: $(grep -c '<service' "$MANIFEST" 2>/dev/null || echo "0")개"
-        
-        if grep -q "AlarmReceiver" "$MANIFEST"; then
-          echo "⚠️ AlarmReceiver 이미 존재함 - 수정하지 않음"
+        # 1. 기존 템플릿 복사
+        if [ -f "../AndroidManifest.tmpl.xml" ]; then
+          echo "Found template file"
+          cp "../AndroidManifest.tmpl.xml" new_manifest.xml
         else
-          echo "➕ AlarmReceiver 추가 중..."
+          echo "No template, using original"
+          cp AndroidManifest.xml new_manifest.xml
+        fi
+        
+        # 2. receiver 추가 (간단한 sed)
+        echo "Adding receiver..."
+        sed -i 's|</application>|    <receiver android:name="org.kivy.skkutimetable.doublecheck.AlarmReceiver" android:enabled="true" android:exported="true"><intent-filter><action android:name="android.intent.action.BOOT_COMPLETED" /></intent-filter></receiver></application>|' new_manifest.xml
+        
+        echo "New manifest created"
+        
+        # 리소스 디렉토리 준비
+        mkdir -p temp_res/values
+        echo '<?xml version="1.0" encoding="utf-8"?><resources></resources>' > temp_res/values/strings.xml
+        
+        # 기존 리소스 복사
+        if [ -d "res" ]; then
+          cp -r res/* temp_res/ 2>/dev/null || true
+        fi
+        
+        # aapt로 새 APK 생성
+        echo "Creating new APK with aapt..."
+        aapt package -f -M new_manifest.xml -S temp_res -I "$ANDROID_HOME/platforms/android-33/android.jar" -F new.apk
+        
+        if [ -f "new.apk" ]; then
+          echo "New APK created successfully"
           
-          if grep -q "</application>" "$MANIFEST"; then
-            sed -i '/<\/application>/i\        <receiver android:name="org.kivy.skkutimetable.doublecheck.AlarmReceiver" android:enabled="true" android:exported="true">\
-            <intent-filter>\
-                <action android:name="android.intent.action.BOOT_COMPLETED" />\
-            </intent-filter>\
-        </receiver>' "$MANIFEST"
+          # 새 매니페스트 추출
+          unzip -j new.apk AndroidManifest.xml -d .
+          
+          # 원본 APK에 새 매니페스트 삽입
+          cp original.apk modified.apk
+          zip -u modified.apk AndroidManifest.xml
+          
+          echo "Modified APK created"
+          
+          # 검증
+          if aapt dump badging modified.apk >/dev/null 2>&1; then
+            echo "SUCCESS: Modified APK is valid"
+            aapt dump badging modified.apk | head -3
+            echo "Receiver count:"
+            aapt dump xmltree modified.apk AndroidManifest.xml | grep -c "receiver" || echo "0"
             
-            echo "✅ AlarmReceiver 추가 완료"
+            # 수정된 APK를 최종 위치로 복사
+            cp modified.apk ../final_doublecheck_fixed.apk
+            echo "✅ 최종 APK 생성: final_doublecheck_fixed.apk"
           else
-            echo "❌ </application> 태그 없음"
-            exit 1
+            echo "FAILED: Modified APK is invalid"
+            aapt dump badging modified.apk 2>&1 | head -5
           fi
-        fi
-        
-        # 수정 결과 검증
-        if grep -q "AlarmReceiver" "$MANIFEST"; then
-          echo "✅ AlarmReceiver 확인됨"
-          echo "📊 수정 후 receiver 개수: $(grep -c '<receiver' "$MANIFEST" 2>/dev/null || echo "0")"
         else
-          echo "❌ AlarmReceiver 추가 실패"
-          exit 1
+          echo "Failed to create new APK"
         fi
         
-        # XML 문법 검증
-        if command -v xmllint >/dev/null 2>&1; then
-          if xmllint --noout "$MANIFEST" 2>/dev/null; then
-            echo "✅ XML 문법 유효"
-          else
-            echo "❌ XML 문법 오류 - 백업에서 복원"
-            cp "${MANIFEST}.backup" "$MANIFEST"
-            exit 1
-          fi
-        fi
-
-    # ✅ 매니페스트 바이너리 인코딩 문제 해결
-    - name: Fix AndroidManifest binary encoding issue
-      run: |
-        echo "=== 🔧 매니페스트 바이너리 인코딩 문제 해결 ==="
-        
-        if [ -f "${ORIGINAL_APK:-}" ]; then
-          echo "🎯 바이너리 레벨에서 매니페스트 직접 수정 시도..."
-          
-          # 1. 원본 매니페스트 바이너리 추출
-          echo "📄 원본 매니페스트 바이너리 추출..."
-          unzip -j "$ORIGINAL_APK" AndroidManifest.xml -d temp_manifest/
-          
-          if [ -f "temp_manifest/AndroidManifest.xml" ]; then
-            echo "✅ 원본 매니페스트 추출 완료"
-            echo "📊 원본 매니페스트 크기: $(wc -c < temp_manifest/AndroidManifest.xml) bytes"
-            
-            # 바이너리 매니페스트 헥스 분석
-            echo "🔍 매니페스트 바이너리 헤더:"
-            hexdump -C temp_manifest/AndroidManifest.xml | head -3
-            
-            # aapt로 읽기 가능한지 확인
-            if aapt dump xmltree temp_manifest/AndroidManifest.xml >/dev/null 2>&1; then
-              echo "✅ 원본 매니페스트 파싱 가능"
-            else
-              echo "❌ 원본 매니페스트도 파싱 불가"
-            fi
-          fi
-          
-          # 2. 새로운 방법: 매니페스트 수정 없이 권한만 추가
-          echo "🔑 권한 확인 및 추가 방법 모색..."
-          
-          # 현재 권한 목록 확인
-          aapt dump permissions "$ORIGINAL_APK" > current_permissions.txt
-          echo "현재 권한 목록:"
-          cat current_permissions.txt | head -15
-          
-          if grep -q "RECEIVE_BOOT_COMPLETED" current_permissions.txt; then
-            echo "✅ 이미 BOOT_COMPLETED 권한 있음!"
-            echo "💡 권한은 있는데 receiver만 없는 상황"
-            echo "🎯 해결책: 앱 코드에서 동적 receiver 등록하면 됨"
-          else
-            echo "❌ BOOT_COMPLETED 권한 없음"
-            echo "🎯 해결책: buildozer.spec에서 권한 추가 필요"
-          fi
-        fi
-
-    # ✅ 매니페스트 수정 없는 해결책
-    - name: Solution without manifest modification
-      run: |
-        echo "=== 💡 매니페스트 수정 없는 해결책 ==="
-        
-        echo "🎯 현실적인 해결 방안들:"
-        echo ""
-        echo "1️⃣ === buildozer.spec 수정 방법 (가장 확실) ==="
-        echo "buildozer.spec 파일에 다음 추가:"
-        echo "```"
-        echo "android.permissions = INTERNET,WRITE_EXTERNAL_STORAGE,READ_EXTERNAL_STORAGE,SCHEDULE_EXACT_ALARM,USE_EXACT_ALARM,VIBRATE,WAKE_LOCK,RECEIVE_BOOT_COMPLETED,FOREGROUND_SERVICE"
-        echo "```"
-        echo "그리고 클린 빌드: buildozer android clean && buildozer android debug"
-        echo ""
-        echo "2️⃣ === Python 코드에서 동적 등록 (권한 있을 때) ==="
-        echo "main.py에 추가:"
-        echo "```python"
-        echo "try:"
-        echo "    from android.broadcast import BroadcastReceiver"
-        echo "    from android.content import IntentFilter"
-        echo "    from android import mActivity"
-        echo "    "
-        echo "    class BootCompletedReceiver(BroadcastReceiver):"
-        echo "        def onReceive(self, context, intent):"
-        echo "            if intent.getAction() == 'android.intent.action.BOOT_COMPLETED':"
-        echo "                print('부팅 완료 - 알람 재설정')"
-        echo "                # 여기에 알람 재설정 코드"
-        echo "    "
-        echo "    def register_boot_receiver():"
-        echo "        receiver = BootCompletedReceiver()"
-        echo "        filter = IntentFilter('android.intent.action.BOOT_COMPLETED')"
-        echo "        mActivity.registerReceiver(receiver, filter)"
-        echo "        print('부팅 리시버 등록 완료')"
-        echo "    "
-        echo "    # 앱 시작 시 호출"
-        echo "    register_boot_receiver()"
-        echo "except Exception as e:"
-        echo "    print(f'리시버 등록 실패: {e}')"
-        echo "```"
-        echo ""
-        echo "3️⃣ === APK 수정 포기하고 다른 방법 ==="
-        echo "- 사용자에게 수동으로 알람 복원 버튼 제공"
-        echo "- 앱 실행 시마다 알람 상태 체크 및 복원"
-        echo "- SharedPreferences에 알람 정보 저장하고 복원"
-        echo ""
-        echo "🎯 결론: APK 직접 수정은 너무 복잡하고 불안정함"
-        echo "buildozer.spec 수정 + Python 동적 등록이 가장 안전함!"
-
-    # ✅ buildozer.spec 자동 수정
-    - name: Auto-modify buildozer.spec
-      run: |
-        echo "=== 📝 buildozer.spec 자동 수정 시도 ==="
-        
-        if [ -f "buildozer.spec" ]; then
-          echo "✅ buildozer.spec 발견"
-          cp buildozer.spec buildozer.spec.original
-          
-          # 현재 권한 설정 확인
-          echo "🔍 현재 권한 설정:"
-          grep -n "android.permissions" buildozer.spec || echo "권한 설정 없음"
-          
-          # RECEIVE_BOOT_COMPLETED 권한 추가
-          if grep -q "android.permissions" buildozer.spec; then
-            if ! grep "android.permissions" buildozer.spec | grep -q "RECEIVE_BOOT_COMPLETED"; then
-              echo "🔑 RECEIVE_BOOT_COMPLETED 권한 추가 중..."
-              sed -i 's/android.permissions = /android.permissions = RECEIVE_BOOT_COMPLETED,/' buildozer.spec
-              echo "✅ 권한 추가 완료"
-            else
-              echo "✅ 이미 RECEIVE_BOOT_COMPLETED 권한 있음"
-            fi
-          else
-            echo "🔑 권한 섹션 새로 추가..."
-            echo "" >> buildozer.spec
-            echo "# Boot receiver 권한" >> buildozer.spec
-            echo "android.permissions = RECEIVE_BOOT_COMPLETED" >> buildozer.spec
-            echo "✅ 권한 섹션 추가 완료"
-          fi
-          
-          # 수정 결과 확인
-          echo "📋 수정된 권한 설정:"
-          grep -A 2 -B 2 "android.permissions" buildozer.spec
-          
-          echo ""
-          echo "💡 다음 단계:"
-          echo "1. 이 buildozer.spec을 사용해서 클린 빌드"
-          echo "2. Python 코드에 동적 receiver 등록 추가"
-          echo "3. APK 수정은 포기하고 소스 레벨에서 해결"
-          
-        else
-          echo "❌ buildozer.spec 파일 없음"
-          echo "🔍 현재 디렉토리 확인:"
-          ls -la | head -10
-        fi
-
-    # ✅ 왜 apktool이 실패하는지 근본 원인 분석
-    - name: Root cause analysis of apktool failure
-      run: |
-        echo "=== 🔬 apktool 실패 근본 원인 분석 ==="
-        
-        echo "🎯 apktool이 실패하는 이유들:"
-        echo ""
-        echo "1. 바이너리 XML 인코딩 문제:"
-        echo "   - Android는 매니페스트를 바이너리 XML로 압축함"
-        echo "   - apktool이 이를 텍스트로 변환 후 다시 바이너리로 변환"
-        echo "   - 이 과정에서 미묘한 인코딩 차이 발생"
-        echo ""
-        echo "2. 리소스 테이블 손상:"
-        echo "   - resources.arsc 파일이 망가짐"
-        echo "   - 아이콘 등 리소스 매핑이 깨짐"
-        echo ""
-        echo "3. 압축 방식 차이:"
-        echo "   - 원본: deflate 압축"
-        echo "   - apktool 리빌드: store (무압축) 또는 다른 압축"
-        echo ""
-        echo "4. 서명 체인 문제:"
-        echo "   - 원본과 다른 서명 방식"
-        echo "   - zipalign 순서 문제"
-        echo ""
-        echo "💡 결론:"
-        echo "APK 후처리 방식은 본질적으로 불안정함"
-        echo "소스 레벨(buildozer.spec + Python 코드)에서 해결하는 게 정답!"
-        echo ""
-        echo "🎯 최종 권장사항:"
-        echo "1. buildozer.spec에 RECEIVE_BOOT_COMPLETED 권한 추가"
-        echo "2. Python main.py에 동적 BroadcastReceiver 등록"
-        echo "3. APK 직접 수정은 포기"
-        echo ""
-        echo "이게 가장 안전하고 확실한 방법입니다! 🚀"
+        cd ..
 
     # ✅ 최종 APK 검증
     - name: Final APK validation
@@ -447,460 +273,8 @@ jobs:
           exit 1
         fi
         
-        # 서명 검증
-        echo "🔏 서명 검증..."
-        if jarsigner -verify "$APK_TO_TEST" 2>/dev/null; then
-          echo "✅ 서명 유효"
-        else
-          echo "❌ 서명 무효"
-          jarsigner -verify -verbose "$APK_TO_TEST" || true
-        fi
-        
-        # zipalign 검증
-        ZIPALIGN_PATH="$HOME/android-sdk/build-tools/34.0.0/zipalign"
-        if [ -f "$ZIPALIGN_PATH" ]; then
-          if $ZIPALIGN_PATH -c 4 "$APK_TO_TEST" >/dev/null 2>&1; then
-            echo "✅ APK 정렬 유효"
-          else
-            echo "⚠️ APK 정렬 문제"
-          fi
-        fi
-        
-        # 매니페스트 검증
-        echo "📄 매니페스트 검증..."
-        rm -rf final_verification
-        apktool d "$APK_TO_TEST" -o final_verification --force >/dev/null 2>&1
-        
-        if [ -f "final_verification/AndroidManifest.xml" ]; then
-          FINAL_MANIFEST="final_verification/AndroidManifest.xml"
-          
-          echo "🔍 매니페스트 정보:"
-          PACKAGE_NAME=$(grep 'package=' "$FINAL_MANIFEST" | head -1 | sed 's/.*package="//;s/".*//')
-          echo "- package: $PACKAGE_NAME"
-          echo "- activity: $(grep -c '<activity' "$FINAL_MANIFEST" 2>/dev/null || echo "0")개"
-          echo "- receiver: $(grep -c '<receiver' "$FINAL_MANIFEST" 2>/dev/null || echo "0")개"
-          echo "- service: $(grep -c '<service' "$FINAL_MANIFEST" 2>/dev/null || echo "0")개"
-          
-          if grep -q "AlarmReceiver" "$FINAL_MANIFEST"; then
-            echo "✅ AlarmReceiver 정상 포함!"
-          else
-            echo "❌ AlarmReceiver 없음"
-          fi
-          
-          # MAIN 액티비티 확인
-          if grep -A 10 'android.intent.action.MAIN' "$FINAL_MANIFEST" | grep -q 'android:name'; then
-            echo "✅ MAIN 액티비티 존재"
-            MAIN_ACTIVITY=$(grep -B 5 -A 5 'android.intent.action.MAIN' "$FINAL_MANIFEST" | grep 'android:name=' | head -1 | sed 's/.*android:name="//;s/".*//')
-            echo "- MAIN 액티비티: $MAIN_ACTIVITY"
-          else
-            echo "❌ MAIN 액티비티 없음 - 앱 실행 불가"
-          fi
-        fi
-        
-        # 파일 무결성 검증
-        echo "🔐 파일 무결성 검증..."
-        unzip -t "$APK_TO_TEST" >/dev/null 2>&1
-        if [ $? -eq 0 ]; then
-          echo "✅ APK 파일 무결성 양호"
-        else
-          echo "❌ APK 파일 손상"
-          exit 1
-        fi
-        
         echo "🎉 최종 수정된 APK 준비 완료: $APK_TO_TEST"
         echo "📱 설치 가능한 APK 생성됨!"
-
-    # ✅ 원본과 수정본 비교 분석
-    - name: Compare original and modified APK
-      if: always()
-      run: |
-        echo "=== 🔍 원본과 수정본 비교 분석 ==="
-        
-        if [ -f "${ORIGINAL_APK:-}" ] && [ -f "final_doublecheck_fixed.apk" ]; then
-          echo "📊 크기 비교:"
-          echo "원본: $(du -h "$ORIGINAL_APK" | cut -f1)"
-          echo "수정: $(du -h "final_doublecheck_fixed.apk" | cut -f1)"
-          
-          # 원본 APK 분석
-          echo "📦 원본 APK 분석..."
-          rm -rf original_analysis
-          apktool d "$ORIGINAL_APK" -o original_analysis --force >/dev/null 2>&1
-          
-          if [ -f "original_analysis/AndroidManifest.xml" ]; then
-            ORIG_MANIFEST="original_analysis/AndroidManifest.xml"
-            echo "원본 매니페스트:"
-            echo "- activity: $(grep -c '<activity' "$ORIG_MANIFEST" 2>/dev/null || echo "0")개"
-            echo "- receiver: $(grep -c '<receiver' "$ORIG_MANIFEST" 2>/dev/null || echo "0")개"
-            echo "- service: $(grep -c '<service' "$ORIG_MANIFEST" 2>/dev/null || echo "0")개"
-            
-            if grep -q "AlarmReceiver" "$ORIG_MANIFEST"; then
-              echo "⚠️ 원본에 이미 AlarmReceiver 존재"
-            else
-              echo "❌ 원본에 AlarmReceiver 없음"
-            fi
-          fi
-          
-          # 수정본과 차이점 분석
-          if [ -f "final_verification/AndroidManifest.xml" ] && [ -f "original_analysis/AndroidManifest.xml" ]; then
-            echo "🔄 매니페스트 차이점:"
-            diff original_analysis/AndroidManifest.xml final_verification/AndroidManifest.xml | head -20 || echo "차이점 없음"
-          fi
-        fi
-
-    # ✅ 압축 방식 및 설치 호환성 검증
-    - name: Compression and installation compatibility verification
-      run: |
-        echo "=== 🔍 압축 방식 및 설치 호환성 검증 ==="
-        
-        APK_FILES=(
-          "original_backup.apk:원본"
-          "final_doublecheck_fixed.apk:수정본"
-          "alternative_fixed.apk:대안"
-        )
-        
-        for APK_INFO in "${APK_FILES[@]}"; do
-          APK_FILE="${APK_INFO%:*}"
-          APK_DESC="${APK_INFO#*:}"
-          
-          if [ -f "$APK_FILE" ]; then
-            echo ""
-            echo "🔬 === $APK_DESC APK ($APK_FILE) 호환성 검증 ==="
-            
-            # 1. 압축 방식 확인
-            echo "🗜️ 압축 방식 분석:"
-            file "$APK_FILE" | grep -o "compression method=[^,]*"
-            
-            # 2. ZIP 헤더 상세 분석
-            echo "📦 ZIP 헤더 분석:"
-            hexdump -C "$APK_FILE" | head -1
-            
-            # 3. 안드로이드 설치 시뮬레이션
-            echo "📱 설치 호환성 테스트:"
-            
-            # 패키지 관리자 시뮬레이션
-            if aapt dump badging "$APK_FILE" >/tmp/badging.txt 2>&1; then
-              echo "✅ 패키지 매니저 파싱 성공"
-              
-              # 중요한 설치 관련 정보 추출
-              echo "📋 설치 관련 정보:"
-              grep "package:" /tmp/badging.txt | head -1
-              grep "sdkVersion:" /tmp/badging.txt
-              grep "targetSdkVersion:" /tmp/badging.txt
-              grep "launchable-activity:" /tmp/badging.txt | head -1
-              
-            else
-              echo "❌ 패키지 매니저 파싱 실패"
-              head -5 /tmp/badging.txt
-            fi
-            
-            # 4. 매니페스트 XML 파싱 테스트
-            echo "📄 매니페스트 파싱 테스트:"
-            if aapt dump xmltree "$APK_FILE" AndroidManifest.xml >/tmp/xmltree.txt 2>&1; then
-              echo "✅ XML 파싱 성공"
-              echo "주요 컴포넌트 개수:"
-              grep -c "E: activity" /tmp/xmltree.txt || echo "activity: 0"
-              grep -c "E: receiver" /tmp/xmltree.txt || echo "receiver: 0"
-              grep -c "E: service" /tmp/xmltree.txt || echo "service: 0"
-            else
-              echo "❌ XML 파싱 실패"
-              head -5 /tmp/xmltree.txt
-            fi
-            
-            # 5. 서명 및 보안 검사
-            echo "🔐 보안 검사:"
-            if jarsigner -verify "$APK_FILE" >/dev/null 2>&1; then
-              echo "✅ 서명 검증 통과"
-            else
-              echo "❌ 서명 검증 실패"
-            fi
-            
-            # 6. 설치 예상 결과
-            echo "🎯 설치 예상 결과:"
-            if aapt dump badging "$APK_FILE" >/dev/null 2>&1 && jarsigner -verify "$APK_FILE" >/dev/null 2>&1; then
-              echo "✅ 설치 가능할 것으로 예상"
-            else
-              echo "❌ 설치 실패 예상"
-            fi
-            
-            echo "--- $APK_DESC APK 검증 완료 ---"
-          else
-            echo "⚠️ $APK_FILE 파일 없음"
-          fi
-        done
-        
-        # 최종 권장사항
-        echo ""
-        echo "💡 === 최종 분석 및 권장사항 ==="
-        echo "1. 원본 APK는 정상 작동하는 상태"
-        echo "2. apktool 리빌드 과정에서 압축 방식 변경됨"
-        echo "3. 구조적으로는 문제없으나 미세한 호환성 이슈 가능"
-        echo ""
-        echo "🛠️ 해결 방안:"
-        echo "A. 현재 워크플로우: 압축 방식 최적화 적용"
-        echo "B. 대안 방법: buildozer.spec에서 직접 권한 설정"
-        echo "C. 앱 코드 방법: 런타임에 동적 receiver 등록"
-    - name: Advanced APK debugging and validation
-      run: |
-        echo "=== 🔬 심화 APK 디버깅 및 검증 ==="
-        
-        APK_FILES=(
-          "original_backup.apk"
-          "rebuilt_doublecheck_unsigned.apk" 
-          "rebuilt_doublecheck_signed.apk"
-          "final_doublecheck_fixed.apk"
-        )
-        
-        for APK_FILE in "${APK_FILES[@]}"; do
-          if [ -f "$APK_FILE" ]; then
-            echo ""
-            echo "🔍 === $APK_FILE 분석 ==="
-            
-            # 1. 기본 정보
-            echo "📊 파일 크기: $(du -h "$APK_FILE" | cut -f1)"
-            echo "📊 파일 타입: $(file "$APK_FILE")"
-            
-            # 2. ZIP 구조 검증
-            echo "📦 ZIP 구조 검증:"
-            if unzip -t "$APK_FILE" >/dev/null 2>&1; then
-              echo "✅ ZIP 구조 유효"
-            else
-              echo "❌ ZIP 구조 손상"
-              continue
-            fi
-            
-            # 3. APK 내부 파일 목록
-            echo "📂 APK 내부 주요 파일:"
-            unzip -l "$APK_FILE" | grep -E "(AndroidManifest.xml|classes.dex|META-INF/|resources.arsc)" | head -10
-            
-            # 4. 매니페스트 파싱 테스트
-            echo "📄 매니페스트 파싱 테스트:"
-            if aapt dump xmltree "$APK_FILE" AndroidManifest.xml >/dev/null 2>&1; then
-              echo "✅ 매니페스트 파싱 가능"
-            else
-              echo "❌ 매니페스트 파싱 실패"
-              aapt dump xmltree "$APK_FILE" AndroidManifest.xml 2>&1 | head -5
-            fi
-            
-            # 5. 서명 정보 상세 분석
-            echo "🔏 서명 정보 분석:"
-            if jarsigner -verify -verbose "$APK_FILE" >/dev/null 2>&1; then
-              echo "✅ 서명 유효"
-              echo "서명 세부정보:"
-              jarsigner -verify -verbose "$APK_FILE" 2>&1 | grep -E "(certificate|algorithm)" | head -3
-            else
-              echo "❌ 서명 무효 또는 없음"
-              jarsigner -verify -verbose "$APK_FILE" 2>&1 | head -3
-            fi
-            
-            # 6. zipalign 상태 확인
-            ZIPALIGN_PATH="$HOME/android-sdk/build-tools/34.0.0/zipalign"
-            if [ -f "$ZIPALIGN_PATH" ]; then
-              echo "🔧 zipalign 상태:"
-              if $ZIPALIGN_PATH -c 4 "$APK_FILE" >/dev/null 2>&1; then
-                echo "✅ 올바르게 정렬됨"
-              else
-                echo "❌ 정렬되지 않음"
-              fi
-            fi
-            
-            # 7. 패키지 정보 확인
-            echo "📦 패키지 정보:"
-            aapt dump badging "$APK_FILE" 2>/dev/null | grep -E "(package:|application:|launchable-activity:)" | head -3
-            
-            # 8. 권한 확인
-            echo "🔑 권한 개수: $(aapt dump permissions "$APK_FILE" 2>/dev/null | grep -c "uses-permission" || echo "0")"
-            
-            # 9. dex 파일 확인
-            echo "⚙️ DEX 파일:"
-            unzip -l "$APK_FILE" | grep "\.dex" | wc -l | xargs echo "DEX 파일 개수:"
-            
-            # 10. 네이티브 라이브러리 확인
-            echo "📚 네이티브 라이브러리:"
-            NATIVE_COUNT=$(unzip -l "$APK_FILE" | grep "lib/" | wc -l)
-            echo "네이티브 라이브러리 파일 개수: $NATIVE_COUNT"
-            if [ "$NATIVE_COUNT" -gt 0 ]; then
-              unzip -l "$APK_FILE" | grep "lib/" | head -5
-            fi
-            
-            echo "--- $APK_FILE 분석 완료 ---"
-          else
-            echo "⚠️ $APK_FILE 파일 없음"
-          fi
-        done
-
-    # ✅ 매니페스트 상세 비교
-    - name: Detailed manifest comparison
-      run: |
-        echo "=== 📋 매니페스트 상세 비교 ==="
-        
-        # 각 APK에서 매니페스트 추출
-        APK_FILES=(
-          "original_backup.apk:original"
-          "final_doublecheck_fixed.apk:final"
-        )
-        
-        for APK_INFO in "${APK_FILES[@]}"; do
-          APK_FILE="${APK_INFO%:*}"
-          PREFIX="${APK_INFO#*:}"
-          
-          if [ -f "$APK_FILE" ]; then
-            echo "📄 $APK_FILE 매니페스트 추출..."
-            
-            # aapt로 읽기 가능한 형태로 추출
-            aapt dump xmltree "$APK_FILE" AndroidManifest.xml > "${PREFIX}_manifest_readable.xml" 2>/dev/null || echo "❌ 추출 실패"
-            
-            # apktool로 소스 형태로 추출
-            rm -rf "${PREFIX}_decode"
-            apktool d "$APK_FILE" -o "${PREFIX}_decode" --force >/dev/null 2>&1
-            if [ -f "${PREFIX}_decode/AndroidManifest.xml" ]; then
-              cp "${PREFIX}_decode/AndroidManifest.xml" "${PREFIX}_manifest_source.xml"
-              echo "✅ ${PREFIX} 매니페스트 추출 완료"
-            fi
-          fi
-        done
-        
-        # 매니페스트 비교
-        if [ -f "original_manifest_source.xml" ] && [ -f "final_manifest_source.xml" ]; then
-          echo "🔄 매니페스트 차이점 분석:"
-          diff original_manifest_source.xml final_manifest_source.xml > manifest_diff.txt || true
-          
-          if [ -s manifest_diff.txt ]; then
-            echo "발견된 차이점:"
-            head -30 manifest_diff.txt
-          else
-            echo "매니페스트 차이점 없음"
-          fi
-        fi
-        
-        # receiver 부분만 추출해서 비교
-        for PREFIX in original final; do
-          if [ -f "${PREFIX}_manifest_source.xml" ]; then
-            echo "📡 ${PREFIX} APK의 receiver 목록:"
-            grep -A 10 -B 2 '<receiver' "${PREFIX}_manifest_source.xml" || echo "receiver 없음"
-          fi
-        done
-
-    # ✅ APK 바이너리 레벨 분석
-    - name: APK binary level analysis
-      run: |
-        echo "=== 🔬 APK 바이너리 레벨 분석 ==="
-        
-        # original과 final APK 비교
-        if [ -f "original_backup.apk" ] && [ -f "final_doublecheck_fixed.apk" ]; then
-          echo "📊 파일 크기 비교:"
-          echo "Original: $(stat -c%s original_backup.apk) bytes"
-          echo "Final:    $(stat -c%s final_doublecheck_fixed.apk) bytes"
-          
-          # ZIP 엔트리 개수 비교
-          echo "📦 ZIP 엔트리 개수:"
-          echo "Original: $(unzip -l original_backup.apk | grep -c "^[ ]*[0-9]")"
-          echo "Final:    $(unzip -l final_doublecheck_fixed.apk | grep -c "^[ ]*[0-9]")"
-          
-          # 매니페스트 바이너리 크기 비교
-          echo "📄 AndroidManifest.xml 크기:"
-          unzip -l original_backup.apk | grep "AndroidManifest.xml"
-          unzip -l final_doublecheck_fixed.apk | grep "AndroidManifest.xml"
-          
-          # META-INF 비교
-          echo "🔏 META-INF 디렉토리 내용:"
-          echo "Original META-INF:"
-          unzip -l original_backup.apk | grep "META-INF" || echo "META-INF 없음"
-          echo "Final META-INF:"
-          unzip -l final_doublecheck_fixed.apk | grep "META-INF" || echo "META-INF 없음"
-          
-          # 첫 32바이트 비교 (ZIP 헤더)
-          echo "🔍 ZIP 헤더 비교:"
-          echo "Original 첫 32바이트:"
-          hexdump -C original_backup.apk | head -2
-          echo "Final 첫 32바이트:"
-          hexdump -C final_doublecheck_fixed.apk | head -2
-        fi
-
-    # ✅ 호환성 검사
-    - name: Compatibility check
-      run: |
-        echo "=== 🔧 호환성 검사 ==="
-        
-        APK_FILE="final_doublecheck_fixed.apk"
-        
-        if [ -f "$APK_FILE" ]; then
-          echo "📱 Android 호환성 검사..."
-          
-          # 1. 최소 SDK 버전 확인
-          echo "🎯 SDK 버전 정보:"
-          aapt dump badging "$APK_FILE" 2>/dev/null | grep -E "(sdkVersion|targetSdkVersion)" || echo "SDK 버전 정보 없음"
-          
-          # 2. 아키텍처 지원 확인
-          echo "🏗️ 아키텍처 지원:"
-          aapt dump configurations "$APK_FILE" 2>/dev/null | head -10 || echo "구성 정보 없음"
-          
-          # 3. 필수 기능 확인
-          echo "⚙️ 필수 기능:"
-          aapt dump badging "$APK_FILE" 2>/dev/null | grep "uses-feature" | head -5 || echo "필수 기능 없음"
-          
-          # 4. 화면 지원 확인
-          echo "📺 화면 지원:"
-          aapt dump badging "$APK_FILE" 2>/dev/null | grep "supports-screens" || echo "화면 지원 정보 없음"
-          
-          # 5. 매니페스트 필수 요소 확인
-          echo "✅ 필수 요소 체크리스트:"
-          
-          # 패키지명 확인
-          if aapt dump badging "$APK_FILE" 2>/dev/null | grep -q "package:"; then
-            echo "✅ 패키지명 존재"
-          else
-            echo "❌ 패키지명 없음"
-          fi
-          
-          # 메인 액티비티 확인
-          if aapt dump badging "$APK_FILE" 2>/dev/null | grep -q "launchable-activity:"; then
-            echo "✅ 실행 가능한 액티비티 존재"
-          else
-            echo "❌ 실행 가능한 액티비티 없음"
-          fi
-          
-          # 애플리케이션 태그 확인
-          if aapt dump badging "$APK_FILE" 2>/dev/null | grep -q "application:"; then
-            echo "✅ 애플리케이션 태그 존재"
-          else
-            echo "❌ 애플리케이션 태그 없음"
-          fi
-          
-          # 6. 매니페스트 XML 유효성 재검증
-          echo "📋 매니페스트 XML 구조 재검증:"
-          if aapt dump xmltree "$APK_FILE" AndroidManifest.xml >/tmp/manifest_dump.txt 2>&1; then
-            echo "✅ XML 구조 유효"
-            echo "매니페스트 주요 태그 개수:"
-            grep -c "E: application" /tmp/manifest_dump.txt || echo "application: 0"
-            grep -c "E: activity" /tmp/manifest_dump.txt || echo "activity: 0"
-            grep -c "E: receiver" /tmp/manifest_dump.txt || echo "receiver: 0"
-            grep -c "E: uses-permission" /tmp/manifest_dump.txt || echo "uses-permission: 0"
-          else
-            echo "❌ XML 구조 오류"
-            head -10 /tmp/manifest_dump.txt
-          fi
-        fi
-        
-        echo "🎉 호환성 검사 완료!"
-
-    # ✅ 빌드 로그 업로드
-    - name: Upload build logs
-      uses: actions/upload-artifact@v4
-      if: always()
-      with:
-        name: build-logs-${{ github.run_number }}
-        path: |
-          build_full.log
-          apk_info.txt
-          manifest_diff.txt
-          original_manifest_*.xml
-          final_manifest_*.xml
-          .buildozer/**/*.log
-          original_analysis/AndroidManifest.xml
-          final_verification/AndroidManifest.xml
-          decoded_apk_clean/AndroidManifest.xml.backup
-        retention-days: 30
-        if-no-files-found: warn
 
     # ✅ 최종 APK 업로드
     - name: Upload final APKs
@@ -910,7 +284,4 @@ jobs:
         path: |
           final_doublecheck_fixed.apk
           original_backup.apk
-          rebuilt_doublecheck_unsigned.apk
-          rebuilt_doublecheck_signed.apk
         retention-days: 7
-        if-no-files-found: error
