@@ -569,7 +569,7 @@ jobs:
     
     # === 11단계: 아티팩트 업로드 ===
     - name: Upload modified APK
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: modified-apk
         path: |
