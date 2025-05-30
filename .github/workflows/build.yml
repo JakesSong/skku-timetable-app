@@ -1,70 +1,210 @@
-name: 🔧 Modify APK and Inject AlarmReceiver
+name: Build and Modify APK
 
 on:
   workflow_dispatch:
-    inputs:
-      apk_url:
-        description: 'APK 다운로드 URL'
-        required: true
-        default: 'https://example.com/app.apk'
-
-env:
-  ORIGINAL_APK: original_backup.apk
+  push:
+    branches: [ main ]
 
 jobs:
-  modify-apk:
+  build-and-modify:
     runs-on: ubuntu-latest
+    
     steps:
-    - name: Checkout code
+    - name: Checkout repository
       uses: actions/checkout@v4
+
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    - name: Setup Android SDK
+      uses: android-actions/setup-android@v3
+      with:
+        api-level: 33
+        build-tools: 34.0.0
 
     - name: Install dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y unzip openjdk-11-jdk wget
+        sudo apt-get install -y unzip zip openjdk-11-jdk wget xxd
+        
+        # Python dependencies
+        pip install buildozer cython kivy
+        
+        # Android tools
         wget https://raw.githubusercontent.com/iBotPeaches/Apktool/master/scripts/linux/apktool -O apktool
         wget https://bitbucket.org/iBotPeaches/apktool/downloads/apktool_2.9.3.jar -O apktool.jar
         chmod +x apktool
         sudo mv apktool apktool.jar /usr/local/bin/
 
-    - name: Download original APK
+    - name: Build original APK with buildozer
       run: |
-        wget "${{ github.event.inputs.apk_url }}" -O "$ORIGINAL_APK"
-
-    - name: Decode APK using apktool
-      run: |
-        apktool d "$ORIGINAL_APK" -o decoded_apk --force
-
-    - name: Inject AlarmReceiver into AndroidManifest.xml
-      run: |
-        sed -i '/<\/application>/i \
-        <receiver android:name="org.kivy.skkutimetable.doublecheck.AlarmReceiver" android:enabled="true" android:exported="true">\n            <intent-filter>\n                <action android:name="android.intent.action.BOOT_COMPLETED" />\n            </intent-filter>\n        </receiver>' decoded_apk/AndroidManifest.xml
-
-    - name: Rebuild APK
-      run: |
-        apktool b decoded_apk -o rebuilt.apk --force-all
-
-    - name: Remove existing signatures
-      run: |
-        zip -d rebuilt.apk META-INF/* || true
-
-    - name: Generate debug keystore if needed
-      run: |
-        if [ ! -f debug.keystore ]; then
-          keytool -genkey -v -keystore debug.keystore \
-            -alias androiddebugkey -keyalg RSA -keysize 2048 -validity 10000 \
-            -dname "CN=Android Debug,O=Android,C=US" \
-            -storepass android -keypass android
+        echo "=== Building original APK with buildozer ==="
+        
+        # buildozer.spec 파일 확인
+        if [ -f "buildozer.spec" ]; then
+          echo "Found buildozer.spec"
+          cat buildozer.spec | head -20
+        else
+          echo "No buildozer.spec found - creating basic one"
+          buildozer init
+        fi
+        
+        # Clean build
+        echo "Building APK..."
+        buildozer android debug
+        
+        # 빌드된 APK 찾기
+        BUILT_APK=$(find bin -name "*.apk" | head -1)
+        if [ -n "$BUILT_APK" ]; then
+          echo "APK built successfully: $BUILT_APK"
+          cp "$BUILT_APK" original_built.apk
+          echo "APK size: $(du -h original_built.apk | cut -f1)"
+        else
+          echo "APK build failed"
+          exit 1
         fi
 
-    - name: Sign APK
+    - name: Method 1 - aapt2 modification
       run: |
-        jarsigner -verbose -sigalg SHA256withRSA -digestalg SHA-256 \
-          -keystore debug.keystore -storepass android -keypass android \
-          rebuilt.apk androiddebugkey
+        echo "=== Modifying APK with aapt2 ==="
+        
+        if [ -f "original_built.apk" ]; then
+          mkdir -p aapt2_work
+          cd aapt2_work
+          
+          # APK 압축 해제
+          echo "Extracting APK..."
+          cp ../original_built.apk original.apk
+          unzip -q original.apk
+          
+          # 현재 매니페스트 분석
+          echo "Analyzing current manifest..."
+          if aapt dump xmltree original.apk AndroidManifest.xml > manifest_readable.xml 2>&1; then
+            echo "Current manifest structure:"
+            head -30 manifest_readable.xml
+            echo "Current receiver count: $(grep -c "receiver" manifest_readable.xml || echo "0")"
+          else
+            echo "Failed to read manifest"
+          fi
+          
+          # 바이너리 매니페스트 정보
+          echo "Binary manifest info:"
+          ls -la AndroidManifest.xml
+          echo "Hex dump (first 32 bytes):"
+          hexdump -C AndroidManifest.xml | head -2
+          
+          cd ..
+        else
+          echo "No APK to modify"
+        fi
 
-    - name: Upload APK
+    - name: Method 2 - apktool modification
+      run: |
+        echo "=== Modifying APK with apktool ==="
+        
+        if [ -f "original_built.apk" ]; then
+          mkdir -p apktool_work
+          cd apktool_work
+          
+          # apktool로 APK 디컴파일
+          echo "Decompiling APK with apktool..."
+          apktool d ../original_built.apk -o decoded_apk
+          
+          if [ -d "decoded_apk" ]; then
+            echo "APK decompiled successfully"
+            
+            # 매니페스트 확인
+            echo "Current AndroidManifest.xml:"
+            head -30 decoded_apk/AndroidManifest.xml
+            
+            # receiver 추가
+            echo "Adding AlarmReceiver to manifest..."
+            cp decoded_apk/AndroidManifest.xml decoded_apk/AndroidManifest.xml.backup
+            
+            # application 태그 종료 전에 receiver 추가
+            sed -i '/<\/application>/i\    <receiver android:name="org.kivy.skkutimetable.doublecheck.AlarmReceiver" android:enabled="true" android:exported="true">\
+        <intent-filter>\
+            <action android:name="android.intent.action.BOOT_COMPLETED" />\
+        </intent-filter>\
+    </receiver>' decoded_apk/AndroidManifest.xml
+            
+            echo "Modified manifest:"
+            grep -A 10 -B 5 "AlarmReceiver" decoded_apk/AndroidManifest.xml || echo "Receiver addition failed"
+            
+            # 리빌드
+            echo "Rebuilding APK..."
+            apktool b decoded_apk -o modified.apk
+            
+            if [ -f "modified.apk" ]; then
+              echo "APK rebuilt successfully"
+              echo "Modified APK size: $(du -h modified.apk | cut -f1)"
+              
+              # 서명
+              echo "Signing APK..."
+              # 디버그 키스토어 생성
+              keytool -genkey -v -keystore debug.keystore -alias androiddebugkey -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US" -storepass android -keypass android -noprompt
+              
+              jarsigner -verbose -sigalg SHA256withRSA -digestalg SHA-256 -keystore debug.keystore -storepass android -keypass android modified.apk androiddebugkey
+              
+              # zipalign (선택사항)
+              ZIPALIGN_PATH="$ANDROID_HOME/build-tools/34.0.0/zipalign"
+              if [ -f "$ZIPALIGN_PATH" ]; then
+                echo "Aligning APK..."
+                $ZIPALIGN_PATH -f -v 4 modified.apk final_modified.apk
+                echo "Final APK created: final_modified.apk"
+              else
+                cp modified.apk final_modified.apk
+              fi
+              
+              # 검증
+              if aapt dump badging final_modified.apk >/dev/null 2>&1; then
+                echo "Modified APK is valid"
+                echo "Package info:"
+                aapt dump badging final_modified.apk | head -5
+              else
+                echo "Modified APK validation failed"
+              fi
+              
+            else
+              echo "APK rebuild failed"
+            fi
+          else
+            echo "APK decompilation failed"
+          fi
+          
+          cd ..
+        else
+          echo "No APK to modify"
+        fi
+
+    - name: Compare results
+      run: |
+        echo "=== Comparing results ==="
+        
+        echo "Generated files:"
+        find . -name "*.apk" -exec ls -la {} \;
+        
+        echo ""
+        echo "Original APK:"
+        if [ -f "original_built.apk" ]; then
+          aapt dump badging original_built.apk | head -3 || echo "Cannot read original APK"
+        fi
+        
+        echo ""
+        echo "Modified APK:"
+        if [ -f "apktool_work/final_modified.apk" ]; then
+          aapt dump badging apktool_work/final_modified.apk | head -3 || echo "Cannot read modified APK"
+        fi
+
+    - name: Upload artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: alarmreceiver-injected-apk
-        path: rebuilt.apk
+        name: apk-build-results
+        path: |
+          original_built.apk
+          apktool_work/final_modified.apk
+          apktool_work/decoded_apk/AndroidManifest.xml
+          aapt2_work/manifest_readable.xml
+        retention-days: 7
