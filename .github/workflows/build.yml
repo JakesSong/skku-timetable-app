@@ -115,7 +115,29 @@ jobs:
         python -m pip install --upgrade pip
         pip install --upgrade setuptools wheel
         pip install Cython==0.29.33
-        pip install buildozer==1.4.0
+        pip install buildozer==1.3.0
+
+    # 🎯 여기에 디버그 코드들 추가!
+    - name: Check buildozer template processing
+      run: |
+        echo "=== 🔍 buildozer 템플릿 처리 과정 추적 ==="
+        buildozer android debug 2>&1 | grep -i "template\|manifest" || echo "템플릿 관련 로그 없음"
+    
+    - name: Check template file location and processing  
+      run: |
+        echo "=== 🔍 템플릿 파일 위치와 처리 확인 ==="
+        echo "현재 위치의 AndroidManifest.tmpl.xml:"
+        ls -la AndroidManifest.tmpl.xml || echo "없음"
+        echo ""
+        echo "buildozer가 템플릿을 어디서 찾는지 확인:"
+        find . -name "*.tmpl.xml" 2>/dev/null || echo "tmpl.xml 파일 없음"
+        echo ""
+        echo "buildozer 내부에서 템플릿 복사 흔적:"
+        find .buildozer -name "*tmpl*" 2>/dev/null || echo "buildozer 내부에 tmpl 흔적 없음"
+    
+    # 기존 빌드 단계
+    - name: Build APK with buildozer
+      run: buildozer android debug
 
     # ✅ 환경 변수 설정
     - name: Set environment variables
