@@ -161,6 +161,51 @@ jobs:
           cat xml/receivers.xml
         else
           echo "❌ xml/receivers.xml NOT found"
+          echo "🚨 CRITICAL: Creating xml/receivers.xml now!"
+          mkdir -p xml
+          cat > xml/receivers.xml << 'EOF'
+<receiver android:name="org.kivy.skkutimetable.doublecheck.AlarmReceiver"
+    android:enabled="true"
+    android:exported="true"
+    android:directBootAware="true">
+    
+    <!-- 부팅 완료시 알람 복원 -->
+    <intent-filter android:priority="1000">
+        <action android:name="android.intent.action.BOOT_COMPLETED" />
+        <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+        <action android:name="com.htc.intent.action.QUICKBOOT_POWERON" />
+        <category android:name="android.intent.category.DEFAULT" />
+    </intent-filter>
+    
+    <!-- 앱 업데이트시 알람 복원 -->
+    <intent-filter>
+        <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+        <action android:name="android.intent.action.PACKAGE_REPLACED" />
+        <data android:scheme="package" />
+    </intent-filter>
+    
+    <!-- 커스텀 알람 액션 -->
+    <intent-filter>
+        <action android:name="org.kivy.skkutimetable.doublecheck.ALARM_ACTION" />
+    </intent-filter>
+    
+    <!-- 일반 브로드캐스트 -->
+    <intent-filter>
+        <action android:name="android.intent.action.USER_PRESENT" />
+    </intent-filter>
+    
+</receiver>
+
+<!-- 🔥 AlarmService 등록 -->
+<service android:name="org.kivy.skkutimetable.doublecheck.AlarmService"
+    android:enabled="true"
+    android:exported="false"
+    android:foregroundServiceType="specialUse">
+</service>
+EOF
+          echo "✅ Created xml/receivers.xml with full AlarmReceiver configuration!"
+          echo "📄 Generated content:"
+          cat xml/receivers.xml
         fi
         
         echo -e "\n📁 Java source verification:"
@@ -170,6 +215,22 @@ jobs:
         else
           echo "❌ Java source directory NOT found"
         fi
+        
+        echo -e "\n🔧 Forcing buildozer.spec updates for PR #1519..."
+        # API 레벨 강제 업데이트
+        sed -i 's/android\.api = 31/android.api = 34/g' buildozer.spec || true
+        sed -i 's/android\.api=31/android.api=34/g' buildozer.spec || true
+        
+        # PR #1519 설정 강제 추가 (없으면)
+        if ! grep -q "android.extra_manifest_application_entry" buildozer.spec; then
+          echo "🔧 Adding PR #1519 setting to buildozer.spec..."
+          echo "" >> buildozer.spec
+          echo "# PR #1519: Extra manifest application entry" >> buildozer.spec
+          echo "android.extra_manifest_application_entry = %(source.dir)s/xml/receivers.xml" >> buildozer.spec
+        fi
+        
+        echo -e "\n📄 Updated buildozer.spec verification:"
+        grep -n "android.extra_manifest_application_entry\|android.api" buildozer.spec || echo "❌ Still not found"
 
     - name: Accept Android SDK licenses
       run: |
