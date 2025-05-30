@@ -94,7 +94,8 @@ jobs:
       run: |
         echo "🔧 === BUILDOZER DEBUG ==="
         echo "📋 Buildozer version and info:"
-        buildozer -v
+        buildozer version || echo "Buildozer version command not available"
+        pip show buildozer
         
         echo -e "\n📱 Android SDK packages:"
         $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager --list_installed
@@ -106,6 +107,9 @@ jobs:
         else
           echo "⚠️ First time build - skipping clean (python-for-android not yet downloaded)"
         fi
+        
+        echo -e "\n📋 Buildozer help (available commands):"
+        buildozer help || echo "Help command failed"
 
     - name: Debug project structure and files
       run: |
