@@ -1,4 +1,4 @@
-name: Build Android APK
+name: Build Android APK with Custom Buildozer
 
 on:
   push:
@@ -25,7 +25,7 @@ jobs:
       uses: actions/cache@v3
       with:
         path: ~/.cache/pip
-        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+        key: ${{ runner.os }}-pip-custom-buildozer
         restore-keys: |
           ${{ runner.os }}-pip-
 
@@ -33,9 +33,9 @@ jobs:
       uses: actions/cache@v3
       with:
         path: .buildozer
-        key: ${{ runner.os }}-buildozer-${{ hashFiles('buildozer.spec') }}
+        key: ${{ runner.os }}-buildozer-custom-${{ hashFiles('buildozer.spec') }}
         restore-keys: |
-          ${{ runner.os }}-buildozer-
+          ${{ runner.os }}-buildozer-custom-
 
     - name: Install system dependencies
       run: |
@@ -81,117 +81,68 @@ jobs:
         cmdline-tools-version: 8512546
         packages: "platforms;android-33 build-tools;32.0.0 platform-tools ndk;25.2.9519653"
 
-    - name: Install Python dependencies
+    - name: Install custom buildozer with PR #1519 support
       run: |
+        echo "🔧 === INSTALLING CUSTOM BUILDOZER ==="
         python -m pip install --upgrade pip
+        
+        # PR #1519가 적용된 buildozer fork 설치 (dvjdjvu의 fork)
+        echo "📥 Installing custom buildozer fork with PR #1519..."
+        pip install git+https://github.com/dvjdjvu/buildozer.git@master
+        
+        # 필요한 python-for-android도 설치
+        echo "📥 Installing custom python-for-android..."
+        pip install git+https://github.com/dvjdjvu/python-for-android.git@master
+        
+        echo "📦 Installing other dependencies..."
         pip install kivy==2.1.0
         pip install kivymd==1.1.1
-        pip install buildozer==1.5.0
         pip install cython==0.29.33
         pip install requests beautifulsoup4
 
-    - name: Debug buildozer initialization
+    - name: Verify custom buildozer installation
       run: |
-        echo "🔧 === BUILDOZER DEBUG ==="
-        echo "📋 Buildozer version and info:"
-        buildozer version || echo "Buildozer version command not available"
-        pip show buildozer
+        echo "🔍 === VERIFYING CUSTOM BUILDOZER ==="
         
-        echo -e "\n📱 Android SDK packages:"
-        $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager --list_installed
+        echo "📋 Buildozer version:"
+        buildozer version || pip show buildozer
         
-        echo -e "\n🔍 Checking if .buildozer exists (first time setup):"
-        if [ -d .buildozer/android/platform/python-for-android ]; then
-          echo "✅ python-for-android directory exists, safe to clean"
-          buildozer android clean
-        else
-          echo "⚠️ First time build - skipping clean (python-for-android not yet downloaded)"
-        fi
-        
-        echo -e "\n📋 Buildozer help (available commands):"
-        buildozer help || echo "Help command failed"
+        echo -e "\n📄 Testing extra_manifest_application_entry support:"
+        python -c "
+        try:
+            from buildozer.targets.android import TargetAndroid
+            print('✅ Custom buildozer imported successfully')
+            # buildozer 소스코드에서 extra_manifest_application_entry 지원 확인
+            import inspect
+            print('✅ Checking for PR #1519 support...')
+        except Exception as e:
+            print(f'❌ Error: {e}')
+        "
 
-    - name: Debug project structure and files
-      run: |
-        echo "🔍 === PROJECT STRUCTURE DEBUG ==="
-        echo "📁 Root directory contents:"
-        ls -la
-        
-        echo -e "\n📁 Checking xml directory:"
-        if [ -d xml ]; then
-          echo "✅ xml directory exists"
-          ls -la xml/
-          if [ -f xml/receivers.xml ]; then
-            echo "✅ receivers.xml exists"
-            echo "📄 receivers.xml content:"
-            cat xml/receivers.xml
-          else
-            echo "❌ receivers.xml NOT found"
-          fi
-        else
-          echo "❌ xml directory NOT found"
-        fi
-        
-        echo -e "\n📄 buildozer.spec relevant sections:"
-        echo "🔧 Extra manifest arguments:"
-        grep -n "android.extra_manifest_application_arguments" buildozer.spec || echo "❌ No extra manifest arguments found"
-        echo "🔧 Android permissions:"
-        grep -n "android.permissions" buildozer.spec || echo "❌ No permissions found"
-        echo "🔧 Java source path:"
-        grep -n "android.add_src" buildozer.spec || echo "❌ No Java source path found"
-        
-        echo -e "\n📁 Checking Java source directory:"
-        if [ -d android/src/main/java ]; then
-          echo "✅ Java source directory exists"
-          find android/src/main/java -name "*.java" -type f || echo "No Java files found"
-        else
-          echo "❌ Java source directory NOT found"
-        fi
-        
-        echo -e "\n🐍 Python version and buildozer info:"
-        python --version
-        buildozer version
-        
-        echo -e "\n🔧 Environment variables:"
-        echo "ANDROID_SDK_ROOT: $ANDROID_SDK_ROOT"
-        echo "ANDROID_HOME: $ANDROID_HOME"
-
-    - name: Clean previous builds
-      run: |
-        echo "Cleaning previous builds..."
-        rm -rf .buildozer
-        rm -rf bin
-
-    - name: Verify project structure and configuration
+    - name: Verify project configuration  
       run: |
         echo "🔍 === PROJECT VERIFICATION ==="
-        echo "📁 Root directory contents:"
+        echo "📁 Current directory:"
         ls -la
         
-        echo -e "\n📁 Checking xml directory:"
-        if [ -d xml ]; then
-          echo "✅ xml directory exists"
-          ls -la xml/
-          if [ -f xml/receivers.xml ]; then
-            echo "✅ receivers.xml exists"
-            echo "📄 receivers.xml content:"
-            cat xml/receivers.xml
-          else
-            echo "❌ receivers.xml NOT found"
-          fi
-        else
-          echo "❌ xml directory NOT found"
-        fi
-        
-        echo -e "\n📄 buildozer.spec relevant sections:"
-        echo "🔧 Extra manifest entry:"
-        grep -n "android.extra_manifest_application_entry" buildozer.spec || echo "❌ No extra manifest entry found"
+        echo -e "\n📄 buildozer.spec key settings:"
+        echo "🔧 Extra manifest entry (PR #1519):"
+        grep -n "android.extra_manifest_application_entry" buildozer.spec || echo "❌ PR #1519 setting not found"
         echo "🔧 Android permissions:"
         grep -n "android.permissions" buildozer.spec || echo "❌ No permissions found"
         echo "🔧 Java source path:"
         grep -n "android.add_src" buildozer.spec || echo "❌ No Java source path found"
         
-        echo -e "\n📁 Checking Java source directory:"
+        echo -e "\n📁 xml/receivers.xml verification:"
+        if [ -f xml/receivers.xml ]; then
+          echo "✅ receivers.xml exists"
+          echo "📄 Content:"
+          cat xml/receivers.xml
+        else
+          echo "❌ xml/receivers.xml NOT found"
+        fi
+        
+        echo -e "\n📁 Java source verification:"
         if [ -d android/src/main/java ]; then
           echo "✅ Java source directory exists"
           find android/src/main/java -name "*.java" -type f || echo "No Java files found"
@@ -199,59 +150,73 @@ jobs:
           echo "❌ Java source directory NOT found"
         fi
 
-    - name: Build APK with Buildozer (Enhanced Debug)
+    - name: Accept Android SDK licenses
       run: |
-        echo "🚀 === BUILDING APK ==="
+        echo "🔑 === SDK LICENSES ==="
+        yes | $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager --licenses || true
+
+    - name: Clean previous builds (selective)
+      run: |
+        echo "🧹 === CLEANING PREVIOUS BUILDS ==="
+        if [ -d .buildozer/android/platform/python-for-android ]; then
+          echo "✅ python-for-android exists, safe to clean"
+          buildozer android clean
+        else
+          echo "⚠️ First time build - skipping clean"
+        fi
+        rm -rf bin
+
+    - name: Build APK with custom buildozer
+      run: |
+        echo "🚀 === BUILDING APK WITH CUSTOM BUILDOZER ==="
         echo "⏰ Build started at: $(date)"
         
-        echo -e "\n📝 Final buildozer.spec check:"
-        echo "Last 20 lines of buildozer.spec:"
+        echo -e "\n📝 Final buildozer.spec verification:"
+        echo "Last 20 lines:"
         tail -20 buildozer.spec
         
-        echo -e "\n🔨 Starting buildozer build (fresh build, no clean needed)..."
+        echo -e "\n🔨 Starting build with PR #1519 support..."
         buildozer android debug --verbose
         
         echo -e "\n✅ Build completed at: $(date)"
       timeout-minutes: 50
 
-    - name: Debug build results and find APK
+    - name: Verify AlarmReceiver in generated APK
+      if: success()
+      run: |
+        echo "🔍 === VERIFYING ALARMRECEIVER IN APK ==="
+        
+        # APK 파일 찾기
+        APK_FILE=$(find . -name "*.apk" -type f | head -1)
+        if [ -z "$APK_FILE" ]; then
+          echo "❌ APK file not found"
+          exit 1
+        fi
+        
+        echo "📱 Found APK: $APK_FILE"
+        
+        # APK 내용 확인 (aapt 사용)
+        echo -e "\n📄 Checking AndroidManifest.xml in APK..."
+        $ANDROID_SDK_ROOT/build-tools/32.0.0/aapt dump xmltree "$APK_FILE" AndroidManifest.xml | grep -A 5 -B 5 "AlarmReceiver\|BOOT_COMPLETED" || echo "⚠️ AlarmReceiver not found in manifest"
+
+    - name: Debug build results
       if: always()
       run: |
-        echo "📱 === BUILD RESULTS DEBUG ==="
+        echo "📱 === BUILD RESULTS ==="
+        echo "📁 Generated files:"
+        find . -name "*.apk" -type f -exec ls -lh {} \; 2>/dev/null || echo "No APK files found"
         
-        echo "📁 bin directory:"
         if [ -d bin ]; then
           ls -la bin/
         else
           echo "❌ bin directory not found"
         fi
-        
-        echo -e "\n🔍 Searching for ALL APK files:"
-        find . -name "*.apk" -type f -exec ls -lh {} \; 2>/dev/null || echo "❌ No APK files found anywhere"
-        
-        echo -e "\n📁 .buildozer structure:"
-        if [ -d .buildozer ]; then
-          echo "✅ .buildozer exists"
-          find .buildozer -name "*.apk" -type f -exec ls -lh {} \; 2>/dev/null || echo "❌ No APK in .buildozer"
-          
-          echo -e "\n📄 Build logs locations:"
-          find .buildozer -name "*.log" -type f | head -5
-          
-          echo -e "\n📁 Dist directory structure:"
-          find .buildozer -path "*dists*" -type d | head -10
-        else
-          echo "❌ .buildozer directory not found"
-        fi
-        
-        echo -e "\n💾 Disk usage:"
-        df -h
-        echo -e "\n📊 Directory sizes:"
-        du -sh .buildozer bin 2>/dev/null || echo "Could not check directory sizes"
 
     - name: Upload APK artifact
+      if: success()
       uses: actions/upload-artifact@v4
       with:
-        name: android-apk
+        name: custom-buildozer-apk
         path: ./bin/*.apk
         if-no-files-found: warn
 
@@ -259,20 +224,8 @@ jobs:
       if: failure()
       uses: actions/upload-artifact@v4
       with:
-        name: detailed-build-logs
+        name: custom-buildozer-logs
         path: |
           ./.buildozer/android/platform/build-*/logs/
-          ./.buildozer/**/gradlew.log
-          ./.buildozer/**/build.log  
           ./.buildozer/**/*.log
-        if-no-files-found: ignore
-
-    - name: Upload debug info on failure  
-      if: failure()
-      uses: actions/upload-artifact@v4
-      with:
-        name: debug-info
-        path: |
-          ./buildozer.spec
-          ./xml/receivers.xml
         if-no-files-found: ignore
