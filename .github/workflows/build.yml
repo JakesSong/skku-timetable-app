@@ -61,8 +61,12 @@ jobs:
     - name: Set up Android SDK
       uses: android-actions/setup-android@v3
       with:
-        api-level: 33
-        build-tools-version: 32.0.0
+        cmdline-tools-version: 8512546
+        packages: |
+          platforms;android-33
+          build-tools;32.0.0
+          platform-tools
+          ndk;25.2.9519653
 
     - name: Install Python dependencies
       run: |
@@ -82,7 +86,7 @@ jobs:
     - name: Build APK with Buildozer
       run: |
         echo "Building APK with AlarmReceiver..."
-        buildozer android debug
+        buildozer android debug --verbose
 
     - name: Upload APK artifact
       uses: actions/upload-artifact@v4
