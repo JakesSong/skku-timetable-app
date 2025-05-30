@@ -231,14 +231,15 @@ jobs:
                 echo "📡 BroadcastReceiver 클래스 생성 준비..."
                 mkdir -p smali_out/org/kivy/skkutimetable/doublecheck
                 
-                # 간단한 AlarmReceiver smali 코드 생성
-                cat > smali_out/org/kivy/skkutimetable/doublecheck/AlarmReceiver.smali << 'SMALI_EOF'
+                # 간단한 AlarmReceiver smali 코드 생성 (파일로 직접 작성)
+                echo "🔧 AlarmReceiver.smali 파일 생성..."
+                cat > smali_out/org/kivy/skkutimetable/doublecheck/AlarmReceiver.smali <<'EOF'
 .class public Lorg/kivy/skkutimetable/doublecheck/AlarmReceiver;
 .super Landroid/content/BroadcastReceiver;
 
-.method public constructor init()V
+.method public constructor <init>()V
     .locals 0
-    invoke-direct {p0}, Landroid/content/BroadcastReceiver;->init()V
+    invoke-direct {p0}, Landroid/content/BroadcastReceiver;-><init>()V
     return-void
 .end method
 
@@ -249,7 +250,7 @@ jobs:
     invoke-static {v0, v1}, Landroid/util/Log;->d(Ljava/lang/String;Ljava/lang/String;)I
     return-void
 .end method
-SMALI_EOF
+EOF
                 
                 echo "✅ AlarmReceiver.smali 생성 완료"
                 
@@ -292,9 +293,9 @@ SMALI_EOF
           # 1. 원본 APK 복사
           cp "../$ORIGINAL_APK" base.apk
           
-          # 2. 간단한 매니페스트 생성 (텍스트)
+          # 2. 간단한 매니페스트 생성 (파일로 직접 작성)
           echo "📝 수정된 매니페스트 생성..."
-          cat > AndroidManifest_text.xml << 'MANIFEST_EOF'
+          cat > AndroidManifest_text.xml <<'EOF'
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="org.kivy.skkutimetable.doublecheck"
@@ -330,7 +331,7 @@ SMALI_EOF
         
     </application>
 </manifest>
-MANIFEST_EOF
+EOF
           
           # 3. aapt를 사용해서 텍스트 매니페스트를 바이너리로 변환
           echo "🔄 텍스트 매니페스트 → 바이너리 변환..."
