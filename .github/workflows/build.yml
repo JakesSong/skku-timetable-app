@@ -314,12 +314,10 @@ jobs:
             # 더 간단한 리소스 구조
             rm -rf temp_res
             mkdir -p temp_res/values
-            cat > temp_res/values/strings.xml << 'XMLEOF'
-<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <string name="app_name">DoubleCheck</string>
-</resources>
-XMLEOF
+            echo '<?xml version="1.0" encoding="utf-8"?>' > temp_res/values/strings.xml
+            echo '<resources>' >> temp_res/values/strings.xml
+            echo '    <string name="app_name">DoubleCheck</string>' >> temp_res/values/strings.xml
+            echo '</resources>' >> temp_res/values/strings.xml
             
             aapt package -f \
               -M "$(pwd)/new_manifest_text.xml" \
