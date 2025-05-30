@@ -25,7 +25,7 @@ android.extra_manifest_application_entry = %(source.dir)s/xml/receivers.xml
 
 # 🔥 Java 소스 경로 (AlarmReceiver.java 포함하기 위해 필요!)
 android.add_src = android/src/main/java
-android.api = 33
+android.api = 34
 android.minapi = 21
 android.sdk = 33
 android.ndk = 25b
