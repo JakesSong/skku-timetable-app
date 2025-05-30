@@ -231,26 +231,26 @@ jobs:
                 echo "📡 BroadcastReceiver 클래스 생성 준비..."
                 mkdir -p smali_out/org/kivy/skkutimetable/doublecheck
                 
-                # 간단한 AlarmReceiver smali 코드 생성 (파일로 직접 작성)
+                # 간단한 AlarmReceiver smali 코드 생성 (echo 방식)
                 echo "🔧 AlarmReceiver.smali 파일 생성..."
-                cat > smali_out/org/kivy/skkutimetable/doublecheck/AlarmReceiver.smali <<'EOF'
-.class public Lorg/kivy/skkutimetable/doublecheck/AlarmReceiver;
-.super Landroid/content/BroadcastReceiver;
-
-.method public constructor <init>()V
-    .locals 0
-    invoke-direct {p0}, Landroid/content/BroadcastReceiver;-><init>()V
-    return-void
-.end method
-
-.method public onReceive(Landroid/content/Context;Landroid/content/Intent;)V
-    .locals 2
-    const-string v0, "AlarmReceiver"
-    const-string v1, "Boot completed - alarm restore needed"
-    invoke-static {v0, v1}, Landroid/util/Log;->d(Ljava/lang/String;Ljava/lang/String;)I
-    return-void
-.end method
-EOF
+                {
+                  echo '.class public Lorg/kivy/skkutimetable/doublecheck/AlarmReceiver;'
+                  echo '.super Landroid/content/BroadcastReceiver;'
+                  echo ''
+                  echo '.method public constructor <init>()V'
+                  echo '    .locals 0'
+                  echo '    invoke-direct {p0}, Landroid/content/BroadcastReceiver;-><init>()V'
+                  echo '    return-void'
+                  echo '.end method'
+                  echo ''
+                  echo '.method public onReceive(Landroid/content/Context;Landroid/content/Intent;)V'
+                  echo '    .locals 2'
+                  echo '    const-string v0, "AlarmReceiver"'
+                  echo '    const-string v1, "Boot completed - alarm restore needed"'
+                  echo '    invoke-static {v0, v1}, Landroid/util/Log;->d(Ljava/lang/String;Ljava/lang/String;)I'
+                  echo '    return-void'
+                  echo '.end method'
+                } > smali_out/org/kivy/skkutimetable/doublecheck/AlarmReceiver.smali
                 
                 echo "✅ AlarmReceiver.smali 생성 완료"
                 
