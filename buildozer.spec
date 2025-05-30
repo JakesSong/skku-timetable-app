@@ -20,6 +20,7 @@ android.wakelock = True
 
 # 🔥 중요: 권한 순서 정리 및 추가
 android.permissions = INTERNET,WRITE_EXTERNAL_STORAGE,READ_EXTERNAL_STORAGE,SCHEDULE_EXACT_ALARM,USE_EXACT_ALARM,VIBRATE,WAKE_LOCK,RECEIVE_BOOT_COMPLETED,FOREGROUND_SERVICE,POST_NOTIFICATIONS,ACCESS_NOTIFICATION_POLICY
+android.extra_manifest_application_arguments
 
 # 🔥 핵심 변경: AndroidManifest.tmpl.xml 사용 (더 확실한 방법)
 android.manifest_template = AndroidManifest.tmpl.xml
