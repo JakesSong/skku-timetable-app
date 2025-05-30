@@ -198,40 +198,28 @@ jobs:
         else
           echo "❌ 템플릿 없음 - 원본 기반으로 처리"
           
-          # 간단한 텍스트 매니페스트 생성 (최소한만)
-          cat > new_manifest_text.xml << 'EOF'
-<?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="org.kivy.skkutimetable.doublecheck"
-    android:versionCode="1"
-    android:versionName="0.1">
-    
-    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
-    <uses-permission android:name="android.permission.WAKE_LOCK" />
-    <uses-permission android:name="android.permission.VIBRATE" />
-    <uses-permission android:name="android.permission.INTERNET" />
-    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
-    
-    <application android:label="DoubleCheck">
-        <activity android:name="org.kivy.android.PythonActivity"
-                  android:label="DoubleCheck"
-                  android:exported="true">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-        </activity>
-        
-        <receiver android:name="org.kivy.skkutimetable.doublecheck.AlarmReceiver" 
-                  android:enabled="true" 
-                  android:exported="true">
-            <intent-filter>
-                <action android:name="android.intent.action.BOOT_COMPLETED" />
-            </intent-filter>
-        </receiver>
-    </application>
-</manifest>
-EOF
+          # echo로 기본 매니페스트 생성
+          echo '<?xml version="1.0" encoding="utf-8"?>' > new_manifest_text.xml
+          echo '<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="org.kivy.skkutimetable.doublecheck" android:versionCode="1" android:versionName="0.1">' >> new_manifest_text.xml
+          echo '  <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />' >> new_manifest_text.xml
+          echo '  <uses-permission android:name="android.permission.WAKE_LOCK" />' >> new_manifest_text.xml
+          echo '  <uses-permission android:name="android.permission.VIBRATE" />' >> new_manifest_text.xml
+          echo '  <uses-permission android:name="android.permission.INTERNET" />' >> new_manifest_text.xml
+          echo '  <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />' >> new_manifest_text.xml
+          echo '  <application android:label="DoubleCheck">' >> new_manifest_text.xml
+          echo '    <activity android:name="org.kivy.android.PythonActivity" android:label="DoubleCheck" android:exported="true">' >> new_manifest_text.xml
+          echo '      <intent-filter>' >> new_manifest_text.xml
+          echo '        <action android:name="android.intent.action.MAIN" />' >> new_manifest_text.xml
+          echo '        <category android:name="android.intent.category.LAUNCHER" />' >> new_manifest_text.xml
+          echo '      </intent-filter>' >> new_manifest_text.xml
+          echo '    </activity>' >> new_manifest_text.xml
+          echo '    <receiver android:name="org.kivy.skkutimetable.doublecheck.AlarmReceiver" android:enabled="true" android:exported="true">' >> new_manifest_text.xml
+          echo '      <intent-filter>' >> new_manifest_text.xml
+          echo '        <action android:name="android.intent.action.BOOT_COMPLETED" />' >> new_manifest_text.xml
+          echo '      </intent-filter>' >> new_manifest_text.xml
+          echo '    </receiver>' >> new_manifest_text.xml
+          echo '  </application>' >> new_manifest_text.xml
+          echo '</manifest>' >> new_manifest_text.xml
           echo "📄 기본 매니페스트 생성 완료"
         fi
         
