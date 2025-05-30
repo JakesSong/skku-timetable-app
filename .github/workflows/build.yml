@@ -175,23 +175,53 @@ jobs:
         echo "📄 현재 매니페스트 분석..."
         if aapt dump xmltree original.apk AndroidManifest.xml > current_manifest.txt 2>&1; then
           echo "현재 receiver 개수: $(grep -c "receiver" current_manifest.txt || echo "0")"
+          grep -c "receiver" current_manifest.txt || echo "0"
         fi
         
-        # 새 매니페스트 생성 (간단한 방식)
+        # 매니페스트 파일 생성 및 디버깅
         echo "Creating new manifest..."
         
-        # 1. 기존 템플릿 복사
+        # 1. 현재 상황 점검
+        echo "🔍 현재 디렉토리: $(pwd)"
+        echo "📁 현재 파일들:"
+        ls -la
+        
+        # 2. 매니페스트 파일 생성
         if [ -f "../AndroidManifest.tmpl.xml" ]; then
-          echo "Found template file"
+          echo "✅ 템플릿 파일 발견"
           cp "../AndroidManifest.tmpl.xml" new_manifest.xml
-        else
-          echo "No template, using original"
+        elif [ -f "AndroidManifest.xml" ]; then
+          echo "✅ 원본 매니페스트 사용"
           cp AndroidManifest.xml new_manifest.xml
+        else
+          echo "❌ 매니페스트 파일을 찾을 수 없음"
+          echo "📁 가능한 파일들:"
+          find . -name "*manifest*" -o -name "*Manifest*" 2>/dev/null
+          exit 1
         fi
         
-        # 2. receiver 추가 (간단한 sed)
+        # 3. 파일 생성 확인
+        if [ ! -f "new_manifest.xml" ]; then
+          echo "❌ new_manifest.xml 생성 실패"
+          exit 1
+        fi
+        
+        echo "✅ 매니페스트 파일 준비됨: $(wc -l < new_manifest.xml) 줄"
+        
+        # 4. receiver 추가
         echo "Adding receiver..."
         sed -i 's|</application>|    <receiver android:name="org.kivy.skkutimetable.doublecheck.AlarmReceiver" android:enabled="true" android:exported="true"><intent-filter><action android:name="android.intent.action.BOOT_COMPLETED" /></intent-filter></receiver></application>|' new_manifest.xml
+        
+        # 5. 수정 결과 확인
+        echo "📄 수정된 매니페스트 확인:"
+        echo "파일 크기: $(wc -l < new_manifest.xml) 줄"
+        echo "receiver 개수: $(grep -c "receiver" new_manifest.xml || echo "0")"
+        
+        # 6. 매니페스트 파일 존재 재확인
+        if [ ! -f "new_manifest.xml" ]; then
+          echo "❌ 수정 후 new_manifest.xml이 사라짐"
+          exit 1
+        fi
         
         echo "New manifest created"
         
@@ -204,9 +234,34 @@ jobs:
           cp -r res/* temp_res/ 2>/dev/null || true
         fi
         
-        # aapt로 새 APK 생성
+        # 7. aapt 명령어에서 절대 경로 사용
         echo "Creating new APK with aapt..."
-        aapt package -f -M new_manifest.xml -S temp_res -I "$ANDROID_HOME/platforms/android-33/android.jar" -F new.apk
+        MANIFEST_PATH="$(pwd)/new_manifest.xml"
+        RESOURCES_PATH="$(pwd)/temp_res"
+        OUTPUT_PATH="$(pwd)/new.apk"
+        
+        echo "📍 사용할 경로들:"
+        echo "  매니페스트: $MANIFEST_PATH"
+        echo "  리소스: $RESOURCES_PATH"  
+        echo "  출력: $OUTPUT_PATH"
+        
+        # 8. 파일 존재 확인
+        if [ ! -f "$MANIFEST_PATH" ]; then
+          echo "❌ 매니페스트 파일 없음: $MANIFEST_PATH"
+          exit 1
+        fi
+        
+        if [ ! -d "$RESOURCES_PATH" ]; then
+          echo "❌ 리소스 디렉토리 없음: $RESOURCES_PATH"
+          exit 1
+        fi
+        
+        # 9. aapt 실행
+        aapt package -f \
+          -M "$MANIFEST_PATH" \
+          -S "$RESOURCES_PATH" \
+          -I "$ANDROID_HOME/platforms/android-33/android.jar" \
+          -F "$OUTPUT_PATH"
         
         if [ -f "new.apk" ]; then
           echo "New APK created successfully"
