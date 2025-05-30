@@ -42,7 +42,7 @@ jobs:
           xz-utils tk-dev libxml2-dev libxmlsec1-dev liblzma-dev \
           libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev \
           libportmidi-dev libswscale-dev libavformat-dev libavcodec-dev \
-          libfreetype6-dev libpng-dev libjpeg-dev aapt
+          libfreetype6-dev libpng-dev libjpeg-dev aapt libxml2-utils
 
     # ✅ 파이썬 의존성 설치
     - name: Install Python dependencies
@@ -159,8 +159,8 @@ jobs:
           exit 1
         fi
 
-    # ✅ APK 수정 (ZIP 방식으로 직접 교체 - aapt 포기!)
-    - name: Modify APK with direct ZIP method (bypass aapt)
+    # ✅ APK 수정 (ZIP 방식으로 직접 교체 - 완전 디버깅!)
+    - name: Modify APK with complete debugging
       run: |
         echo "=== 🔧 APK 수정 (ZIP 직접 방식으로 AlarmReceiver 추가) ==="
         
@@ -256,43 +256,97 @@ jobs:
         
         echo "📄 수정된 매니페스트 receiver 개수: $(grep -c "AlarmReceiver" new_manifest_text.xml || echo "0")"
         
-        # 5. 텍스트 매니페스트를 바이너리로 변환
+        # 5. 완전한 aapt 디버깅!
         echo "🔄 바이너리 매니페스트 생성 중..."
         
-        # 파일 존재 확인
-        echo "📋 현재 상황 확인:"
+        # aapt 명령어 완전 디버깅
+        echo "🔧 aapt 명령어 실행 전 최종 확인..."
         echo "  작업 디렉토리: $(pwd)"
-        echo "  new_manifest_text.xml 존재: $([ -f new_manifest_text.xml ] && echo "✅" || echo "❌")"
-        echo "  매니페스트 크기: $(wc -l < new_manifest_text.xml) 줄"
-        echo "  매니페스트 첫 5줄:"
-        head -5 new_manifest_text.xml
+        echo "  매니페스트 파일 절대경로: $(realpath new_manifest_text.xml)"
+        echo "  매니페스트 파일 존재: $([ -f new_manifest_text.xml ] && echo "✅" || echo "❌")"
+        echo "  android.jar 절대경로: $(realpath $ANDROID_HOME/platforms/android-33/android.jar)"
+        echo "  android.jar 존재: $([ -f "$ANDROID_HOME/platforms/android-33/android.jar" ] && echo "✅" || echo "❌")"
+
+        # 매니페스트 XML 문법 검사
+        echo "🔍 XML 문법 검사..."
+        if xmllint --noout new_manifest_text.xml 2>/dev/null; then
+          echo "✅ XML 문법 정상"
+        else
+          echo "❌ XML 문법 오류 - xmllint 결과:"
+          xmllint --noout new_manifest_text.xml 2>&1 || true
+        fi
+
+        # aapt 버전 확인
+        echo "📋 aapt 정보:"
+        aapt version
+
+        # 단계별 aapt 실행
+        echo "🚀 aapt 실행 시도 1: 기본 명령어"
         
         # 임시 APK 생성 (매니페스트만)
         mkdir -p temp_res/values
         echo '<?xml version="1.0" encoding="utf-8"?><resources><string name="app_name">DoubleCheck</string></resources>' > temp_res/values/strings.xml
+        echo "  리소스 디렉토리 절대경로: $(realpath temp_res)"
         
-        echo "📋 리소스 확인:"
-        echo "  temp_res 디렉토리: $([ -d temp_res ] && echo "✅" || echo "❌")"
-        echo "  strings.xml 존재: $([ -f temp_res/values/strings.xml ] && echo "✅" || echo "❌")"
-        
-        echo "🔧 aapt 명령어 실행 중..."
-        echo "  매니페스트: $(pwd)/new_manifest_text.xml"
-        echo "  리소스: $(pwd)/temp_res"
-        echo "  android.jar: $ANDROID_HOME/platforms/android-33/android.jar"
-        echo "  출력: $(pwd)/temp_with_manifest.apk"
-        
-        # aapt 명령어 상세 실행
         aapt package -f \
-          -M "$(pwd)/new_manifest_text.xml" \
-          -S "$(pwd)/temp_res" \
+          -M new_manifest_text.xml \
+          -S temp_res \
           -I "$ANDROID_HOME/platforms/android-33/android.jar" \
-          -F "$(pwd)/temp_with_manifest.apk" \
-          --debug-mode
+          -F temp_with_manifest.apk 2>&1 | tee aapt_output.log
+
+        RESULT1=$?
+        echo "결과 코드: $RESULT1"
+
+        if [ $RESULT1 -ne 0 ]; then
+          echo "🚀 aapt 실행 시도 2: 절대경로 사용"
+          aapt package -f \
+            -M "$(pwd)/new_manifest_text.xml" \
+            -S "$(pwd)/temp_res" \
+            -I "$ANDROID_HOME/platforms/android-33/android.jar" \
+            -F "$(pwd)/temp_with_manifest.apk" 2>&1 | tee aapt_output2.log
+          
+          RESULT2=$?
+          echo "결과 코드: $RESULT2"
+          
+          if [ $RESULT2 -ne 0 ]; then
+            echo "🚀 aapt 실행 시도 3: 최소 리소스로"
+            
+            # 더 간단한 리소스 구조
+            rm -rf temp_res
+            mkdir -p temp_res/values
+            cat > temp_res/values/strings.xml << 'XMLEOF'
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">DoubleCheck</string>
+</resources>
+XMLEOF
+            
+            aapt package -f \
+              -M "$(pwd)/new_manifest_text.xml" \
+              -S "$(pwd)/temp_res" \
+              -I "$ANDROID_HOME/platforms/android-33/android.jar" \
+              -F "$(pwd)/temp_with_manifest.apk" \
+              --debug-mode \
+              -v 2>&1 | tee aapt_output3.log
+            
+            RESULT3=$?
+            echo "결과 코드: $RESULT3"
+          fi
+        fi
+
+        echo "📄 aapt 출력 로그들:"
+        echo "=== aapt_output.log ==="
+        cat aapt_output.log 2>/dev/null || echo "로그 없음"
+        echo "=== aapt_output2.log ==="  
+        cat aapt_output2.log 2>/dev/null || echo "로그 없음"
+        echo "=== aapt_output3.log ==="
+        cat aapt_output3.log 2>/dev/null || echo "로그 없음"
+
+        echo "📁 현재 디렉토리 최종 상태:"
+        ls -la
         
-        APK_RESULT=$?
-        echo "aapt 실행 결과 코드: $APK_RESULT"
-        
-        if [ $APK_RESULT -eq 0 ] && [ -f "temp_with_manifest.apk" ]; then
+        # 성공한 경우 계속 진행
+        if [ -f "temp_with_manifest.apk" ]; then
           echo "✅ 임시 APK 생성 성공"
           
           # 새 바이너리 매니페스트 추출
@@ -337,11 +391,7 @@ jobs:
             exit 1
           fi
         else
-          echo "❌ aapt 실행 실패"
-          echo "현재 디렉토리 파일들:"
-          ls -la
-          echo "temp_res 내용:"
-          find temp_res -type f
+          echo "❌ 모든 aapt 시도 실패"
           exit 1
         fi
         
