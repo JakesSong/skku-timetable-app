@@ -1,4 +1,4 @@
-name: APK Modification Methods
+name: APK Modification Test
 
 on:
   workflow_dispatch:
@@ -6,13 +6,10 @@ on:
       apk_url:
         description: 'APK Download URL'
         required: true
-        default: 'https://github.com/user/repo/releases/download/v1.0/app.apk'
-
-env:
-  ORIGINAL_APK: original_backup.apk
+        default: 'https://example.com/app.apk'
 
 jobs:
-  modify-apk:
+  test-apk-modification:
     runs-on: ubuntu-latest
     
     steps:
@@ -23,372 +20,34 @@ jobs:
       uses: android-actions/setup-android@v3
       with:
         api-level: 33
-        build-tools: 34.0.0
 
-    - name: Install tools
+    - name: Install basic tools
       run: |
         sudo apt-get update
-        sudo apt-get install -y unzip zip openjdk-11-jdk wget curl xxd
-        
-        # apktool 설치
-        wget https://raw.githubusercontent.com/iBotPeaches/Apktool/master/scripts/linux/apktool -O apktool
-        wget https://bitbucket.org/iBotPeaches/apktool/downloads/apktool_2.9.3.jar -O apktool.jar
-        chmod +x apktool
-        sudo mv apktool apktool.jar /usr/local/bin/
+        sudo apt-get install -y unzip zip wget
 
-    - name: Download APK
+    - name: Download and analyze APK
       run: |
         echo "Downloading APK..."
-        wget "${{ github.event.inputs.apk_url }}" -O "$ORIGINAL_APK"
+        wget "${{ github.event.inputs.apk_url }}" -O original.apk
         
-        if [ -f "$ORIGINAL_APK" ]; then
-          echo "APK downloaded successfully"
-          echo "File size: $(du -h $ORIGINAL_APK | cut -f1)"
-        else
-          echo "APK download failed"
-          exit 1
-        fi
-
-    - name: Method 1 - aapt2 analysis
-      run: |
-        echo "=== Method 1: aapt2 analysis ==="
+        echo "APK info:"
+        ls -la original.apk
+        file original.apk
         
-        mkdir -p aapt2_work
-        cd aapt2_work
+        echo "Extracting APK..."
+        unzip -l original.apk | head -20
         
-        # APK 파일 추출
-        cp "../$ORIGINAL_APK" original.apk
-        unzip -q original.apk
-        
-        echo "APK files extracted"
-        ls -la | head -10
-        
-        # 매니페스트 분석
-        if aapt dump xmltree original.apk AndroidManifest.xml > manifest_readable.xml 2>&1; then
-          echo "Manifest extracted successfully"
-          echo "Current receiver count: $(grep -c "receiver" manifest_readable.xml || echo "0")"
-        else
-          echo "Manifest extraction failed"
-        fi
-        
-        # 바이너리 매니페스트 분석
-        echo "Manifest file info:"
+        echo "Manifest check..."
+        unzip -j original.apk AndroidManifest.xml
         ls -la AndroidManifest.xml
-        echo "Manifest hex dump (first 64 bytes):"
-        hexdump -C AndroidManifest.xml | head -4
         
-        cd ..
-
-    - name: Method 2 - Binary hex analysis
-      run: |
-        echo "=== Method 2: Binary hex analysis ==="
-        
-        mkdir -p hex_work
-        cd hex_work
-        
-        # 매니페스트 추출
-        unzip -j "../$ORIGINAL_APK" AndroidManifest.xml
-        
-        if [ -f "AndroidManifest.xml" ]; then
-          echo "Manifest extracted"
-          echo "Size: $(wc -c < AndroidManifest.xml) bytes"
-          echo "File type: $(file AndroidManifest.xml)"
-          
-          # 문자열 검색
-          echo "Searching for strings:"
-          strings AndroidManifest.xml | grep -E "(receiver|activity|AlarmReceiver)" | head -10 || echo "No relevant strings found"
-          
-          # receiver 패턴 검색
-          echo "Searching for receiver patterns:"
-          xxd AndroidManifest.xml | grep -i "receiver" || echo "No receiver binary patterns found"
-          
-          # 백업
-          cp AndroidManifest.xml AndroidManifest.xml.backup
-          echo "Manifest backup created"
-        else
-          echo "Manifest extraction failed"
-        fi
-        
-        cd ..
-
-    - name: Method 3 - baksmali DEX modification
-      run: |
-        echo "=== Method 3: baksmali DEX modification ==="
-        
-        # baksmali/smali 도구 다운로드
-        echo "Downloading baksmali/smali tools..."
-        wget -q https://bitbucket.org/JesusFreke/smali/downloads/baksmali-2.5.2.jar -O baksmali.jar
-        wget -q https://bitbucket.org/JesusFreke/smali/downloads/smali-2.5.2.jar -O smali.jar
-        
-        if [ -f "baksmali.jar" ] && [ -f "smali.jar" ]; then
-          echo "Tools downloaded successfully"
-          
-          mkdir -p dex_work
-          cd dex_work
-          
-          # classes.dex 추출
-          unzip -j "../$ORIGINAL_APK" "classes*.dex"
-          
-          if [ -f "classes.dex" ]; then
-            echo "classes.dex extracted"
-            echo "DEX file size: $(du -h classes.dex | cut -f1)"
-            
-            # DEX 디컴파일
-            echo "Decompiling DEX to smali..."
-            java -jar ../baksmali.jar disassemble classes.dex -o smali_out
-            
-            if [ -d "smali_out" ]; then
-              echo "Smali decompilation successful"
-              echo "Generated smali files: $(find smali_out -name "*.smali" | wc -l)"
-              
-              # PythonActivity 찾기
-              echo "Finding PythonActivity files:"
-              find smali_out -name "*Activity*.smali" | head -5
-              
-              # AlarmReceiver 클래스 생성 준비
-              echo "Creating AlarmReceiver class..."
-              mkdir -p smali_out/org/kivy/skkutimetable/doublecheck
-              
-              # smali 파일 생성 (echo 방식)
-              echo "Generating AlarmReceiver.smali..."
-              echo '.class public Lorg/kivy/skkutimetable/doublecheck/AlarmReceiver;' > smali_out/org/kivy/skkutimetable/doublecheck/AlarmReceiver.smali
-              echo '.super Landroid/content/BroadcastReceiver;' >> smali_out/org/kivy/skkutimetable/doublecheck/AlarmReceiver.smali
-              echo '' >> smali_out/org/kivy/skkutimetable/doublecheck/AlarmReceiver.smali
-              echo '.method public constructor <init>()V' >> smali_out/org/kivy/skkutimetable/doublecheck/AlarmReceiver.smali
-              echo '    .locals 0' >> smali_out/org/kivy/skkutimetable/doublecheck/AlarmReceiver.smali
-              echo '    invoke-direct {p0}, Landroid/content/BroadcastReceiver;-><init>()V' >> smali_out/org/kivy/skkutimetable/doublecheck/AlarmReceiver.smali
-              echo '    return-void' >> smali_out/org/kivy/skkutimetable/doublecheck/AlarmReceiver.smali
-              echo '.end method' >> smali_out/org/kivy/skkutimetable/doublecheck/AlarmReceiver.smali
-              echo '' >> smali_out/org/kivy/skkutimetable/doublecheck/AlarmReceiver.smali
-              echo '.method public onReceive(Landroid/content/Context;Landroid/content/Intent;)V' >> smali_out/org/kivy/skkutimetable/doublecheck/AlarmReceiver.smali
-              echo '    .locals 2' >> smali_out/org/kivy/skkutimetable/doublecheck/AlarmReceiver.smali
-              echo '    const-string v0, "AlarmReceiver"' >> smali_out/org/kivy/skkutimetable/doublecheck/AlarmReceiver.smali
-              echo '    const-string v1, "Boot completed - alarm restore needed"' >> smali_out/org/kivy/skkutimetable/doublecheck/AlarmReceiver.smali
-              echo '    invoke-static {v0, v1}, Landroid/util/Log;->d(Ljava/lang/String;Ljava/lang/String;)I' >> smali_out/org/kivy/skkutimetable/doublecheck/AlarmReceiver.smali
-              echo '    return-void' >> smali_out/org/kivy/skkutimetable/doublecheck/AlarmReceiver.smali
-              echo '.end method' >> smali_out/org/kivy/skkutimetable/doublecheck/AlarmReceiver.smali
-              
-              echo "AlarmReceiver.smali created"
-              
-              # smali 재컴파일
-              echo "Recompiling smali to DEX..."
-              java -jar ../smali.jar assemble smali_out -o classes_modified.dex
-              
-              if [ -f "classes_modified.dex" ]; then
-                echo "DEX recompilation successful"
-                echo "Modified DEX size: $(du -h classes_modified.dex | cut -f1)"
-              else
-                echo "DEX recompilation failed"
-              fi
-            else
-              echo "Smali decompilation failed"
-            fi
-          else
-            echo "classes.dex extraction failed"
-          fi
-          
-          cd ..
-        else
-          echo "Tools download failed"
-        fi
-
-    - name: Method 4 - APK synthesis
-      run: |
-        echo "=== Method 4: APK synthesis ==="
-        
-        mkdir -p synthesis_work
-        cd synthesis_work
-        
-        # 원본 APK 복사
-        cp "../$ORIGINAL_APK" base.apk
-        
-        # 매니페스트 생성 (echo 방식)
-        echo "Creating modified manifest..."
-        echo '<?xml version="1.0" encoding="utf-8"?>' > AndroidManifest_text.xml
-        echo '<manifest xmlns:android="http://schemas.android.com/apk/res/android"' >> AndroidManifest_text.xml
-        echo '    package="org.kivy.skkutimetable.doublecheck"' >> AndroidManifest_text.xml
-        echo '    android:versionCode="10211"' >> AndroidManifest_text.xml
-        echo '    android:versionName="0.1">' >> AndroidManifest_text.xml
-        echo '    ' >> AndroidManifest_text.xml
-        echo '    <uses-permission android:name="android.permission.INTERNET" />' >> AndroidManifest_text.xml
-        echo '    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />' >> AndroidManifest_text.xml
-        echo '    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />' >> AndroidManifest_text.xml
-        echo '    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />' >> AndroidManifest_text.xml
-        echo '    <uses-permission android:name="android.permission.WAKE_LOCK" />' >> AndroidManifest_text.xml
-        echo '    <uses-permission android:name="android.permission.VIBRATE" />' >> AndroidManifest_text.xml
-        echo '    ' >> AndroidManifest_text.xml
-        echo '    <application android:label="DoubleCheck" android:icon="@mipmap/icon">' >> AndroidManifest_text.xml
-        echo '        <activity android:name="org.kivy.android.PythonActivity"' >> AndroidManifest_text.xml
-        echo '                  android:label="DoubleCheck"' >> AndroidManifest_text.xml
-        echo '                  android:exported="true">' >> AndroidManifest_text.xml
-        echo '            <intent-filter>' >> AndroidManifest_text.xml
-        echo '                <action android:name="android.intent.action.MAIN" />' >> AndroidManifest_text.xml
-        echo '                <category android:name="android.intent.category.LAUNCHER" />' >> AndroidManifest_text.xml
-        echo '            </intent-filter>' >> AndroidManifest_text.xml
-        echo '        </activity>' >> AndroidManifest_text.xml
-        echo '        ' >> AndroidManifest_text.xml
-        echo '        <service android:name="org.kivy.android.PythonService" android:process=":pythonservice" />' >> AndroidManifest_text.xml
-        echo '        ' >> AndroidManifest_text.xml
-        echo '        <receiver android:name="org.kivy.skkutimetable.doublecheck.AlarmReceiver"' >> AndroidManifest_text.xml
-        echo '                  android:enabled="true"' >> AndroidManifest_text.xml
-        echo '                  android:exported="true">' >> AndroidManifest_text.xml
-        echo '            <intent-filter>' >> AndroidManifest_text.xml
-        echo '                <action android:name="android.intent.action.BOOT_COMPLETED" />' >> AndroidManifest_text.xml
-        echo '            </intent-filter>' >> AndroidManifest_text.xml
-        echo '        </receiver>' >> AndroidManifest_text.xml
-        echo '        ' >> AndroidManifest_text.xml
-        echo '    </application>' >> AndroidManifest_text.xml
-        echo '</manifest>' >> AndroidManifest_text.xml
-        
-        # 리소스 디렉토리 생성
-        mkdir -p temp_resources/res/values
-        echo '<?xml version="1.0" encoding="utf-8"?><resources></resources>' > temp_resources/res/values/strings.xml
-        
-        # aapt로 바이너리 매니페스트 생성
-        if aapt package -f -M AndroidManifest_text.xml -S temp_resources/res -I "$ANDROID_HOME/platforms/android-33/android.jar" -F temp.apk 2>/dev/null; then
-          echo "Binary manifest generation successful"
-          
-          # 매니페스트 추출
-          unzip -j temp.apk AndroidManifest.xml -d .
-          if [ -f "AndroidManifest.xml" ]; then
-            echo "New manifest extracted"
-            echo "New manifest size: $(wc -c < AndroidManifest.xml) bytes"
-            
-            # 원본 APK에 삽입
-            echo "Inserting new manifest into original APK..."
-            zip base.apk AndroidManifest.xml
-            
-            # 결과 검증
-            echo "Synthesis APK created"
-            mv base.apk synthesis_fixed.apk
-            
-            if aapt dump badging synthesis_fixed.apk >/dev/null 2>&1; then
-              echo "Synthesis APK structure valid"
-              echo "Synthesis APK info:"
-              aapt dump badging synthesis_fixed.apk | head -5
-            else
-              echo "Synthesis APK structure error"
-            fi
-          else
-            echo "New manifest extraction failed"
-          fi
-        else
-          echo "Binary manifest generation failed"
-        fi
-        
-        cd ..
-
-    - name: Method 5 - jadx conversion
-      run: |
-        echo "=== Method 5: jadx conversion ==="
-        
-        mkdir -p studio_work
-        cd studio_work
-        
-        # jadx 다운로드
-        echo "Downloading jadx..."
-        wget -q https://github.com/skylot/jadx/releases/download/v1.4.7/jadx-1.4.7.zip -O jadx.zip
-        
-        if [ -f "jadx.zip" ]; then
-          unzip -q jadx.zip
-          chmod +x jadx-1.4.7/bin/jadx
-          
-          echo "jadx installed successfully"
-          
-          # APK를 Java 프로젝트로 변환
-          echo "Converting APK to Java project..."
-          ./jadx-1.4.7/bin/jadx "../$ORIGINAL_APK" -d java_project
-          
-          if [ -d "java_project" ]; then
-            echo "Java project conversion successful"
-            
-            # 매니페스트 확인
-            if [ -f "java_project/resources/AndroidManifest.xml" ]; then
-              echo "Manifest found"
-              echo "Current manifest content:"
-              head -20 java_project/resources/AndroidManifest.xml
-              
-              # 매니페스트 백업
-              cp java_project/resources/AndroidManifest.xml java_project/resources/AndroidManifest.xml.backup
-              
-              # receiver 추가
-              echo "Adding receiver to manifest..."
-              sed -i '/<\/application>/i\        <receiver android:name="org.kivy.skkutimetable.doublecheck.AlarmReceiver" android:enabled="true" android:exported="true">\
-            <intent-filter>\
-                <action android:name="android.intent.action.BOOT_COMPLETED" />\
-            </intent-filter>\
-        </receiver>' java_project/resources/AndroidManifest.xml
-              
-              echo "Manifest modification completed"
-              echo "Modified manifest:"
-              grep -A 10 -B 5 "AlarmReceiver" java_project/resources/AndroidManifest.xml || echo "Addition failed"
-            else
-              echo "Manifest not found"
-            fi
-            
-            # 프로젝트 구조 확인
-            echo "Project structure:"
-            find java_project -type f -name "*.xml" | head -10
-          else
-            echo "Java project conversion failed"
-          fi
-        else
-          echo "jadx download failed"
-        fi
-        
-        cd ..
-
-    - name: Compare results
-      run: |
-        echo "=== Results comparison ==="
-        
-        echo "Generated APK files:"
-        find . -name "*.apk" -exec echo "{}:" \; -exec du -h {} \; 2>/dev/null || echo "No APK files found"
-        
-        echo ""
-        echo "Method success status:"
-        
-        if [ -d "aapt2_work" ]; then
-          echo "✅ Method 1 (aapt2): Attempted"
-        else
-          echo "❌ Method 1 (aapt2): Failed"
-        fi
-        
-        if [ -f "hex_work/AndroidManifest.xml" ]; then
-          echo "✅ Method 2 (hex): Manifest extracted"
-        else
-          echo "❌ Method 2 (hex): Failed"
-        fi
-        
-        if [ -f "dex_work/classes_modified.dex" ]; then
-          echo "✅ Method 3 (baksmali): DEX modified"
-        else
-          echo "❌ Method 3 (baksmali): Failed"
-        fi
-        
-        if [ -f "synthesis_work/synthesis_fixed.apk" ]; then
-          echo "✅ Method 4 (synthesis): APK created"
-        else
-          echo "❌ Method 4 (synthesis): Failed"
-        fi
-        
-        if [ -f "studio_work/java_project/resources/AndroidManifest.xml" ]; then
-          echo "✅ Method 5 (jadx): Project converted"
-        else
-          echo "❌ Method 5 (jadx): Failed"
-        fi
-        
-        echo ""
-        echo "Next step: Use the most successful method for final APK generation"
+        echo "Basic analysis complete"
 
     - name: Upload results
       uses: actions/upload-artifact@v4
       with:
-        name: apk-modification-results
+        name: apk-analysis
         path: |
-          *.apk
-          */AndroidManifest.xml
-          */manifest_readable.xml
-          */classes_modified.dex
-          */synthesis_fixed.apk
-        retention-days: 7
+          original.apk
+          AndroidManifest.xml
