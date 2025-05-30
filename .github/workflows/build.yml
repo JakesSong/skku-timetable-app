@@ -1,372 +1,140 @@
-name: Build Android APK
-on:
-  workflow_dispatch:
-  push:
-    branches: [ main, master ]
-jobs:
-  build:
-    runs-on: ubuntu-22.04
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+# ✅ APK 수정 (ZIP 방식으로 직접 교체 - aapt 포기!)
+- name: Modify APK with direct ZIP method (bypass aapt)
+  run: |
+    echo "=== 🔧 APK 수정 (ZIP 직접 방식으로 AlarmReceiver 추가) ==="
     
-    - name: Set up Python 3.9
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.9'
-
-    # ✅ 완전한 클린 빌드
-    - name: Complete clean build
-      run: |
-        echo "=== 🧹 Completely cleaning build environment ==="
-        rm -rf .buildozer bin build android/build android/.gradle
-        rm -rf ~/.buildozer ~/.gradle ~/.android
-        echo "✅ 모든 캐시 제거 완료"
-
-    # ✅ Java 17 세팅
-    - name: Set up Java 17 for buildozer
-      uses: actions/setup-java@v4
-      with:
-        distribution: 'temurin'
-        java-version: '17'
-
-    # ✅ 시스템 종속 패키지 설치
-    - name: Install system dependencies
-      run: |
-        sudo apt-get update -qq
-        sudo apt-get install -y \
-          git zip unzip autoconf libtool pkg-config \
-          zlib1g-dev libncurses5-dev libncursesw5-dev libtinfo5 cmake \
-          libffi-dev libssl-dev build-essential libsqlite3-dev sqlite3 \
-          bzip2 libbz2-dev libreadline-dev llvm \
-          xz-utils tk-dev libxml2-dev libxmlsec1-dev liblzma-dev \
-          libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev \
-          libportmidi-dev libswscale-dev libavformat-dev libavcodec-dev \
-          libfreetype6-dev libpng-dev libjpeg-dev aapt
-
-    # ✅ 파이썬 의존성 설치
-    - name: Install Python dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install --upgrade setuptools wheel
-        pip install Cython==0.29.33
-        pip install buildozer==1.4.0
-
-    # ✅ 환경 변수 설정
-    - name: Set environment variables
-      run: |
-        echo "P4A_NUM_PROCS=1" >> $GITHUB_ENV
-        echo "GRADLE_OPTS=-Dorg.gradle.daemon=false -Dorg.gradle.jvmargs='-Xmx3072m -XX:MaxMetaspaceSize=768m' -Dorg.gradle.parallel=false" >> $GITHUB_ENV
-        echo "P4A_GRADLE_OPTS=--stacktrace --info" >> $GITHUB_ENV
-
-    # ✅ APK 수정 도구 설치
-    - name: Install APK modification tools
-      run: |
-        echo "=== 🛠️ APK 수정 도구 설치 ==="
+    if [ -z "${ORIGINAL_APK:-}" ] || [ ! -f "$ORIGINAL_APK" ]; then
+      echo "❌ 원본 APK 없음"
+      exit 1
+    fi
+    
+    echo "🎯 대상 APK: $ORIGINAL_APK"
+    
+    # 백업 생성
+    cp "$ORIGINAL_APK" original_backup.apk
+    echo "✅ 원본 백업 완료"
+    
+    # 작업 디렉토리 생성
+    mkdir -p zip_work
+    cd zip_work
+    
+    # APK를 ZIP으로 처리
+    cp "../$ORIGINAL_APK" work.apk
+    
+    # 1. 현재 매니페스트 추출
+    unzip -j work.apk AndroidManifest.xml
+    echo "📄 원본 매니페스트 추출 완료"
+    
+    # 2. aapt dump를 사용해서 XML 텍스트로 변환
+    aapt dump xmltree work.apk AndroidManifest.xml > manifest_text.txt
+    echo "📄 매니페스트 텍스트 변환 완료"
+    
+    # 3. 템플릿이 있다면 사용, 없다면 원본 기반으로 텍스트 매니페스트 생성
+    if [ -f "../AndroidManifest.tmpl.xml" ]; then
+      echo "✅ 템플릿 파일 사용"
+      cp "../AndroidManifest.tmpl.xml" new_manifest_text.xml
+    else
+      echo "❌ 템플릿 없음 - 원본 기반으로 처리"
+      
+      # 간단한 텍스트 매니페스트 생성 (최소한만)
+      cat > new_manifest_text.xml << 'EOF'
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="org.kivy.skkutimetable.doublecheck"
+    android:versionCode="1"
+    android:versionName="0.1">
+    
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+    
+    <application android:label="DoubleCheck">
+        <activity android:name="org.kivy.android.PythonActivity"
+                  android:label="DoubleCheck"
+                  android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
         
-        # Android SDK 명령줄 도구 설치
-        echo "📥 Android SDK 명령줄 도구 다운로드..."
-        mkdir -p ~/android-sdk
-        cd ~/android-sdk
+        <receiver android:name="org.kivy.skkutimetable.doublecheck.AlarmReceiver" 
+                  android:enabled="true" 
+                  android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
+    </application>
+</manifest>
+EOF
+      echo "📄 기본 매니페스트 생성 완료"
+    fi
+    
+    # 4. receiver 추가 (템플릿에 없는 경우만)
+    if ! grep -q "AlarmReceiver" new_manifest_text.xml; then
+      echo "📝 AlarmReceiver 추가 중..."
+      sed -i 's|</application>|    <receiver android:name="org.kivy.skkutimetable.doublecheck.AlarmReceiver" android:enabled="true" android:exported="true"><intent-filter><action android:name="android.intent.action.BOOT_COMPLETED" /></intent-filter></receiver></application>|' new_manifest_text.xml
+    else
+      echo "✅ AlarmReceiver 이미 존재"
+    fi
+    
+    # 5. 텍스트 매니페스트를 바이너리로 변환
+    echo "🔄 바이너리 매니페스트 생성 중..."
+    
+    # 임시 APK 생성 (매니페스트만)
+    mkdir -p temp_res/values
+    echo '<?xml version="1.0" encoding="utf-8"?><resources><string name="app_name">DoubleCheck</string></resources>' > temp_res/values/strings.xml
+    
+    aapt package -f \
+      -M new_manifest_text.xml \
+      -S temp_res \
+      -I "/home/runner/android-sdk/platforms/android-33/android.jar" \
+      -F temp_with_manifest.apk
+    
+    if [ -f "temp_with_manifest.apk" ]; then
+      echo "✅ 임시 APK 생성 성공"
+      
+      # 새 바이너리 매니페스트 추출
+      unzip -j temp_with_manifest.apk AndroidManifest.xml -d new_manifest
+      
+      if [ -f "new_manifest/AndroidManifest.xml" ]; then
+        echo "✅ 새 바이너리 매니페스트 추출 성공"
         
-        wget -q https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip
-        unzip -q commandlinetools-linux-11076708_latest.zip
-        mkdir -p cmdline-tools/latest
-        mv cmdline-tools/* cmdline-tools/latest/ 2>/dev/null || true
-        
-        # 환경 변수 설정 (ANDROID_HOME 추가!)
-        export ANDROID_SDK_ROOT=~/android-sdk
-        export ANDROID_HOME=~/android-sdk
-        export PATH=$PATH:$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$ANDROID_SDK_ROOT/build-tools/34.0.0
-        echo "ANDROID_SDK_ROOT=$HOME/android-sdk" >> $GITHUB_ENV
-        echo "ANDROID_HOME=$HOME/android-sdk" >> $GITHUB_ENV
-        echo "$HOME/android-sdk/cmdline-tools/latest/bin" >> $GITHUB_PATH
-        echo "$HOME/android-sdk/build-tools/34.0.0" >> $GITHUB_PATH
-        
-        # SDK 라이센스 자동 동의
-        yes | sdkmanager --licenses || true
-        
-        # 필요한 패키지 설치 (platforms 추가!)
-        echo "🔧 Android SDK 패키지 설치..."
-        sdkmanager "build-tools;34.0.0" "platform-tools" "platforms;android-33"
-        
-        # 설치 확인
-        echo "📋 설치 확인:"
-        ls -la ~/android-sdk/platforms/ || echo "platforms 디렉토리 없음"
-        if [ -f "~/android-sdk/platforms/android-33/android.jar" ]; then
-          echo "✅ android.jar 발견"
-        else
-          echo "❌ android.jar 없음"
-        fi
-        
-        echo "✅ 모든 도구 설치 완료"
-
-    # ✅ 빌드 수행
-    - name: Build APK with buildozer
-      run: |
-        echo "=== 🔨 Buildozer APK 빌드 ==="
-        buildozer android debug --verbose > build_full.log 2>&1 || BUILD_FAILED=true
-        if [ "$BUILD_FAILED" = "true" ]; then
-          echo "❌ 빌드 실패!"
-          echo "=== 빌드 로그 마지막 100줄 ==="
-          tail -100 build_full.log
-          exit 1
-        else
-          echo "✅ 빌드 성공!"
-        fi
-
-    # ✅ APK 파일 찾기 및 검증
-    - name: Find and verify APK
-      run: |
-        echo "=== 🔍 APK 파일 찾기 및 검증 ==="
-        
-        # APK 파일 자동 탐지
-        POSSIBLE_APKS=(
-          "./bin/doublecheck-0.1-arm64-v8a-debug.apk"
-          "./bin/*.apk"
-          ".buildozer/android/platform/build-arm64-v8a/dists/doublecheck/build/outputs/apk/debug/*.apk"
-        )
-        
-        FOUND_APK=""
-        for apk_pattern in "${POSSIBLE_APKS[@]}"; do
-          for apk_file in $apk_pattern; do
-            if [ -f "$apk_file" ]; then
-              FOUND_APK="$apk_file"
-              echo "✅ APK 발견: $FOUND_APK"
-              break 2
-            fi
-          done
-        done
-        
-        if [ -z "$FOUND_APK" ]; then
-          FOUND_APK=$(find . -name "*debug*.apk" -type f | head -1)
-          if [ -n "$FOUND_APK" ]; then
-            echo "✅ 전체 검색으로 APK 발견: $FOUND_APK"
-          else
-            echo "❌ APK 파일을 찾을 수 없음"
-            exit 1
-          fi
-        fi
-        
-        echo "ORIGINAL_APK=$FOUND_APK" >> $GITHUB_ENV
-        echo "📊 APK 크기: $(du -h "$FOUND_APK" | cut -f1)"
-        
-        # 원본 APK 유효성 검사
-        if aapt dump badging "$FOUND_APK" >/dev/null 2>&1; then
-          echo "✅ 원본 APK 구조 유효"
-        else
-          echo "❌ 원본 APK 구조 오류"
-          exit 1
-        fi
-
-    # ✅ APK 수정 (aapt2 방식으로 AlarmReceiver 추가)
-    - name: Modify APK with aapt2 method (replacing apktool)
-      run: |
-        echo "=== 🔧 APK 수정 (aapt2 방식으로 AlarmReceiver 추가) ==="
-        
-        if [ -z "${ORIGINAL_APK:-}" ] || [ ! -f "$ORIGINAL_APK" ]; then
-          echo "❌ 원본 APK 없음"
-          exit 1
-        fi
-        
-        echo "🎯 대상 APK: $ORIGINAL_APK"
-        
-        # 백업 생성
-        cp "$ORIGINAL_APK" original_backup.apk
-        echo "✅ 원본 백업 완료"
-        
-        # aapt2 방식으로 수정
-        mkdir -p aapt2_work
-        cd aapt2_work
-        
-        # APK 압축 해제
-        cp "../$ORIGINAL_APK" original.apk
-        unzip -q original.apk
-        
-        echo "📄 현재 매니페스트 분석..."
-        if aapt dump xmltree original.apk AndroidManifest.xml > current_manifest.txt 2>&1; then
-          echo "현재 receiver 개수: $(grep -c "receiver" current_manifest.txt || echo "0")"
-          grep -c "receiver" current_manifest.txt || echo "0"
-        fi
-        
-        # 매니페스트 파일 생성 및 디버깅
-        echo "Creating new manifest..."
-        
-        # 1. 현재 상황 점검
-        echo "🔍 현재 디렉토리: $(pwd)"
-        echo "📁 현재 파일들:"
-        ls -la
-        
-        # 2. 매니페스트 파일 생성
-        if [ -f "../AndroidManifest.tmpl.xml" ]; then
-          echo "✅ 템플릿 파일 발견"
-          cp "../AndroidManifest.tmpl.xml" new_manifest.xml
-        elif [ -f "AndroidManifest.xml" ]; then
-          echo "✅ 원본 매니페스트 사용"
-          cp AndroidManifest.xml new_manifest.xml
-        else
-          echo "❌ 매니페스트 파일을 찾을 수 없음"
-          echo "📁 가능한 파일들:"
-          find . -name "*manifest*" -o -name "*Manifest*" 2>/dev/null
-          exit 1
-        fi
-        
-        # 3. 파일 생성 확인
-        if [ ! -f "new_manifest.xml" ]; then
-          echo "❌ new_manifest.xml 생성 실패"
-          exit 1
-        fi
-        
-        echo "✅ 매니페스트 파일 준비됨: $(wc -l < new_manifest.xml) 줄"
-        
-        # 4. receiver 추가
-        echo "Adding receiver..."
-        sed -i 's|</application>|    <receiver android:name="org.kivy.skkutimetable.doublecheck.AlarmReceiver" android:enabled="true" android:exported="true"><intent-filter><action android:name="android.intent.action.BOOT_COMPLETED" /></intent-filter></receiver></application>|' new_manifest.xml
-        
-        # 5. 수정 결과 확인
-        echo "📄 수정된 매니페스트 확인:"
-        echo "파일 크기: $(wc -l < new_manifest.xml) 줄"
-        echo "receiver 개수: $(grep -c "receiver" new_manifest.xml || echo "0")"
-        
-        # 6. 매니페스트 파일 존재 재확인
-        if [ ! -f "new_manifest.xml" ]; then
-          echo "❌ 수정 후 new_manifest.xml이 사라짐"
-          exit 1
-        fi
-        
-        echo "New manifest created"
-        
-        # 리소스 디렉토리 준비
-        mkdir -p temp_res/values
-        echo '<?xml version="1.0" encoding="utf-8"?><resources></resources>' > temp_res/values/strings.xml
-        
-        # 기존 리소스 복사
-        if [ -d "res" ]; then
-          cp -r res/* temp_res/ 2>/dev/null || true
-        fi
-        
-        # 7. aapt 명령어에서 절대 경로 사용
-        echo "Creating new APK with aapt..."
-        MANIFEST_PATH="$(pwd)/new_manifest.xml"
-        RESOURCES_PATH="$(pwd)/temp_res"
-        OUTPUT_PATH="$(pwd)/new.apk"
-        
-        echo "📍 사용할 경로들:"
-        echo "  매니페스트: $MANIFEST_PATH"
-        echo "  리소스: $RESOURCES_PATH"  
-        echo "  출력: $OUTPUT_PATH"
-        
-        # 8. 파일 존재 확인
-        if [ ! -f "$MANIFEST_PATH" ]; then
-          echo "❌ 매니페스트 파일 없음: $MANIFEST_PATH"
-          exit 1
-        fi
-        
-        if [ ! -d "$RESOURCES_PATH" ]; then
-          echo "❌ 리소스 디렉토리 없음: $RESOURCES_PATH"
-          exit 1
-        fi
-        
-        # 9. aapt 실행 (android.jar 경로 확인 추가)
-        echo "🔍 Android SDK 환경 확인:"
-        echo "ANDROID_HOME: ${ANDROID_HOME:-없음}"
-        echo "ANDROID_SDK_ROOT: ${ANDROID_SDK_ROOT:-없음}"
-        
-        # android.jar 경로 찾기
-        ANDROID_JAR=""
-        if [ -f "$ANDROID_HOME/platforms/android-33/android.jar" ]; then
-          ANDROID_JAR="$ANDROID_HOME/platforms/android-33/android.jar"
-          echo "✅ android-33.jar 발견: $ANDROID_JAR"
-        elif [ -f "$ANDROID_HOME/platforms/android-34/android.jar" ]; then
-          ANDROID_JAR="$ANDROID_HOME/platforms/android-34/android.jar"
-          echo "✅ android-34.jar 발견: $ANDROID_JAR"
-        else
-          echo "❌ android.jar를 찾을 수 없음"
-          echo "사용 가능한 platforms:"
-          ls -la "$ANDROID_HOME/platforms/" 2>/dev/null || echo "platforms 디렉토리 없음"
-          exit 1
-        fi
-        
-        aapt package -f \
-          -M "$MANIFEST_PATH" \
-          -S "$RESOURCES_PATH" \
-          -I "$ANDROID_JAR" \
-          -F "$OUTPUT_PATH"
-        
-        if [ -f "new.apk" ]; then
-          echo "New APK created successfully"
-          
-          # 새 매니페스트 추출
-          unzip -j new.apk AndroidManifest.xml -d .
-          
-          # 원본 APK에 새 매니페스트 삽입
-          cp original.apk modified.apk
-          zip -u modified.apk AndroidManifest.xml
-          
-          echo "Modified APK created"
-          
-          # 검증
-          if aapt dump badging modified.apk >/dev/null 2>&1; then
-            echo "SUCCESS: Modified APK is valid"
-            aapt dump badging modified.apk | head -3
-            echo "Receiver count:"
-            aapt dump xmltree modified.apk AndroidManifest.xml | grep -c "receiver" || echo "0"
-            
-            # 수정된 APK를 최종 위치로 복사
-            cp modified.apk ../final_doublecheck_fixed.apk
-            echo "✅ 최종 APK 생성: final_doublecheck_fixed.apk"
-          else
-            echo "FAILED: Modified APK is invalid"
-            aapt dump badging modified.apk 2>&1 | head -5
-          fi
-        else
-          echo "Failed to create new APK"
-        fi
-        
+        # 원본 APK에 새 매니페스트 삽입
+        cp work.apk final.apk
+        cd new_manifest
+        zip -u ../final.apk AndroidManifest.xml
         cd ..
-
-    # ✅ 최종 APK 검증
-    - name: Final APK validation
-      run: |
-        echo "=== 🎯 최종 APK 검증 ==="
         
-        APK_TO_TEST="final_doublecheck_fixed.apk"
+        echo "📦 매니페스트 교체 완료"
         
-        if [ ! -f "$APK_TO_TEST" ]; then
-          echo "❌ 최종 APK 없음"
-          exit 1
-        fi
-        
-        echo "📱 최종 APK 정보:"
-        echo "파일명: $APK_TO_TEST"
-        echo "크기: $(du -h "$APK_TO_TEST" | cut -f1)"
-        
-        # APK 구조 검증
-        echo "🔍 APK 구조 검증..."
-        if aapt dump badging "$APK_TO_TEST" > apk_info.txt 2>&1; then
-          echo "✅ APK 구조 유효"
+        # 검증
+        if aapt dump badging final.apk >/dev/null 2>&1; then
+          echo "✅ 수정된 APK 유효성 검사 통과"
           
-          # 패키지 정보 출력
-          echo "📦 패키지 정보:"
-          grep "package:" apk_info.txt | head -3
-          grep "application:" apk_info.txt | head -1
-          grep "launchable-activity:" apk_info.txt | head -1
+          # receiver 개수 확인
+          RECEIVER_COUNT=$(aapt dump xmltree final.apk AndroidManifest.xml | grep -c "receiver" || echo "0")
+          echo "📱 Receiver 개수: $RECEIVER_COUNT"
+          
+          # 최종 APK 복사
+          cp final.apk ../final_doublecheck_fixed.apk
+          echo "🎉 최종 APK 생성 성공: final_doublecheck_fixed.apk"
           
         else
-          echo "❌ APK 구조 오류"
-          cat apk_info.txt
+          echo "❌ 수정된 APK 유효성 검사 실패"
+          aapt dump badging final.apk 2>&1 | head -5
           exit 1
         fi
-        
-        echo "🎉 최종 수정된 APK 준비 완료: $APK_TO_TEST"
-        echo "📱 설치 가능한 APK 생성됨!"
-
-    # ✅ 최종 APK 업로드
-    - name: Upload final APKs
-      uses: actions/upload-artifact@v4
-      with:
-        name: doublecheck-apks-${{ github.run_number }}
-        path: |
-          final_doublecheck_fixed.apk
-          original_backup.apk
-        retention-days: 7
+      else
+        echo "❌ 새 매니페스트 추출 실패"
+        exit 1
+      fi
+    else
+      echo "❌ 임시 APK 생성 실패"
+      exit 1
+    fi
+    
+    cd ..
