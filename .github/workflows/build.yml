@@ -93,15 +93,19 @@ jobs:
     - name: Debug buildozer initialization
       run: |
         echo "🔧 === BUILDOZER DEBUG ==="
-        echo "📋 Buildozer configuration check:"
-        buildozer android clean || echo "⚠️ Clean failed (normal for first run)"
+        echo "📋 Buildozer version and info:"
         buildozer -v
         
         echo -e "\n📱 Android SDK packages:"
         $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager --list_installed
         
-        echo -e "\n🔍 Buildozer spec validation:"
-        buildozer android debug --dry-run || echo "⚠️ Dry run completed with warnings"
+        echo -e "\n🔍 Checking if .buildozer exists (first time setup):"
+        if [ -d .buildozer/android/platform/python-for-android ]; then
+          echo "✅ python-for-android directory exists, safe to clean"
+          buildozer android clean
+        else
+          echo "⚠️ First time build - skipping clean (python-for-android not yet downloaded)"
+        fi
 
     - name: Debug project structure and files
       run: |
@@ -168,11 +172,11 @@ jobs:
         echo "Last 20 lines of buildozer.spec:"
         tail -20 buildozer.spec
         
-        echo -e "\n🔨 Starting buildozer build..."
+        echo -e "\n🔨 Starting buildozer build (fresh build, no clean needed)..."
         buildozer android debug --verbose
         
         echo -e "\n✅ Build completed at: $(date)"
-      timeout-minutes: 45
+      timeout-minutes: 50
 
     - name: Debug build results and find APK
       if: always()
