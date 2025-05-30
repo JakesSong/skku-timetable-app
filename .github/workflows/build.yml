@@ -80,40 +80,147 @@ jobs:
         # APK 압축 해제
         unzip -q original.apk
         
-        # 새 매니페스트 생성
-        cat > new_manifest.xml << 'EOF'
-<?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="org.kivy.skkutimetable.doublecheck"
-    android:versionCode="10211"
-    android:versionName="0.1">
+        # 새 매니페스트 생성 (파일에서 복사)
+        echo "Creating new manifest from template..."
+        if [ -f "../AndroidManifest.tmpl.xml" ]; then
+          echo "Using AndroidManifest.tmpl.xml from repository"
+          cp "../AndroidManifest.tmpl.xml" base_manifest.xml
+          
+          # tmpl 파일을 읽어서 receiver 추가
+          python3 -c "
+import xml.etree.ElementTree as ET
+import subprocess
+
+# 원본 APK에서 패키지 정보 추출
+result = subprocess.run(['aapt', 'dump', 'badging', 'original.apk'], capture_output=True, text=True)
+package_line = [line for line in result.stdout.split('\n') if line.startswith('package:')][0]
+package_name = line.split(\"name='\")[1].split(\"'\")[0] if \"name='\" in package_line else 'org.kivy.skkutimetable.doublecheck'
+
+print(f'Package name: {package_name}')
+
+# tmpl 파일 읽기
+with open('base_manifest.xml', 'r', encoding='utf-8') as f:
+    manifest_content = f.read()
+
+# receiver XML 생성
+receiver_xml = '''    <receiver android:name=\"org.kivy.skkutimetable.doublecheck.AlarmReceiver\"
+              android:enabled=\"true\"
+              android:exported=\"true\">
+        <intent-filter>
+            <action android:name=\"android.intent.action.BOOT_COMPLETED\" />
+        </intent-filter>
+    </receiver>'''
+
+# </application> 태그 앞에 receiver 삽입
+if '</application>' in manifest_content:
+    modified_content = manifest_content.replace('</application>', receiver_xml + '\n</application>')
     
-    <uses-permission android:name="android.permission.INTERNET" />
-    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    with open('new_manifest.xml', 'w', encoding='utf-8') as f:
+        f.write(modified_content)
     
-    <application android:label="DoubleCheck" android:icon="@mipmap/icon">
-        <activity android:name="org.kivy.android.PythonActivity"
-                  android:label="DoubleCheck"
-                  android:exported="true">
+    print('Receiver added to template manifest successfully')
+else:
+    print('Could not find </application> tag in template')
+    # 백업: 기본 매니페스트 생성
+    basic_manifest = f'''<?xml version=\"1.0\" encoding=\"utf-8\"?>
+<manifest xmlns:android=\"http://schemas.android.com/apk/res/android\"
+    package=\"{package_name}\"
+    android:versionCode=\"1\"
+    android:versionName=\"1.0\">
+    
+    <uses-permission android:name=\"android.permission.INTERNET\" />
+    <uses-permission android:name=\"android.permission.RECEIVE_BOOT_COMPLETED\" />
+    
+    <application android:label=\"DoubleCheck\">
+        <activity android:name=\"org.kivy.android.PythonActivity\"
+                  android:exported=\"true\">
             <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
+                <action android:name=\"android.intent.action.MAIN\" />
+                <category android:name=\"android.intent.category.LAUNCHER\" />
             </intent-filter>
         </activity>
         
-        <service android:name="org.kivy.android.PythonService" />
-        
-        <receiver android:name="org.kivy.skkutimetable.doublecheck.AlarmReceiver"
-                  android:enabled="true"
-                  android:exported="true">
+        <receiver android:name=\"org.kivy.skkutimetable.doublecheck.AlarmReceiver\"
+                  android:enabled=\"true\"
+                  android:exported=\"true\">
             <intent-filter>
-                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name=\"android.intent.action.BOOT_COMPLETED\" />
             </intent-filter>
         </receiver>
         
     </application>
-</manifest>
-EOF
+</manifest>'''
+    
+    with open('new_manifest.xml', 'w', encoding='utf-8') as f:
+        f.write(basic_manifest)
+    
+    print('Created basic manifest as fallback')
+"
+        elif [ -f "../AndroidManifest_template.xml" ]; then
+          echo "Using AndroidManifest_template.xml from repository"
+          cp "../AndroidManifest_template.xml" new_manifest.xml
+        else
+          echo "No template found, creating basic manifest from original APK"
+          # 원본 매니페스트를 기반으로 receiver만 추가
+          aapt dump xmltree original.apk AndroidManifest.xml > original_readable.xml
+          
+          # Python으로 매니페스트 수정
+          python3 -c "
+import re
+import subprocess
+
+# 원본 APK에서 패키지 정보 추출
+result = subprocess.run(['aapt', 'dump', 'badging', 'original.apk'], capture_output=True, text=True)
+package_line = [line for line in result.stdout.split('\n') if line.startswith('package:')][0]
+package_name = re.search(r\"name='([^']+)'\", package_line).group(1)
+version_code = re.search(r\"versionCode='([^']+)'\", package_line).group(1)
+version_name = re.search(r\"versionName='([^']+)'\", package_line).group(1)
+
+print(f'Package: {package_name}')
+print(f'Version Code: {version_code}')
+print(f'Version Name: {version_name}')
+
+# 기본 매니페스트 생성
+manifest = f'''<?xml version=\"1.0\" encoding=\"utf-8\"?>
+<manifest xmlns:android=\"http://schemas.android.com/apk/res/android\"
+    package=\"{package_name}\"
+    android:versionCode=\"{version_code}\"
+    android:versionName=\"{version_name}\">
+    
+    <uses-permission android:name=\"android.permission.INTERNET\" />
+    <uses-permission android:name=\"android.permission.RECEIVE_BOOT_COMPLETED\" />
+    <uses-permission android:name=\"android.permission.WAKE_LOCK\" />
+    <uses-permission android:name=\"android.permission.VIBRATE\" />
+    
+    <application android:label=\"DoubleCheck\" android:icon=\"@mipmap/icon\">
+        <activity android:name=\"org.kivy.android.PythonActivity\"
+                  android:label=\"DoubleCheck\"
+                  android:exported=\"true\">
+            <intent-filter>
+                <action android:name=\"android.intent.action.MAIN\" />
+                <category android:name=\"android.intent.category.LAUNCHER\" />
+            </intent-filter>
+        </activity>
+        
+        <service android:name=\"org.kivy.android.PythonService\" android:process=\":pythonservice\" />
+        
+        <receiver android:name=\"org.kivy.skkutimetable.doublecheck.AlarmReceiver\"
+                  android:enabled=\"true\"
+                  android:exported=\"true\">
+            <intent-filter>
+                <action android:name=\"android.intent.action.BOOT_COMPLETED\" />
+            </intent-filter>
+        </receiver>
+        
+    </application>
+</manifest>'''
+
+with open('new_manifest.xml', 'w', encoding='utf-8') as f:
+    f.write(manifest)
+
+print('New manifest created successfully')
+"
+        fi
         
         # 리소스 디렉토리 준비
         mkdir -p temp_res/values
