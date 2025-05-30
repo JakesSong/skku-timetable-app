@@ -79,11 +79,6 @@ jobs:
         rm -rf .buildozer
         rm -rf bin
 
-    - name: Initialize buildozer
-      run: |
-        echo "Initializing buildozer..."
-        buildozer android clean
-
     - name: Build APK with Buildozer
       run: |
         echo "Building APK with AlarmReceiver..."
