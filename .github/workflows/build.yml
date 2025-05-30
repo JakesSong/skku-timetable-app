@@ -62,7 +62,7 @@ jobs:
       uses: android-actions/setup-android@v3
       with:
         api-level: 33
-        build-tools-version: 33.0.0
+        build-tools-version: 32.0.0
 
     - name: Install Python dependencies
       run: |
