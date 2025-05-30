@@ -9,6 +9,7 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
+    
     - name: Set up Python 3.9
       uses: actions/setup-python@v5
       with:
@@ -18,75 +19,9 @@ jobs:
     - name: Complete clean build
       run: |
         echo "=== 🧹 Completely cleaning build environment ==="
-        
-        # 프로젝트 디렉토리 기준
-        rm -rf .buildozer
-        rm -rf bin
-        rm -rf build
-        rm -rf android/build
-        rm -rf android/.gradle
-    
-        # 사용자 캐시 디렉토리 기준
-        rm -rf ~/.buildozer
-        rm -rf ~/.gradle
-        rm -rf ~/.android
-    
+        rm -rf .buildozer bin build android/build android/.gradle
+        rm -rf ~/.buildozer ~/.gradle ~/.android
         echo "✅ 모든 캐시 제거 완료"
-
-    # ✅ .java 파일 경로 확인
-    - name: Check java file visibility
-      run: |
-        echo "=== 🔍 java 파일 경로 확인 ==="
-        find android/src -type f -name "*.java" || echo "❌ java 파일 없음"
-        if [ -d "android/src/main/java/org/kivy/skkutimetable/doublecheck" ]; then
-          echo "✅ java 소스 디렉토리 존재함"
-          ls -R android/src/main/java/org/kivy/skkutimetable/doublecheck
-        else
-          echo "❌ java 소스 디렉토리 없음"
-        fi
-
-    # ✅ buildozer.spec manifest 설정 확인
-    - name: Check manifest configuration in buildozer.spec
-      run: |
-        echo "=== 🔧 buildozer.spec manifest 설정 확인 ==="
-        if [ -f "buildozer.spec" ]; then
-          echo "--- manifest 관련 설정들 ---"
-          grep -n "manifest" buildozer.spec || echo "manifest 설정 없음"
-          echo "--- android.manifest_template 설정 ---"
-          grep -n "android.manifest_template" buildozer.spec || echo "android.manifest_template 설정 없음"
-        else
-          echo "❌ buildozer.spec 파일 없음"
-        fi
-
-    # ✅ buildozer.spec manifest 설정 확인 (템플릿 방식)
-    - name: Check manifest configuration in buildozer.spec (template mode)
-      run: |
-        echo "=== 🔧 buildozer.spec manifest 설정 확인 (템플릿 방식) ==="
-        if [ -f "buildozer.spec" ]; then
-          echo "--- manifest 관련 설정들 ---"
-          grep -n "manifest" buildozer.spec || echo "manifest 설정 없음"
-          echo "--- android.manifest_template 설정 ---"
-          grep -n "android.manifest_template" buildozer.spec || echo "android.manifest_template 설정 없음"
-          echo "--- 주석 처리된 android.add_manifest_xml 확인 ---"
-          grep -n "android.add_manifest_xml" buildozer.spec || echo "android.add_manifest_xml 설정 없음"
-          echo ""
-          echo "--- AndroidManifest.tmpl.xml 파일 존재 확인 ---"
-          if [ -f "AndroidManifest.tmpl.xml" ]; then
-            echo "✅ AndroidManifest.tmpl.xml 파일 존재"
-            echo "--- 템플릿 파일 크기 ---"
-            ls -la AndroidManifest.tmpl.xml
-            echo "--- 템플릿 파일 첫 10줄 ---"
-            head -10 AndroidManifest.tmpl.xml
-            echo "--- AlarmReceiver 포함 여부 ---"
-            grep -n "AlarmReceiver" AndroidManifest.tmpl.xml || echo "❌ AlarmReceiver 없음"
-            echo "--- NonExistentReceiver 디버그 코드 확인 ---"
-            grep -n "NonExistentReceiver" AndroidManifest.tmpl.xml || echo "NonExistentReceiver 없음"
-          else
-            echo "❌ AndroidManifest.tmpl.xml 파일 없음"
-          fi
-        else
-          echo "❌ buildozer.spec 파일 없음"
-        fi
 
     # ✅ Java 17 세팅
     - name: Set up Java 17 for buildozer
@@ -109,35 +44,13 @@ jobs:
           libportmidi-dev libswscale-dev libavformat-dev libavcodec-dev \
           libfreetype6-dev libpng-dev libjpeg-dev
 
-    # ✅ 파이썬 의연성 설치
+    # ✅ 파이썬 의존성 설치
     - name: Install Python dependencies
       run: |
         python -m pip install --upgrade pip
         pip install --upgrade setuptools wheel
         pip install Cython==0.29.33
         pip install buildozer==1.4.0
-
-    # 🎯 여기에 디버그 코드들 추가!
-    - name: Check buildozer template processing
-      run: |
-        echo "=== 🔍 buildozer 템플릿 처리 과정 추적 ==="
-        buildozer android debug 2>&1 | grep -i "template\|manifest" || echo "템플릿 관련 로그 없음"
-    
-    - name: Check template file location and processing  
-      run: |
-        echo "=== 🔍 템플릿 파일 위치와 처리 확인 ==="
-        echo "현재 위치의 AndroidManifest.tmpl.xml:"
-        ls -la AndroidManifest.tmpl.xml || echo "없음"
-        echo ""
-        echo "buildozer가 템플릿을 어디서 찾는지 확인:"
-        find . -name "*.tmpl.xml" 2>/dev/null || echo "tmpl.xml 파일 없음"
-        echo ""
-        echo "buildozer 내부에서 템플릿 복사 흔적:"
-        find .buildozer -name "*tmpl*" 2>/dev/null || echo "buildozer 내부에 tmpl 흔적 없음"
-    
-    # 기존 빌드 단계
-    - name: Build APK with buildozer
-      run: buildozer android debug
 
     # ✅ 환경 변수 설정
     - name: Set environment variables
@@ -146,390 +59,178 @@ jobs:
         echo "GRADLE_OPTS=-Dorg.gradle.daemon=false -Dorg.gradle.jvmargs='-Xmx3072m -XX:MaxMetaspaceSize=768m' -Dorg.gradle.parallel=false" >> $GITHUB_ENV
         echo "P4A_GRADLE_OPTS=--stacktrace --info" >> $GITHUB_ENV
 
-    # ✅ 빌드 수행 및 로그 저장
-    - name: Build APK
+    # ✅ APK 수정 도구 설치
+    - name: Install APK modification tools
       run: |
-        echo "=== Build start ==="
+        echo "=== 🛠️ APK 수정 도구 설치 ==="
+        
+        # Android SDK 명령줄 도구 설치
+        echo "📥 Android SDK 명령줄 도구 다운로드..."
+        mkdir -p ~/android-sdk
+        cd ~/android-sdk
+        
+        wget -q https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip
+        unzip -q commandlinetools-linux-11076708_latest.zip
+        mkdir -p cmdline-tools/latest
+        mv cmdline-tools/* cmdline-tools/latest/ 2>/dev/null || true
+        
+        # 환경 변수 설정
+        export ANDROID_SDK_ROOT=~/android-sdk
+        export PATH=$PATH:$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$ANDROID_SDK_ROOT/build-tools/33.0.2
+        echo "ANDROID_SDK_ROOT=~/android-sdk" >> $GITHUB_ENV
+        echo "~/android-sdk/cmdline-tools/latest/bin" >> $GITHUB_PATH
+        echo "~/android-sdk/build-tools/33.0.2" >> $GITHUB_PATH
+        
+        # SDK 라이센스 자동 동의
+        yes | sdkmanager --licenses
+        
+        # build-tools 설치 (zipalign 포함)
+        echo "🔧 Android Build Tools 설치..."
+        sdkmanager "build-tools;33.0.2"
+        
+        # apktool 다운로드 및 설치
+        echo "📥 apktool 다운로드..."
+        cd ~
+        wget -q https://raw.githubusercontent.com/iBotPeaches/Apktool/master/scripts/linux/apktool
+        wget -q https://bitbucket.org/iBotPeaches/apktool/downloads/apktool_2.9.3.jar
+        
+        chmod +x apktool
+        sudo mv apktool /usr/local/bin/
+        sudo mv apktool_2.9.3.jar /usr/local/bin/apktool.jar
+        
+        echo "✅ 모든 도구 설치 완료"
+
+    # ✅ 빌드 수행
+    - name: Build APK with buildozer
+      run: |
+        echo "=== 🔨 Buildozer APK 빌드 ==="
         buildozer android debug --verbose > build_full.log 2>&1 || BUILD_FAILED=true
         if [ "$BUILD_FAILED" = "true" ]; then
           echo "❌ 빌드 실패!"
-          echo "=== 빌드 로그 마지리 100줄 ==="
+          echo "=== 빌드 로그 마지막 100줄 ==="
           tail -100 build_full.log
-          echo "=== AndroidManifest 관련 로그 검색 ==="
-          grep -i "manifest" build_full.log | tail -20 || echo "manifest 관련 로그 없음"
           exit 1
         else
           echo "✅ 빌드 성공!"
         fi
 
-    - name: Check Java compilation results
+    # ✅ APK 파일 찾기 및 검증
+    - name: Find and verify APK
       run: |
-        echo "=== 🔍 .class 파일 생성 여부 확인 ==="
+        echo "=== 🔍 APK 파일 찾기 및 검증 ==="
         
-        # .class 파일 검색
-        find .buildozer -type f -name "*.class" || echo "❌ .class 파일 없음"
-    
-        echo ""
-        echo "=== 🔍 AlarmReceiver 관련 .class 파일 존재 여부 ==="
-        find .buildozer -type f -name "*AlarmReceiver*.class" || echo "❌ AlarmReceiver .class 파일 없음"
-    
-        echo ""
-        echo "=== 🔍 Java 컴파일 로그 추적 (javac 호출 확인) ==="
-        grep -i "javac" build_full.log | tail -20 || echo "❌ javac 호출 로그 없음"
-    
-        echo ""
-        echo "=== 🔍 Java 소스가 포함된 컴파일 대상 목록 (javaCompile)" 
-        grep -i "javaCompile" build_full.log | tail -20 || echo "❌ javaCompile 관련 로그 없음"
-    
-
-    # ✅ APK 디켜폴 및 AlarmReceiver 확인
-    - name: Decompile APK and check AlarmReceiver
-      run: |
-        echo "=== 🔍 apktool 설치 ==="
-        sudo apt-get install -y apktool
-
-        echo "=== 📆 apk 디켜폴 중 ==="
-        apktool d bin/*.apk -o decoded_apk || echo "❌ apktool 실패"
-
-        echo ""
-        echo "=== 🔍 AndroidManifest.xml 내 AlarmReceiver 확인 ==="
-        if [ -f "decoded_apk/AndroidManifest.xml" ]; then
-          grep -A 5 -B 2 "AlarmReceiver" decoded_apk/AndroidManifest.xml || echo "❌ AlarmReceiver 없음"
-        else
-          echo "❌ decoded_apk/AndroidManifest.xml 없음"
-        fi
-
-        echo ""
-        echo "=== 🔍 AlarmReceiver 클래스(smali) 존재 확인 ==="
-        find decoded_apk/smali -type f -name "*AlarmReceiver*.smali" || echo "❌ AlarmReceiver 클래스 없음"
-
-    # ✅ 빌드 후 생성된 AndroidManifest.xml 철저 분석
-    - name: Analyze generated AndroidManifest.xml (Enhanced)
-      if: always()
-      run: |
-        echo "=== 🔍 생성된 AndroidManifest.xml 철저 분석 ==="
-        echo "모든 AndroidManifest.xml 파일 찾기:"
-        find .buildozer -name "AndroidManifest.xml" -type f 2>/dev/null | while read -r file; do
-          echo "📁 $file ($(wc -c < "$file") bytes)"
-        done || echo "AndroidManifest.xml 없음"
-        
-        echo ""
-        echo "=== 🔍 주요 매니페스트 파일들 상세 분석 ==="
-        MAIN_MANIFESTS=(
-          ".buildozer/android/platform/build-arm64-v8a/dists/doublecheck/src/main/AndroidManifest.xml"
-          ".buildozer/android/platform/build-arm64-v8a/dists/doublecheck/AndroidManifest.xml"
-          ".buildozer/android/platform/build-arm64-v8a/dists/doublecheck/build/intermediates/merged_manifests/debug/AndroidManifest.xml"
+        # APK 파일 자동 탐지
+        POSSIBLE_APKS=(
+          "./bin/doublecheck-0.1-arm64-v8a-debug.apk"
+          "./bin/*.apk"
+          ".buildozer/android/platform/build-arm64-v8a/dists/doublecheck/build/outputs/apk/debug/*.apk"
         )
         
-        for manifest in "${MAIN_MANIFESTS[@]}"; do
-          if [ -f "$manifest" ]; then
-            echo ""
-            echo "🎯 ================== 매니페스트 분석: $manifest =================="
-            echo "📊 파일 정보: $(wc -c < "$manifest") bytes, $(wc -l < "$manifest") 줄"
-            
-            echo ""
-            echo "--- 📋 기본 정보 ---"
-            grep "package=" "$manifest" | head -1 || echo "패키지 정보 없음"
-            grep "android:versionCode=" "$manifest" | head -1 || echo "버전 코드 없음"
-            grep "android:versionName=" "$manifest" | head -1 || echo "버전 이름 없음"
-            
-            echo ""
-            echo "--- 🔍 전체 구조 통계 ---"
-            echo "uses-permission: $(grep -c '<uses-permission' "$manifest" 2>/dev/null || echo "0")개"
-            echo "activity: $(grep -c '<activity' "$manifest" 2>/dev/null || echo "0")개"
-            echo "receiver: $(grep -c '<receiver' "$manifest" 2>/dev/null || echo "0")개"
-            echo "service: $(grep -c '<service' "$manifest" 2>/dev/null || echo "0")개"
-            echo "intent-filter: $(grep -c '<intent-filter' "$manifest" 2>/dev/null || echo "0")개"
-            
-            echo ""
-            echo "--- 🎯 AlarmReceiver 핵심 검색 ---"
-            if grep -q "AlarmReceiver" "$manifest"; then
-              echo "✅ AlarmReceiver 발견!"
-              echo "📍 AlarmReceiver 전체 내용:"
-              grep -A 20 -B 2 "AlarmReceiver" "$manifest" | head -25
-            else
-              echo "❌ AlarmReceiver 없음"
+        FOUND_APK=""
+        for apk_pattern in "${POSSIBLE_APKS[@]}"; do
+          for apk_file in $apk_pattern; do
+            if [ -f "$apk_file" ]; then
+              FOUND_APK="$apk_file"
+              echo "✅ APK 발견: $FOUND_APK"
+              break 2
             fi
-            
-            echo ""
-            echo "--- 🔍 모든 receiver 태그 분석 ---"
-            receiver_count=$(grep -c "<receiver" "$manifest" 2>/dev/null || echo "0")
-            echo "총 receiver 개수: $receiver_count"
-            if [ "$receiver_count" -gt 0 ]; then
-              echo "📋 모든 receiver 목록:"
-              grep -o 'android:name="[^"]*"' "$manifest" | grep -A1 -B1 receiver || echo "receiver name 추출 실패"
-              echo ""
-              echo "📋 receiver 태그들 (처음 10개):"
-              grep -A 5 "<receiver" "$manifest" | head -30
-            fi
-            
-            echo ""
-            echo "--- 🔍 디버그 코드 검증 ---"
-            if grep -q "NonExistentReceiver" "$manifest"; then
-              echo "🎯 NonExistentReceiver 발견! (템플릿 적용됨)"
-            else
-              echo "❌ NonExistentReceiver 없음 (템플릿 무시됨)"
-            fi
-            
-            echo ""
-            echo "--- 📋 권한 목록 (알람 관련) ---"
-            echo "WAKE_LOCK: $(grep -c 'WAKE_LOCK' "$manifest" 2>/dev/null || echo "0")개"
-            echo "RECEIVE_BOOT_COMPLETED: $(grep -c 'RECEIVE_BOOT_COMPLETED' "$manifest" 2>/dev/null || echo "0")개"
-            echo "SCHEDULE_EXACT_ALARM: $(grep -c 'SCHEDULE_EXACT_ALARM' "$manifest" 2>/dev/null || echo "0")개"
-            echo "SET_ALARM: $(grep -c 'SET_ALARM' "$manifest" 2>/dev/null || echo "0")개"
-            
-            echo ""
-            echo "--- 📋 전체 권한 목록 ---"
-            grep '<uses-permission' "$manifest" | sed 's/.*android:name="//;s/".*//' | sort || echo "권한 목록 추출 실패"
-            
-            echo ""
-            echo "--- 🔍 매니페스트 전체 내용 (처음 50줄) ---"
-            head -50 "$manifest"
-            
-            echo ""
-            echo "--- 🔍 매니페스트 전체 내용 (마지막 20줄) ---"
-            tail -20 "$manifest"
-            
-          else
-            echo "❌ 파일 없음: $manifest"
-          fi
-          echo ""
+          done
         done
         
-        echo ""
-        echo "=== 🎯 최종 요약 ==="
-        echo "템플릿 적용 여부 최종 판단:"
-        for manifest in "${MAIN_MANIFESTS[@]}"; do
-          if [ -f "$manifest" ]; then
-            if grep -q "NonExistentReceiver" "$manifest"; then
-              echo "✅ $manifest - 템플릿 적용됨"
-            else
-              echo "❌ $manifest - 템플릿 무시됨"
-            fi
-          fi
-        done
-
-    # ✅ 빌드 로그 업로드
-    - name: Upload build logs
-      uses: actions/upload-artifact@v4
-      if: always()
-      with:
-        name: build-logs-${{ github.run_number }}
-        path: |
-          build_full.log
-          .buildozer/**/*.log
-          .buildozer/**/AndroidManifest.xml
-        retention-days: 30
-        if-no-files-found: warn
-
-    # ✅ APK 업로드
-    - name: Upload APK
-      if: success()
-      uses: actions/upload-artifact@v4
-      with:
-        name: skku-timetable-apk
-        path: bin/*.apk
-        retention-days: 7
-        if-no-files-found: error
-
-    # 기존 워크플로우에 추가할 단계들
-    
-    # APK 설치 오류 진단 및 수정
-    - name: Diagnose APK installation issues
-      run: |
-        echo "=== 🔍 APK 설치 오류 진단 ==="
-        
-        # 1. APK 파일 존재 확인
-        echo "--- 📱 APK 파일 확인 ---"
-        if [ -f "final_doublecheck.apk" ]; then
-          echo "✅ final_doublecheck.apk 존재"
-          echo "📊 파일 크기: $(du -h final_doublecheck.apk | cut -f1)"
-          echo "📊 파일 권한: $(ls -la final_doublecheck.apk)"
-        else
-          echo "❌ final_doublecheck.apk 없음"
-          echo "🔍 현재 디렉토리 APK 파일들:"
-          find . -name "*.apk" -type f
-        fi
-        
-        # 2. APK 서명 상태 확인
-        echo ""
-        echo "--- 🔏 APK 서명 확인 ---"
-        if command -v jarsigner >/dev/null 2>&1; then
-          echo "🔍 APK 서명 검증:"
-          jarsigner -verify -verbose final_doublecheck.apk 2>&1 || echo "❌ 서명 검증 실패"
-        else
-          echo "❌ jarsigner 없음"
-        fi
-        
-        # 3. APK 구조 검증
-        echo ""
-        echo "--- 📦 APK 내부 구조 확인 ---"
-        echo "🔍 APK 내부 파일 목록 (상위 20개):"
-        unzip -l final_doublecheck.apk | head -25
-        
-        echo ""
-        echo "🔍 필수 파일 존재 확인:"
-        unzip -l final_doublecheck.apk | grep -E "(AndroidManifest.xml|classes.dex|META-INF)" || echo "❌ 필수 파일 누락"
-        
-        # 4. AndroidManifest.xml 검증
-        echo ""
-        echo "--- 📋 AndroidManifest.xml 검증 ---"
-        if unzip -l final_doublecheck.apk | grep -q "AndroidManifest.xml"; then
-          echo "✅ AndroidManifest.xml 존재"
-          
-          # AndroidManifest.xml 추출 및 검증
-          apktool d final_doublecheck.apk -o manifest_check --force >/dev/null 2>&1
-          
-          if [ -f "manifest_check/AndroidManifest.xml" ]; then
-            echo "🔍 매니페스트 기본 정보:"
-            echo "package: $(grep 'package=' manifest_check/AndroidManifest.xml | head -1)"
-            echo "versionCode: $(grep 'android:versionCode=' manifest_check/AndroidManifest.xml | head -1)"
-            echo "versionName: $(grep 'android:versionName=' manifest_check/AndroidManifest.xml | head -1)"
-            echo "minSdkVersion: $(grep 'android:minSdkVersion=' manifest_check/AndroidManifest.xml | head -1)"
-            echo "targetSdkVersion: $(grep 'android:targetSdkVersion=' manifest_check/AndroidManifest.xml | head -1)"
-            
-            echo ""
-            echo "🔍 액티비티 확인:"
-            activity_count=$(grep -c '<activity' manifest_check/AndroidManifest.xml 2>/dev/null || echo "0")
-            echo "액티비티 개수: $activity_count"
-            
-            if [ "$activity_count" -gt 0 ]; then
-              echo "메인 액티비티:"
-              grep -A 10 'android.intent.action.MAIN' manifest_check/AndroidManifest.xml | head -15 || echo "메인 액티비티 없음"
-            fi
-            
-            echo ""
-            echo "🔍 권한 확인:"
-            echo "권한 개수: $(grep -c '<uses-permission' manifest_check/AndroidManifest.xml 2>/dev/null || echo "0")"
-            
+        if [ -z "$FOUND_APK" ]; then
+          FOUND_APK=$(find . -name "*debug*.apk" -type f | head -1)
+          if [ -n "$FOUND_APK" ]; then
+            echo "✅ 전체 검색으로 APK 발견: $FOUND_APK"
           else
-            echo "❌ AndroidManifest.xml 추출 실패"
+            echo "❌ APK 파일을 찾을 수 없음"
+            exit 1
           fi
-        else
-          echo "❌ AndroidManifest.xml 없음 - APK 손상"
         fi
-    
-    # APK 수정 및 재생성
-    - name: Fix APK issues and regenerate
-      run: |
-        echo "=== 🔧 APK 문제 수정 및 재생성 ==="
         
-        # 1. 원본 buildozer APK 확인
-        echo "--- 📱 원본 buildozer APK 확인 ---"
-        ORIGINAL_APK="$APK_FILE"
-        if [ -f "$ORIGINAL_APK" ]; then
-          echo "✅ 원본 APK: $ORIGINAL_APK"
-          echo "📊 원본 크기: $(du -h "$ORIGINAL_APK" | cut -f1)"
-          
-          # 원본 APK 서명 확인
-          echo "🔍 원본 APK 서명 확인:"
-          jarsigner -verify "$ORIGINAL_APK" 2>&1 && echo "✅ 원본 서명됨" || echo "⚠️ 원본 서명 안됨"
-          
-          # 원본을 백업용으로 복사
-          cp "$ORIGINAL_APK" original_backup.apk
-          echo "✅ 원본 백업 완료"
-        else
+        echo "ORIGINAL_APK=$FOUND_APK" >> $GITHUB_ENV
+        echo "📊 APK 크기: $(du -h "$FOUND_APK" | cut -f1)"
+
+    # ✅ APK 수정 (AlarmReceiver 추가)
+    - name: Modify APK to add AlarmReceiver
+      run: |
+        echo "=== 🔧 APK 수정 (AlarmReceiver 추가) ==="
+        
+        if [ -z "${ORIGINAL_APK:-}" ] || [ ! -f "$ORIGINAL_APK" ]; then
           echo "❌ 원본 APK 없음"
           exit 1
         fi
         
-        # 2. 깨끗한 APK 수정 과정
-        echo ""
-        echo "--- 🧹 깨끗한 APK 수정 시작 ---"
+        echo "🎯 대상 APK: $ORIGINAL_APK"
         
-        # 기존 디컴파일 디렉토리 정리
-        rm -rf decoded_apk_clean manifest_check
+        # 백업 생성
+        cp "$ORIGINAL_APK" original_backup.apk
+        echo "✅ 원본 백업 완료"
         
-        # 원본 APK 디컴파일
-        echo "📦 원본 APK 디컴파일..."
-        apktool d "$ORIGINAL_APK" -o decoded_apk_clean --force
+        # 작업 공간 정리
+        rm -rf decoded_apk_clean
         
-        if [ ! -d "decoded_apk_clean" ]; then
+        # APK 디컴파일
+        echo "📦 APK 디컴파일..."
+        if apktool d "$ORIGINAL_APK" -o decoded_apk_clean --force; then
+          echo "✅ APK 디컴파일 성공"
+        else
           echo "❌ APK 디컴파일 실패"
           exit 1
         fi
         
-        # AndroidManifest.xml 백업
-        cp decoded_apk_clean/AndroidManifest.xml decoded_apk_clean/AndroidManifest.xml.backup
-        
-        # 3. AndroidManifest.xml 신중하게 수정
-        echo ""
-        echo "--- 📝 AndroidManifest.xml 신중한 수정 ---"
-        
+        # AndroidManifest.xml 수정
         MANIFEST="decoded_apk_clean/AndroidManifest.xml"
+        cp "$MANIFEST" "${MANIFEST}.backup"
         
-        # 현재 상태 확인
-        echo "🔍 수정 전 상태:"
-        echo "receiver 개수: $(grep -c '<receiver' "$MANIFEST" 2>/dev/null || echo "0")"
-        echo "AlarmReceiver 존재: $(grep -c 'AlarmReceiver' "$MANIFEST" 2>/dev/null || echo "0")"
+        echo "🔍 현재 receiver 개수: $(grep -c '<receiver' "$MANIFEST" 2>/dev/null || echo "0")"
         
-        # AlarmReceiver가 이미 있는지 확인
         if grep -q "AlarmReceiver" "$MANIFEST"; then
           echo "⚠️ AlarmReceiver 이미 존재함 - 수정하지 않음"
         else
           echo "➕ AlarmReceiver 추가 중..."
           
-          # </application> 태그 바로 앞에 receiver 추가
           if grep -q "</application>" "$MANIFEST"; then
-            # 임시 파일 사용하여 안전하게 수정
-            awk '
-            /<\/application>/ {
-              print "        <receiver android:name=\"org.kivy.skkutimetable.doublecheck.AlarmReceiver\" android:enabled=\"true\" android:exported=\"true\">"
-              print "            <intent-filter>"
-              print "                <action android:name=\"android.intent.action.BOOT_COMPLETED\" />"
-              print "            </intent-filter>"
-              print "        </receiver>"
-            }
-            { print }
-            ' "$MANIFEST" > "${MANIFEST}.tmp" && mv "${MANIFEST}.tmp" "$MANIFEST"
-            
+            sed -i '/<\/application>/i\        <receiver android:name="org.kivy.skkutimetable.doublecheck.AlarmReceiver" android:enabled="true" android:exported="true">\
+            <intent-filter>\
+                <action android:name="android.intent.action.BOOT_COMPLETED" />\
+            </intent-filter>\
+        </receiver>' "$MANIFEST"
             echo "✅ AlarmReceiver 추가 완료"
           else
-            echo "❌ </application> 태그 없음 - 매니페스트 구조 이상"
+            echo "❌ </application> 태그 없음"
             exit 1
           fi
         fi
         
-        # 4. 수정 결과 검증
-        echo ""
-        echo "--- 🔍 수정 결과 검증 ---"
-        echo "수정 후 receiver 개수: $(grep -c '<receiver' "$MANIFEST" 2>/dev/null || echo "0")"
-        echo "AlarmReceiver 존재: $(grep -c 'AlarmReceiver' "$MANIFEST" 2>/dev/null || echo "0")"
-        
+        # 수정 결과 검증
         if grep -q "AlarmReceiver" "$MANIFEST"; then
           echo "✅ AlarmReceiver 확인됨"
+          echo "📊 수정 후 receiver 개수: $(grep -c '<receiver' "$MANIFEST" 2>/dev/null || echo "0")"
         else
           echo "❌ AlarmReceiver 추가 실패"
           exit 1
         fi
-    
-    # 신중한 APK 리빌드 및 서명
-    - name: Careful APK rebuild and signing
+
+    # ✅ 수정된 APK 리빌드 및 서명
+    - name: Rebuild and sign modified APK
       run: |
-        echo "=== 🔨 신중한 APK 리빌드 및 서명 ==="
+        echo "=== 🔨 수정된 APK 리빌드 및 서명 ==="
         
-        # 1. APK 리빌드
-        echo "--- 📦 APK 리빌드 ---"
-        apktool b decoded_apk_clean -o rebuilt_doublecheck.apk
-        
-        if [ ! -f "rebuilt_doublecheck.apk" ]; then
+        # APK 리빌드
+        echo "📦 APK 리빌드..."
+        if apktool b decoded_apk_clean -o rebuilt_doublecheck.apk --force-all; then
+          echo "✅ APK 리빌드 성공"
+          echo "📊 리빌드 APK 크기: $(du -h rebuilt_doublecheck.apk | cut -f1)"
+        else
           echo "❌ APK 리빌드 실패"
           exit 1
         fi
         
-        echo "✅ APK 리빌드 성공"
-        echo "📊 리빌드 APK 크기: $(du -h rebuilt_doublecheck.apk | cut -f1)"
-        
-        # 2. 기존 서명 제거 (필요시)
-        echo ""
-        echo "--- 🗑️ 기존 서명 제거 ---"
+        # 기존 서명 제거
+        echo "🗑️ 기존 서명 제거..."
         zip -d rebuilt_doublecheck.apk META-INF/\* 2>/dev/null || echo "기존 서명 없음"
         
-        # 3. 새로운 서명 적용
-        echo ""
-        echo "--- ✍️ 새로운 서명 적용 ---"
-        
-        # 디버그 키스토어가 없으면 생성
+        # 디버그 키스토어 생성
         if [ ! -f "debug.keystore" ]; then
           echo "🔑 디버그 키스토어 생성..."
           keytool -genkey -v \
@@ -544,7 +245,7 @@ jobs:
         fi
         
         # APK 서명
-        echo "🔏 APK 서명 중..."
+        echo "🔏 APK 서명..."
         jarsigner -verbose \
           -sigalg SHA256withRSA \
           -digestalg SHA-256 \
@@ -555,8 +256,6 @@ jobs:
           androiddebugkey
         
         # 서명 검증
-        echo ""
-        echo "🔍 서명 검증:"
         if jarsigner -verify rebuilt_doublecheck.apk 2>/dev/null; then
           echo "✅ 서명 검증 성공"
         else
@@ -564,28 +263,18 @@ jobs:
           exit 1
         fi
         
-        # 4. zipalign (선택적)
-        echo ""
-        echo "--- 🔧 APK 정렬 (zipalign) ---"
-        
+        # zipalign 정렬
         ZIPALIGN_PATH="$HOME/android-sdk/build-tools/33.0.2/zipalign"
         if [ -f "$ZIPALIGN_PATH" ]; then
-          echo "🎯 APK 정렬 중..."
+          echo "🔧 APK 정렬..."
           $ZIPALIGN_PATH -f 4 rebuilt_doublecheck.apk final_doublecheck_fixed.apk
-          
-          if [ -f "final_doublecheck_fixed.apk" ]; then
-            echo "✅ APK 정렬 완료"
-            echo "📊 최종 APK 크기: $(du -h final_doublecheck_fixed.apk | cut -f1)"
-          else
-            echo "⚠️ zipalign 실패 - 서명된 APK 사용"
-            cp rebuilt_doublecheck.apk final_doublecheck_fixed.apk
-          fi
+          echo "✅ APK 정렬 완료"
         else
           echo "⚠️ zipalign 없음 - 서명된 APK 사용"
           cp rebuilt_doublecheck.apk final_doublecheck_fixed.apk
         fi
-    
-    # 최종 APK 검증
+
+    # ✅ 최종 APK 검증
     - name: Final APK validation
       run: |
         echo "=== 🎯 최종 APK 검증 ==="
@@ -600,18 +289,15 @@ jobs:
         echo "📱 최종 APK 정보:"
         echo "파일명: $APK_TO_TEST"
         echo "크기: $(du -h "$APK_TO_TEST" | cut -f1)"
-        echo "권한: $(ls -la "$APK_TO_TEST")"
         
-        echo ""
-        echo "--- 🔏 서명 검증 ---"
+        # 서명 검증
         if jarsigner -verify "$APK_TO_TEST" 2>/dev/null; then
           echo "✅ 서명 유효"
         else
           echo "❌ 서명 무효"
         fi
         
-        echo ""
-        echo "--- 📋 최종 AndroidManifest.xml 확인 ---"
+        # 최종 매니페스트 확인
         apktool d "$APK_TO_TEST" -o final_verification --force >/dev/null 2>&1
         
         if [ -f "final_verification/AndroidManifest.xml" ]; then
@@ -619,47 +305,71 @@ jobs:
           
           echo "🔍 기본 정보:"
           echo "package: $(grep 'package=' "$FINAL_MANIFEST" | head -1)"
-          echo "versionCode: $(grep 'android:versionCode=' "$FINAL_MANIFEST" | head -1)"
-          echo "minSdkVersion: $(grep 'android:minSdkVersion=' "$FINAL_MANIFEST" | head -1)"
+          echo "activity: $(grep -c '<activity' "$FINAL_MANIFEST" 2>/dev/null || echo "0")개"
+          echo "receiver: $(grep -c '<receiver' "$FINAL_MANIFEST" 2>/dev/null || echo "0")개"
           
-          echo ""
-          echo "🔍 컴포넌트 개수:"
-          echo "activity: $(grep -c '<activity' "$FINAL_MANIFEST" 2>/dev/null || echo "0")"
-          echo "receiver: $(grep -c '<receiver' "$FINAL_MANIFEST" 2>/dev/null || echo "0")"
-          echo "service: $(grep -c '<service' "$FINAL_MANIFEST" 2>/dev/null || echo "0")"
-          
-          echo ""
-          echo "🎯 AlarmReceiver 최종 확인:"
           if grep -q "AlarmReceiver" "$FINAL_MANIFEST"; then
             echo "✅ AlarmReceiver 정상 포함!"
-            grep -A 6 -B 2 "AlarmReceiver" "$FINAL_MANIFEST"
           else
             echo "❌ AlarmReceiver 없음"
           fi
           
-          echo ""
-          echo "🔍 MAIN 액티비티 확인:"
           if grep -A 10 'android.intent.action.MAIN' "$FINAL_MANIFEST" | grep -q 'android:name'; then
             echo "✅ MAIN 액티비티 존재"
-            grep -A 3 -B 1 'android.intent.action.MAIN' "$FINAL_MANIFEST" | head -10
           else
             echo "❌ MAIN 액티비티 없음 - 앱 실행 불가"
           fi
-          
-        else
-          echo "❌ 최종 매니페스트 추출 실패"
         fi
         
-        echo ""
         echo "🎉 최종 수정된 APK 준비 완료: $APK_TO_TEST"
-    
-    # 아티팩트 업로드 (수정됨)
-    - name: Upload fixed APK
+
+    # ✅ 원본 APK 분석 (디버깅용)
+    - name: Analyze original APK for debugging
+      if: always()
+      run: |
+        echo "=== 🔍 원본 APK 분석 (디버깅용) ==="
+        
+        if [ -f "${ORIGINAL_APK:-}" ]; then
+          echo "📦 원본 APK 디컴파일 및 분석..."
+          apktool d "$ORIGINAL_APK" -o original_analysis --force >/dev/null 2>&1
+          
+          if [ -f "original_analysis/AndroidManifest.xml" ]; then
+            ORIG_MANIFEST="original_analysis/AndroidManifest.xml"
+            echo "원본 APK 매니페스트 정보:"
+            echo "activity: $(grep -c '<activity' "$ORIG_MANIFEST" 2>/dev/null || echo "0")개"
+            echo "receiver: $(grep -c '<receiver' "$ORIG_MANIFEST" 2>/dev/null || echo "0")개"
+            echo "service: $(grep -c '<service' "$ORIG_MANIFEST" 2>/dev/null || echo "0")개"
+            echo "권한: $(grep -c '<uses-permission' "$ORIG_MANIFEST" 2>/dev/null || echo "0")개"
+            
+            if grep -q "AlarmReceiver" "$ORIG_MANIFEST"; then
+              echo "⚠️ 원본에 이미 AlarmReceiver 존재"
+            else
+              echo "❌ 원본에 AlarmReceiver 없음"
+            fi
+          fi
+        fi
+
+    # ✅ 빌드 로그 업로드
+    - name: Upload build logs
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: build-logs-${{ github.run_number }}
+        path: |
+          build_full.log
+          .buildozer/**/*.log
+          original_analysis/AndroidManifest.xml
+          final_verification/AndroidManifest.xml
+        retention-days: 30
+        if-no-files-found: warn
+
+    # ✅ 최종 APK 업로드
+    - name: Upload final APKs
       uses: actions/upload-artifact@v4
       with:
-        name: fixed-signed-apk
+        name: doublecheck-apks-${{ github.run_number }}
         path: |
           final_doublecheck_fixed.apk
           original_backup.apk
-          final_verification/AndroidManifest.xml
         retention-days: 7
+        if-no-files-found: error
