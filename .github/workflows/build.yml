@@ -74,19 +74,30 @@ jobs:
         mkdir -p cmdline-tools/latest
         mv cmdline-tools/* cmdline-tools/latest/ 2>/dev/null || true
         
-        # 환경 변수 설정
+        # 환경 변수 설정 (ANDROID_HOME 추가!)
         export ANDROID_SDK_ROOT=~/android-sdk
+        export ANDROID_HOME=~/android-sdk
         export PATH=$PATH:$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$ANDROID_SDK_ROOT/build-tools/34.0.0
-        echo "ANDROID_SDK_ROOT=~/android-sdk" >> $GITHUB_ENV
-        echo "~/android-sdk/cmdline-tools/latest/bin" >> $GITHUB_PATH
-        echo "~/android-sdk/build-tools/34.0.0" >> $GITHUB_PATH
+        echo "ANDROID_SDK_ROOT=$HOME/android-sdk" >> $GITHUB_ENV
+        echo "ANDROID_HOME=$HOME/android-sdk" >> $GITHUB_ENV
+        echo "$HOME/android-sdk/cmdline-tools/latest/bin" >> $GITHUB_PATH
+        echo "$HOME/android-sdk/build-tools/34.0.0" >> $GITHUB_PATH
         
         # SDK 라이센스 자동 동의
         yes | sdkmanager --licenses || true
         
-        # build-tools 최신 버전 설치
-        echo "🔧 Android Build Tools 설치..."
-        sdkmanager "build-tools;34.0.0" "platform-tools"
+        # 필요한 패키지 설치 (platforms 추가!)
+        echo "🔧 Android SDK 패키지 설치..."
+        sdkmanager "build-tools;34.0.0" "platform-tools" "platforms;android-33"
+        
+        # 설치 확인
+        echo "📋 설치 확인:"
+        ls -la ~/android-sdk/platforms/ || echo "platforms 디렉토리 없음"
+        if [ -f "~/android-sdk/platforms/android-33/android.jar" ]; then
+          echo "✅ android.jar 발견"
+        else
+          echo "❌ android.jar 없음"
+        fi
         
         echo "✅ 모든 도구 설치 완료"
 
@@ -256,11 +267,30 @@ jobs:
           exit 1
         fi
         
-        # 9. aapt 실행
+        # 9. aapt 실행 (android.jar 경로 확인 추가)
+        echo "🔍 Android SDK 환경 확인:"
+        echo "ANDROID_HOME: ${ANDROID_HOME:-없음}"
+        echo "ANDROID_SDK_ROOT: ${ANDROID_SDK_ROOT:-없음}"
+        
+        # android.jar 경로 찾기
+        ANDROID_JAR=""
+        if [ -f "$ANDROID_HOME/platforms/android-33/android.jar" ]; then
+          ANDROID_JAR="$ANDROID_HOME/platforms/android-33/android.jar"
+          echo "✅ android-33.jar 발견: $ANDROID_JAR"
+        elif [ -f "$ANDROID_HOME/platforms/android-34/android.jar" ]; then
+          ANDROID_JAR="$ANDROID_HOME/platforms/android-34/android.jar"
+          echo "✅ android-34.jar 발견: $ANDROID_JAR"
+        else
+          echo "❌ android.jar를 찾을 수 없음"
+          echo "사용 가능한 platforms:"
+          ls -la "$ANDROID_HOME/platforms/" 2>/dev/null || echo "platforms 디렉토리 없음"
+          exit 1
+        fi
+        
         aapt package -f \
           -M "$MANIFEST_PATH" \
           -S "$RESOURCES_PATH" \
-          -I "$ANDROID_HOME/platforms/android-33/android.jar" \
+          -I "$ANDROID_JAR" \
           -F "$OUTPUT_PATH"
         
         if [ -f "new.apk" ]; then
