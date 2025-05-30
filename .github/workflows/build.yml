@@ -66,9 +66,9 @@ jobs:
           exit 1
         fi
 
-    - name: Method 1 - aapt2 modification
+    - name: Method 1 - aapt2 modification (Primary)
       run: |
-        echo "=== Modifying APK with aapt2 ==="
+        echo "=== Modifying APK with aapt2 (Primary Method) ==="
         
         if [ -f "original_built.apk" ]; then
           mkdir -p aapt2_work
@@ -95,88 +95,156 @@ jobs:
           echo "Hex dump (first 32 bytes):"
           hexdump -C AndroidManifest.xml | head -2
           
-          cd ..
-        else
-          echo "No APK to modify"
-        fi
+          # 새로운 매니페스트 생성 (텍스트 형태)
+          echo "Creating new manifest with receiver..."
+          python3 << 'PYTHON_EOF'
+import xml.etree.ElementTree as ET
+import subprocess
+import os
 
-    - name: Method 2 - apktool modification
-      run: |
-        echo "=== Modifying APK with apktool ==="
+# aapt로 현재 매니페스트를 XML 형태로 추출
+try:
+    result = subprocess.run(['aapt', 'dump', 'xmltree', 'original.apk', 'AndroidManifest.xml'], 
+                          capture_output=True, text=True)
+    if result.returncode != 0:
+        print("Failed to extract manifest with aapt")
+        exit(1)
+    
+    # 기본 매니페스트 템플릿 생성
+    manifest_xml = '''<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="org.kivy.skkutimetable.doublecheck"
+    android:versionCode="10211"
+    android:versionName="0.1">
+    
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+    
+    <application android:label="DoubleCheck" android:icon="@mipmap/icon">
+        <activity android:name="org.kivy.android.PythonActivity"
+                  android:label="DoubleCheck"
+                  android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
         
-        if [ -f "original_built.apk" ]; then
-          mkdir -p apktool_work
-          cd apktool_work
+        <service android:name="org.kivy.android.PythonService" android:process=":pythonservice" />
+        
+        <receiver android:name="org.kivy.skkutimetable.doublecheck.AlarmReceiver"
+                  android:enabled="true"
+                  android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
+        
+    </application>
+</manifest>'''
+    
+    # 새 매니페스트 저장
+    with open('AndroidManifest_new.xml', 'w', encoding='utf-8') as f:
+        f.write(manifest_xml)
+    
+    print("New manifest created successfully")
+    
+except Exception as e:
+    print(f"Error creating manifest: {e}")
+    exit(1)
+PYTHON_EOF
           
-          # apktool로 APK 디컴파일
-          echo "Decompiling APK with apktool..."
-          apktool d ../original_built.apk -o decoded_apk
+          # aapt로 새 매니페스트를 바이너리로 변환
+          echo "Converting new manifest to binary..."
+          mkdir -p temp_res/values
+          echo '<?xml version="1.0" encoding="utf-8"?><resources><string name="app_name">DoubleCheck</string></resources>' > temp_res/values/strings.xml
           
-          if [ -d "decoded_apk" ]; then
-            echo "APK decompiled successfully"
+          # 기존 리소스 복사
+          if [ -d "res" ]; then
+            echo "Copying existing resources..."
+            cp -r res/* temp_res/ 2>/dev/null || true
+          fi
+          
+          # aapt로 새 APK 패키징
+          if aapt package -f -M AndroidManifest_new.xml -S temp_res -I "$ANDROID_HOME/platforms/android-33/android.jar" -F new_base.apk; then
+            echo "New APK base created successfully"
             
-            # 매니페스트 확인
-            echo "Current AndroidManifest.xml:"
-            head -30 decoded_apk/AndroidManifest.xml
-            
-            # receiver 추가
-            echo "Adding AlarmReceiver to manifest..."
-            cp decoded_apk/AndroidManifest.xml decoded_apk/AndroidManifest.xml.backup
-            
-            # application 태그 종료 전에 receiver 추가
-            sed -i '/<\/application>/i\    <receiver android:name="org.kivy.skkutimetable.doublecheck.AlarmReceiver" android:enabled="true" android:exported="true">\
-        <intent-filter>\
-            <action android:name="android.intent.action.BOOT_COMPLETED" />\
-        </intent-filter>\
-    </receiver>' decoded_apk/AndroidManifest.xml
-            
-            echo "Modified manifest:"
-            grep -A 10 -B 5 "AlarmReceiver" decoded_apk/AndroidManifest.xml || echo "Receiver addition failed"
-            
-            # 리빌드
-            echo "Rebuilding APK..."
-            apktool b decoded_apk -o modified.apk
-            
-            if [ -f "modified.apk" ]; then
-              echo "APK rebuilt successfully"
-              echo "Modified APK size: $(du -h modified.apk | cut -f1)"
+            # 새 매니페스트 추출
+            unzip -j new_base.apk AndroidManifest.xml -d .
+            if [ -f "AndroidManifest.xml" ]; then
+              echo "New binary manifest extracted"
+              echo "New manifest size: $(wc -c < AndroidManifest.xml) bytes"
               
-              # 서명
-              echo "Signing APK..."
-              # 디버그 키스토어 생성
-              keytool -genkey -v -keystore debug.keystore -alias androiddebugkey -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US" -storepass android -keypass android -noprompt
+              # 원본 APK에 새 매니페스트와 리소스 삽입
+              echo "Creating final modified APK..."
+              cp original.apk final_modified.apk
               
-              jarsigner -verbose -sigalg SHA256withRSA -digestalg SHA-256 -keystore debug.keystore -storepass android -keypass android modified.apk androiddebugkey
+              # 새 매니페스트 삽입
+              zip -u final_modified.apk AndroidManifest.xml
               
-              # zipalign (선택사항)
-              ZIPALIGN_PATH="$ANDROID_HOME/build-tools/34.0.0/zipalign"
-              if [ -f "$ZIPALIGN_PATH" ]; then
-                echo "Aligning APK..."
-                $ZIPALIGN_PATH -f -v 4 modified.apk final_modified.apk
-                echo "Final APK created: final_modified.apk"
-              else
-                cp modified.apk final_modified.apk
+              # 새 리소스 삽입 (있다면)
+              if [ -f "resources.arsc" ]; then
+                unzip -j new_base.apk resources.arsc -d .
+                zip -u final_modified.apk resources.arsc
               fi
+              
+              echo "Final APK created: final_modified.apk"
+              echo "Final APK size: $(du -h final_modified.apk | cut -f1)"
               
               # 검증
               if aapt dump badging final_modified.apk >/dev/null 2>&1; then
-                echo "Modified APK is valid"
+                echo "✅ Modified APK is valid!"
                 echo "Package info:"
                 aapt dump badging final_modified.apk | head -5
+                
+                # receiver 확인
+                echo "Checking for receiver:"
+                aapt dump xmltree final_modified.apk AndroidManifest.xml | grep -A 5 -B 5 "receiver" || echo "No receiver found in final APK"
               else
-                echo "Modified APK validation failed"
+                echo "❌ Modified APK validation failed"
+                aapt dump badging final_modified.apk 2>&1 | head -10
               fi
               
             else
-              echo "APK rebuild failed"
+              echo "Failed to extract new binary manifest"
             fi
           else
-            echo "APK decompilation failed"
+            echo "Failed to create new APK base"
           fi
           
           cd ..
         else
           echo "No APK to modify"
+        fi
+
+    - name: Method 2 - Alternative approach (Backup)
+      if: failure()
+      run: |
+        echo "=== Alternative approach if aapt2 fails ==="
+        
+        if [ -f "original_built.apk" ]; then
+          mkdir -p alternative_work
+          cd alternative_work
+          
+          echo "Trying direct binary modification..."
+          cp ../original_built.apk test.apk
+          
+          # 간단한 검증만
+          if aapt dump badging test.apk >/dev/null 2>&1; then
+            echo "Original APK is valid"
+            echo "Package info:"
+            aapt dump badging test.apk | head -3
+          else
+            echo "Original APK has issues"
+          fi
+          
+          cd ..
         fi
 
     - name: Compare results
