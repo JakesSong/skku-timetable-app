@@ -175,6 +175,12 @@ jobs:
       run: |
         echo "🔑 === SDK LICENSES ==="
         yes | $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager --licenses || true
+        
+        # buildozer용 SDK 경로도 라이센스 수락
+        if [ -d "/home/runner/.buildozer/android/platform/android-sdk" ]; then
+          echo "🔑 Accepting licenses for buildozer SDK..."
+          yes | /home/runner/.buildozer/android/platform/android-sdk/cmdline-tools/latest/bin/sdkmanager --licenses || true
+        fi
 
     - name: Clean previous builds (selective)
       run: |
@@ -186,6 +192,16 @@ jobs:
           echo "⚠️ First time build - skipping clean"
         fi
         rm -rf bin
+        
+        # buildozer SDK 경로에 API 33 강제 설치
+        echo "🔧 === ENSURING API 33 FOR BUILDOZER ==="
+        if [ -d "/home/runner/.buildozer/android/platform/android-sdk" ]; then
+          echo "📥 Installing API 33 for buildozer SDK..."
+          /home/runner/.buildozer/android/platform/android-sdk/cmdline-tools/latest/bin/sdkmanager "platforms;android-33" || \
+          echo "⚠️ Could not install API 33 for buildozer SDK"
+        else
+          echo "⚠️ Buildozer SDK not found yet, will be created during build"
+        fi
 
     - name: Build APK with custom buildozer
       run: |
@@ -195,6 +211,12 @@ jobs:
         echo -e "\n📝 Final buildozer.spec verification:"
         echo "Last 20 lines:"
         tail -20 buildozer.spec
+        
+        # API 33 문제 회피 - 안정적인 API 31로 강제 변경
+        echo -e "\n🔧 Forcing stable API level..."
+        sed -i 's/android\.api = 33/android.api = 31/g' buildozer.spec || true
+        sed -i 's/android\.api=33/android.api=31/g' buildozer.spec || true
+        echo "📝 Updated API level to 31 for stability"
         
         echo -e "\n🔨 Starting build with PR #1519 support..."
         buildozer android debug --verbose
