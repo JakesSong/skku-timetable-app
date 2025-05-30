@@ -183,10 +183,10 @@ jobs:
         echo -e "\n✅ Build completed at: $(date)"
       timeout-minutes: 50
 
-    - name: Verify AlarmReceiver in generated APK
+    - name: Verify AlarmReceiver in generated APK (완전 분석)
       if: success()
       run: |
-        echo "🔍 === VERIFYING ALARMRECEIVER IN APK ==="
+        echo "🔍 === COMPLETE APK ANALYSIS ==="
         
         # APK 파일 찾기
         APK_FILE=$(find . -name "*.apk" -type f | head -1)
@@ -196,23 +196,126 @@ jobs:
         fi
         
         echo "📱 Found APK: $APK_FILE"
+        echo "📏 APK Size: $(ls -lh "$APK_FILE" | awk '{print $5}')"
         
-        # APK 내용 확인 (aapt 사용)
-        echo -e "\n📄 Checking AndroidManifest.xml in APK..."
-        $ANDROID_SDK_ROOT/build-tools/32.0.0/aapt dump xmltree "$APK_FILE" AndroidManifest.xml | grep -A 5 -B 5 "AlarmReceiver\|BOOT_COMPLETED" || echo "⚠️ AlarmReceiver not found in manifest"
+        echo -e "\n🔍 === 1. FULL AndroidManifest.xml DUMP ==="
+        $ANDROID_SDK_ROOT/build-tools/32.0.0/aapt dump xmltree "$APK_FILE" AndroidManifest.xml > full_manifest.txt
+        echo "📄 Full manifest saved to full_manifest.txt (will be uploaded as artifact)"
+        
+        echo -e "\n🔍 === 2. SEARCHING FOR ALARMRECEIVER ==="
+        echo "🔎 Searching for 'receiver' elements:"
+        grep -n -A 10 -B 2 "receiver" full_manifest.txt || echo "❌ No receiver found"
+        
+        echo -e "\n🔎 Searching for 'AlarmReceiver' specifically:"
+        grep -n -A 5 -B 5 -i "alarm.*receiver\|alarmreceiver" full_manifest.txt || echo "❌ No AlarmReceiver found"
+        
+        echo -e "\n🔎 Searching for 'BOOT_COMPLETED':"
+        grep -n -A 5 -B 5 "BOOT_COMPLETED" full_manifest.txt || echo "❌ No BOOT_COMPLETED found"
+        
+        echo -e "\n🔍 === 3. APPLICATION ELEMENT ANALYSIS ==="
+        echo "🔎 Application element and its children:"
+        grep -n -A 50 "E: application" full_manifest.txt | head -100
+        
+        echo -e "\n🔍 === 4. PERMISSIONS CHECK ==="
+        echo "🔎 All permissions:"
+        grep -n "uses-permission" full_manifest.txt
+        
+        echo -e "\n🔍 === 5. APK CONTENTS ANALYSIS ==="
+        echo "🔎 APK structure:"
+        $ANDROID_SDK_ROOT/build-tools/32.0.0/aapt list -v "$APK_FILE" | head -20
+        
+        echo -e "\n🔎 Java classes in APK:"
+        $ANDROID_SDK_ROOT/build-tools/32.0.0/aapt list "$APK_FILE" | grep -i "\.class$" | grep -i "alarm\|receiver" || echo "❌ No AlarmReceiver class found"
+        
+        echo -e "\n🔍 === 6. BUILDOZER.SPEC VERIFICATION ==="
+        echo "🔎 Current extra_manifest setting:"
+        grep -n "android.extra_manifest" buildozer.spec || echo "❌ No extra_manifest setting found"
+        
+        echo -e "\n📊 === SUMMARY ==="
+        RECEIVER_COUNT=$(grep -c "E: receiver" full_manifest.txt 2>/dev/null || echo "0")
+        BOOT_COUNT=$(grep -c "BOOT_COMPLETED" full_manifest.txt 2>/dev/null || echo "0")
+        ALARM_COUNT=$(grep -c -i "alarm" full_manifest.txt 2>/dev/null || echo "0")
+        
+        echo "📈 Analysis Results:"
+        echo "   - Receiver elements: $RECEIVER_COUNT"
+        echo "   - BOOT_COMPLETED references: $BOOT_COUNT"
+        echo "   - Alarm references: $ALARM_COUNT"
+        
+        if [ "$RECEIVER_COUNT" -gt 0 ] && [ "$BOOT_COUNT" -gt 0 ]; then
+          echo "✅ SUCCESS: AlarmReceiver appears to be properly integrated!"
+        elif [ "$BOOT_COUNT" -gt 0 ]; then
+          echo "⚠️ PARTIAL: BOOT_COMPLETED found but no receiver element"
+        else
+          echo "❌ FAILED: No AlarmReceiver integration detected"
+        fi
 
-    - name: Debug build results
+    - name: Collect full build logs and debugging info
       if: always()
       run: |
-        echo "📱 === BUILD RESULTS ==="
-        echo "📁 Generated files:"
-        find . -name "*.apk" -type f -exec ls -lh {} \; 2>/dev/null || echo "No APK files found"
+        echo "📁 === COLLECTING BUILD LOGS AND DEBUG INFO ==="
         
-        if [ -d bin ]; then
-          ls -la bin/
-        else
-          echo "❌ bin directory not found"
-        fi
+        # 디버그 정보 수집 디렉토리 생성
+        mkdir -p debug_output
+        
+        echo "📄 Copying buildozer.spec..."
+        cp buildozer.spec debug_output/ 2>/dev/null || echo "buildozer.spec not found"
+        
+        echo "📄 Copying full manifest analysis..."
+        cp full_manifest.txt debug_output/ 2>/dev/null || echo "full_manifest.txt not found"
+        
+        echo "📄 Collecting buildozer logs..."
+        find .buildozer -name "*.log" -type f -exec cp {} debug_output/ \; 2>/dev/null || echo "No .log files found"
+        
+        echo "📄 Collecting gradle logs..."
+        find .buildozer -path "*/gradle*" -name "*.log" -type f -exec cp {} debug_output/ \; 2>/dev/null || echo "No gradle logs found"
+        
+        echo "📄 Collecting python-for-android logs..."
+        find .buildozer -path "*/python-for-android*" -name "*.log" -type f -exec cp {} debug_output/ \; 2>/dev/null || echo "No p4a logs found"
+        
+        echo "📄 Creating build environment info..."
+        cat > debug_output/build_env_info.txt << 'EOF'
+        BUILD ENVIRONMENT INFO
+        ======================
+        Date: $(date)
+        Python Version: $(python --version)
+        Buildozer Version: $(buildozer version 2>&1 || echo "N/A")
+        Java Version: $(java -version 2>&1 | head -3)
+        Android SDK: $ANDROID_SDK_ROOT
+        Available Build Tools: $(ls $ANDROID_SDK_ROOT/build-tools/ 2>/dev/null || echo "N/A")
+        
+        REPOSITORY INFO
+        ===============
+        Current Branch: $GITHUB_REF_NAME
+        Commit SHA: $GITHUB_SHA
+        Workflow Run: $GITHUB_RUN_NUMBER
+        
+        BUILDOZER.SPEC SETTINGS
+        =======================
+        EOF
+        
+        echo "📄 Adding buildozer.spec to env info..."
+        cat buildozer.spec >> debug_output/build_env_info.txt 2>/dev/null || echo "buildozer.spec not found" >> debug_output/build_env_info.txt
+        
+        echo "📄 Creating directory structure log..."
+        echo "FULL PROJECT STRUCTURE" > debug_output/project_structure.txt
+        echo "======================" >> debug_output/project_structure.txt
+        find . -type f -name "*.py" -o -name "*.java" -o -name "*.xml" -o -name "*.spec" -o -name "*.kv" | head -50 >> debug_output/project_structure.txt 2>/dev/null
+        
+        echo "📄 Creating buildozer directory structure..."
+        echo "BUILDOZER DIRECTORY STRUCTURE" > debug_output/buildozer_structure.txt
+        echo "=============================" >> debug_output/buildozer_structure.txt
+        find .buildozer -type d | head -100 >> debug_output/buildozer_structure.txt 2>/dev/null || echo ".buildozer not found" >> debug_output/buildozer_structure.txt
+        
+        echo "📄 Checking for generated AndroidManifest templates..."
+        echo "ANDROIDMANIFEST TEMPLATES" > debug_output/manifest_templates.txt
+        echo "=========================" >> debug_output/manifest_templates.txt
+        find .buildozer -name "*AndroidManifest*" -type f -exec echo "=== {} ===" \; -exec cat {} \; 2>/dev/null >> debug_output/manifest_templates.txt || echo "No manifest templates found" >> debug_output/manifest_templates.txt
+        
+        echo "📄 Debug output files created:"
+        ls -la debug_output/
+        
+        echo "📊 Total debug output size:"
+        du -sh debug_output/
 
     - name: Upload APK artifact
       if: success()
@@ -222,12 +325,27 @@ jobs:
         path: ./bin/*.apk
         if-no-files-found: warn
 
-    - name: Upload build logs on failure
+    - name: Upload complete debug package
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: complete-build-debug-logs
+        path: |
+          debug_output/
+          ./.buildozer/android/platform/build-*/logs/
+          ./.buildozer/**/*.log
+          ./full_manifest.txt
+        if-no-files-found: ignore
+        retention-days: 30
+
+    - name: Upload buildozer cache for inspection
       if: failure()
       uses: actions/upload-artifact@v4
       with:
-        name: custom-buildozer-logs
+        name: buildozer-cache-debug
         path: |
-          ./.buildozer/android/platform/build-*/logs/
-          ./.buildozer/**/*.log
+          ./.buildozer/android/platform/python-for-android/
+          ./.buildozer/android/platform/build-*/dists/*/templates/
+          ./.buildozer/android/platform/build-*/dists/*/src/
         if-no-files-found: ignore
+        retention-days: 7
