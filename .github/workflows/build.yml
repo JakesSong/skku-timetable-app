@@ -90,9 +90,11 @@ jobs:
         echo "📥 Installing custom buildozer fork with PR #1519..."
         pip install git+https://github.com/dvjdjvu/buildozer.git@master
         
-        # 필요한 python-for-android도 설치
+        # python-for-android는 develop 브랜치 시도, 없으면 기본 kivy 버전 사용
         echo "📥 Installing custom python-for-android..."
-        pip install git+https://github.com/dvjdjvu/python-for-android.git@master
+        pip install git+https://github.com/dvjdjvu/python-for-android.git@develop || \
+        pip install git+https://github.com/kivy/python-for-android.git@develop || \
+        echo "⚠️ Using default python-for-android, will rely on buildozer fork for manifest support"
         
         echo "📦 Installing other dependencies..."
         pip install kivy==2.1.0
