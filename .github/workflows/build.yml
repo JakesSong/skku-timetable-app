@@ -280,54 +280,55 @@ jobs:
         echo "📋 aapt 정보:"
         aapt version
 
-        # 단계별 aapt 실행 (성공 체크 로직 수정!)
-        echo "🚀 aapt 실행 시도 1: 기본 명령어"
+        # 단계별 aapt 실행 (AndroidManifest.xml 이름 사용!)
+        echo "🚀 aapt 실행 - AndroidManifest.xml 이름으로 변경"
         
         # 임시 APK 생성 (매니페스트만)
         mkdir -p temp_res/values
         echo '<?xml version="1.0" encoding="utf-8"?><resources><string name="app_name">DoubleCheck</string></resources>' > temp_res/values/strings.xml
         echo "  리소스 디렉토리 절대경로: $(realpath temp_res)"
         
+        # 원본 AndroidManifest.xml 백업
+        cp AndroidManifest.xml AndroidManifest_original.xml
+        
+        # 수정된 매니페스트를 표준 이름으로 복사
+        cp new_manifest_text.xml AndroidManifest.xml
+        echo "✅ 수정된 매니페스트를 AndroidManifest.xml로 복사"
+        
+        # aapt 실행 (이제 -M 옵션 없이!)
         aapt package -f \
-          -M new_manifest_text.xml \
           -S temp_res \
           -I "$ANDROID_HOME/platforms/android-33/android.jar" \
-          -F temp_with_manifest.apk 2>&1 | tee aapt_output.log
+          -F temp_with_manifest.apk \
+          -v 2>&1 | tee aapt_output.log
 
         RESULT1=$?
         echo "결과 코드: $RESULT1"
 
         # 성공 체크: 결과 코드 0이고 APK 파일이 생성되었으면 성공!
         if [ $RESULT1 -eq 0 ] && [ -f "temp_with_manifest.apk" ]; then
-          echo "✅ aapt 실행 성공! (에러 메시지는 무시)"
+          echo "✅ aapt 실행 성공! AndroidManifest.xml 방식"
+          echo "APK 크기: $(du -h temp_with_manifest.apk | cut -f1)"
           APK_SUCCESS=true
-        elif [ $RESULT1 -ne 0 ]; then
+        else
           echo "🚀 aapt 실행 시도 2: 절대경로 사용"
           aapt package -f \
-            -M "$(pwd)/new_manifest_text.xml" \
             -S "$(pwd)/temp_res" \
             -I "$ANDROID_HOME/platforms/android-33/android.jar" \
-            -F "$(pwd)/temp_with_manifest.apk" 2>&1 | tee aapt_output2.log
+            -F "$(pwd)/temp_with_manifest.apk" \
+            -v 2>&1 | tee aapt_output2.log
           
           RESULT2=$?
           echo "결과 코드: $RESULT2"
           
           if [ $RESULT2 -eq 0 ] && [ -f "temp_with_manifest.apk" ]; then
             echo "✅ aapt 실행 성공! (시도 2)"
+            echo "APK 크기: $(du -h temp_with_manifest.apk | cut -f1)"
             APK_SUCCESS=true
           else
-            echo "🚀 aapt 실행 시도 3: 최소 리소스로"
-            
-            # 더 간단한 리소스 구조
-            rm -rf temp_res
-            mkdir -p temp_res/values
-            echo '<?xml version="1.0" encoding="utf-8"?>' > temp_res/values/strings.xml
-            echo '<resources>' >> temp_res/values/strings.xml
-            echo '    <string name="app_name">DoubleCheck</string>' >> temp_res/values/strings.xml
-            echo '</resources>' >> temp_res/values/strings.xml
+            echo "🚀 aapt 실행 시도 3: 디버그 모드"
             
             aapt package -f \
-              -M "$(pwd)/new_manifest_text.xml" \
               -S "$(pwd)/temp_res" \
               -I "$ANDROID_HOME/platforms/android-33/android.jar" \
               -F "$(pwd)/temp_with_manifest.apk" \
@@ -339,19 +340,19 @@ jobs:
             
             if [ $RESULT3 -eq 0 ] && [ -f "temp_with_manifest.apk" ]; then
               echo "✅ aapt 실행 성공! (시도 3)"
+              echo "APK 크기: $(du -h temp_with_manifest.apk | cut -f1)"
               APK_SUCCESS=true
             else
               APK_SUCCESS=false
             fi
           fi
-        else
-          APK_SUCCESS=false
         fi
 
         # 성공한 경우 계속 진행
         if [ "$APK_SUCCESS" = "true" ]; then
           echo "🎉 aapt로 APK 생성 성공!"
-          echo "APK 크기: $(du -h temp_with_manifest.apk | cut -f1)"
+          echo "📊 생성된 APK 정보:"
+          ls -la temp_with_manifest.apk
           
           # 새 바이너리 매니페스트 추출
           mkdir -p new_manifest
