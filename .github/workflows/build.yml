@@ -1,4 +1,4 @@
-name: Build Android APK with Custom Buildozer
+name: Build Android APK (Standard)
 
 on:
   push:
@@ -10,7 +10,7 @@ on:
 jobs:
   build:
     runs-on: ubuntu-22.04
-    timeout-minutes: 60
+    timeout-minutes: 45
 
     steps:
     - name: Checkout repository
@@ -25,7 +25,7 @@ jobs:
       uses: actions/cache@v3
       with:
         path: ~/.cache/pip
-        key: ${{ runner.os }}-pip-custom-buildozer
+        key: ${{ runner.os }}-pip-standard
         restore-keys: |
           ${{ runner.os }}-pip-
 
@@ -33,9 +33,9 @@ jobs:
       uses: actions/cache@v3
       with:
         path: .buildozer
-        key: ${{ runner.os }}-buildozer-custom-${{ hashFiles('buildozer.spec') }}
+        key: ${{ runner.os }}-buildozer-${{ hashFiles('buildozer.spec') }}
         restore-keys: |
-          ${{ runner.os }}-buildozer-custom-
+          ${{ runner.os }}-buildozer-
 
     - name: Install system dependencies
       run: |
@@ -57,7 +57,6 @@ jobs:
           zlib1g-dev \
           libgstreamer1.0-0 \
           libgstreamer1.0-dev \
-          libunwind-dev \
           gstreamer1.0-plugins-base \
           gstreamer1.0-plugins-good \
           openjdk-17-jdk \
@@ -80,115 +79,33 @@ jobs:
       with:
         cmdline-tools-version: 8512546
         packages: "platforms;android-33 build-tools;32.0.0 platform-tools ndk;25.2.9519653"
-        
-    - name: Verify Android SDK installation
-      run: |
-        echo "🔍 === ANDROID SDK VERIFICATION ==="
-        echo "📁 Android SDK root: $ANDROID_SDK_ROOT"
-        echo "📱 Installed platforms:"
-        ls -la $ANDROID_SDK_ROOT/platforms/ || echo "No platforms directory"
-        echo "🔧 Available API levels:"
-        $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager --list_installed | grep "platforms;android-" || echo "No platforms installed"
-        
-        # API 33이 없으면 강제 설치
-        if [ ! -d "$ANDROID_SDK_ROOT/platforms/android-33" ]; then
-          echo "⚠️ API 33 not found, installing..."
-          $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager "platforms;android-33"
-        else
-          echo "✅ API 33 already installed"
-        fi
 
-    - name: Install custom buildozer with PR #1519 support
+    - name: Install standard buildozer and dependencies
       run: |
-        echo "🔧 === INSTALLING CUSTOM BUILDOZER ==="
+        echo "📦 === INSTALLING STANDARD BUILDOZER ==="
         python -m pip install --upgrade pip
         
-        # PR #1519가 적용된 buildozer fork 설치 (dvjdjvu의 fork)
-        echo "📥 Installing custom buildozer fork with PR #1519..."
-        pip install git+https://github.com/dvjdjvu/buildozer.git@master
-        
-        # python-for-android는 develop 브랜치 시도, 없으면 기본 kivy 버전 사용
-        echo "📥 Installing custom python-for-android..."
-        pip install git+https://github.com/dvjdjvu/python-for-android.git@develop || \
-        pip install git+https://github.com/kivy/python-for-android.git@develop || \
-        echo "⚠️ Using default python-for-android, will rely on buildozer fork for manifest support"
-        
-        echo "📦 Installing other dependencies..."
+        # 표준 안정 버전들 설치
+        pip install buildozer==1.5.0
         pip install kivy==2.1.0
         pip install kivymd==1.1.1
         pip install cython==0.29.33
         pip install requests beautifulsoup4
-
-    - name: Verify custom buildozer installation
-      run: |
-        echo "🔍 === VERIFYING CUSTOM BUILDOZER ==="
         
+        echo "✅ Standard packages installed"
+
+    - name: Verify buildozer installation
+      run: |
         echo "📋 Buildozer version:"
-        buildozer version || pip show buildozer
+        buildozer version
         
-        echo -e "\n📄 Testing extra_manifest_application_entry support:"
-        python -c "
-        try:
-            from buildozer.targets.android import TargetAndroid
-            print('✅ Custom buildozer imported successfully')
-            # buildozer 소스코드에서 extra_manifest_application_entry 지원 확인
-            import inspect
-            print('✅ Checking for PR #1519 support...')
-        except Exception as e:
-            print(f'❌ Error: {e}')
-        "
-
-    - name: Verify project configuration  
-      run: |
-        echo "🔍 === PROJECT VERIFICATION ==="
-        echo "📁 Current directory:"
-        ls -la
-        
-        echo -e "\n📄 buildozer.spec key settings:"
-        echo "🔧 Extra manifest entry (PR #1519):"
-        grep -n "android.extra_manifest_application_entry" buildozer.spec || echo "❌ PR #1519 setting not found"
-        echo "🔧 Android permissions:"
-        grep -n "android.permissions" buildozer.spec || echo "❌ No permissions found"
-        echo "🔧 Android API settings:"
-        grep -n "android.api\|android.minapi\|android.sdk" buildozer.spec || echo "❌ No API settings found"
-        echo "🔧 Java source path:"
-        grep -n "android.add_src" buildozer.spec || echo "❌ No Java source path found"
-        
-        echo -e "\n📁 xml/receivers.xml verification:"
-        if [ -f xml/receivers.xml ]; then
-          echo "✅ receivers.xml exists"
-          echo "📄 Content:"
-          cat xml/receivers.xml
-        else
-          echo "❌ xml/receivers.xml NOT found - Please create this file manually!"
-          echo "🚨 CRITICAL: receivers.xml is required for AlarmReceiver functionality"
-        fi
-        
-        echo -e "\n📁 Java source verification:"
-        if [ -d android/src/main/java ]; then
-          echo "✅ Java source directory exists"
-          find android/src/main/java -name "*.java" -type f || echo "No Java files found"
-        else
-          echo "❌ Java source directory NOT found"
-        fi
-        
-        echo -e "\n🔧 Checking buildozer.spec API level..."
-        API_LEVEL=$(grep "android.api" buildozer.spec | head -1 | cut -d'=' -f2 | tr -d ' ')
-        echo "📱 Current API level: $API_LEVEL"
-        if [ "$API_LEVEL" != "34" ]; then
-          echo "⚠️ WARNING: API level should be 34 for Google Play compliance"
-        fi
+        echo "📄 Checking buildozer.spec:"
+        ls -la buildozer.spec
 
     - name: Accept Android SDK licenses
       run: |
         echo "🔑 === SDK LICENSES ==="
         yes | $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager --licenses || true
-        
-        # buildozer용 SDK 경로도 라이센스 수락
-        if [ -d "/home/runner/.buildozer/android/platform/android-sdk" ]; then
-          echo "🔑 Accepting licenses for buildozer SDK..."
-          yes | /home/runner/.buildozer/android/platform/android-sdk/cmdline-tools/latest/bin/sdkmanager --licenses || true
-        fi
 
     - name: Clean previous builds (selective)
       run: |
@@ -200,42 +117,28 @@ jobs:
           echo "⚠️ First time build - skipping clean"
         fi
         rm -rf bin
-        
-        # buildozer SDK 경로에 API 33 강제 설치
-        echo "🔧 === ENSURING API 33 FOR BUILDOZER ==="
-        if [ -d "/home/runner/.buildozer/android/platform/android-sdk" ]; then
-          echo "📥 Installing API 33 for buildozer SDK..."
-          /home/runner/.buildozer/android/platform/android-sdk/cmdline-tools/latest/bin/sdkmanager "platforms;android-33" || \
-          echo "⚠️ Could not install API 33 for buildozer SDK"
-        else
-          echo "⚠️ Buildozer SDK not found yet, will be created during build"
-        fi
 
-    - name: Build APK with custom buildozer
+    - name: Build APK with standard buildozer
       run: |
-        echo "🚀 === BUILDING APK WITH CUSTOM BUILDOZER ==="
+        echo "🚀 === BUILDING APK WITH STANDARD BUILDOZER ==="
         echo "⏰ Build started at: $(date)"
         
-        echo -e "\n📝 Final buildozer.spec verification:"
-        echo "Last 20 lines:"
-        tail -20 buildozer.spec
+        echo "📝 Final buildozer.spec verification:"
+        echo "Key settings:"
+        grep -E "android\.(api|minapi|sdk|permissions)" buildozer.spec || echo "❌ Settings not found"
         
-        # API 33 문제 회피 - 안정적인 API 31로 강제 변경
-        echo -e "\n🔧 Forcing stable API level..."
-        sed -i 's/android\.api = 33/android.api = 31/g' buildozer.spec || true
-        sed -i 's/android\.api=33/android.api=31/g' buildozer.spec || true
-        echo "📝 Updated API level to 31 for stability"
-        
-        echo -e "\n🔨 Starting build with PR #1519 support..."
+        echo "🔨 Starting standard build..."
         buildozer android debug --verbose
         
-        echo -e "\n✅ Build completed at: $(date)"
-      timeout-minutes: 50
+        echo "✅ Build completed at: $(date)"
+      timeout-minutes: 40
 
-    - name: Verify AlarmReceiver in generated APK (상세 분석)
+    - name: Verify build results
       if: success()
       run: |
-        echo "🔍 === AndroidManifest.xml 완전 분석 ==="
+        echo "📱 === BUILD RESULTS ==="
+        echo "📁 Generated files:"
+        find . -name "*.apk" -type f -exec ls -lh {} \; 2>/dev/null || echo "No APK files found"
         
         # APK 파일 찾기
         APK_FILE=$(find . -name "*.apk" -type f | head -1)
@@ -247,86 +150,27 @@ jobs:
         echo "📱 Found APK: $APK_FILE"
         echo "📏 APK Size: $(ls -lh "$APK_FILE" | awk '{print $5}')"
         
-        # AndroidManifest.xml 전체 덤프
-        echo -e "\n📄 Dumping complete AndroidManifest.xml..."
-        $ANDROID_SDK_ROOT/build-tools/32.0.0/aapt dump xmltree "$APK_FILE" AndroidManifest.xml > full_manifest.txt
-        
-        echo "🔎 1. receiver 요소 검색:"
-        grep -n -A 15 -B 2 "E: receiver" full_manifest.txt || echo "❌ No receiver found"
-        
-        echo -e "\n🔎 2. BOOT_COMPLETED 액션 검색:"
-        grep -n -A 5 -B 5 "BOOT_COMPLETED" full_manifest.txt || echo "❌ No BOOT_COMPLETED found"
-        
-        echo -e "\n🔎 3. AlarmReceiver 클래스 검색:"
-        grep -n -A 10 -B 5 -i "alarmreceiver" full_manifest.txt || echo "❌ No AlarmReceiver found"
-        
-        echo -e "\n🔎 4. 커스텀 알람 액션 검색:"
-        grep -n "ALARM_ACTION" full_manifest.txt || echo "❌ No custom alarm action found"
-        
-        echo -e "\n🔎 5. AlarmService 검색:"
-        grep -n -A 5 -B 2 -i "alarmservice\|service.*alarm" full_manifest.txt || echo "❌ No AlarmService found"
-        
-        echo -e "\n📊 === 분석 결과 요약 ==="
-        RECEIVER_COUNT=$(grep -c "E: receiver" full_manifest.txt 2>/dev/null || echo "0")
-        BOOT_COUNT=$(grep -c "BOOT_COMPLETED" full_manifest.txt 2>/dev/null || echo "0")
-        ALARM_ACTION_COUNT=$(grep -c "ALARM_ACTION" full_manifest.txt 2>/dev/null || echo "0")
-        SERVICE_COUNT=$(grep -c "E: service" full_manifest.txt 2>/dev/null || echo "0")
-        
-        echo "📈 Detection Results:"
-        echo "   - Receiver 요소: $RECEIVER_COUNT"
-        echo "   - BOOT_COMPLETED 액션: $BOOT_COUNT"  
-        echo "   - 커스텀 ALARM_ACTION: $ALARM_ACTION_COUNT"
-        echo "   - Service 요소: $SERVICE_COUNT"
-        
-        if [ "$RECEIVER_COUNT" -gt 0 ] && [ "$BOOT_COUNT" -gt 0 ]; then
-          echo "✅ SUCCESS: AlarmReceiver가 성공적으로 AndroidManifest.xml에 삽입됨!"
-          if [ "$ALARM_ACTION_COUNT" -gt 0 ]; then
-            echo "🎯 BONUS: 커스텀 알람 액션도 포함됨!"
-          fi
-          if [ "$SERVICE_COUNT" -gt 0 ]; then
-            echo "🎯 BONUS: AlarmService도 포함됨!"
-          fi
+        # 간단한 APK 검증
+        if [ -s "$APK_FILE" ]; then
+          echo "✅ APK file exists and has content"
         else
-          echo "❌ FAILED: AlarmReceiver 삽입 실패"
-        fi
-
-    - name: Debug build results
-      if: always()
-      run: |
-        echo "📱 === BUILD RESULTS ==="
-        echo "📁 Generated files:"
-        find . -name "*.apk" -type f -exec ls -lh {} \; 2>/dev/null || echo "No APK files found"
-        
-        if [ -d bin ]; then
-          ls -la bin/
-        else
-          echo "❌ bin directory not found"
+          echo "❌ APK file is empty or corrupted"
+          exit 1
         fi
 
     - name: Upload APK artifact
       if: success()
       uses: actions/upload-artifact@v4
       with:
-        name: custom-buildozer-apk
+        name: standard-android-apk
         path: ./bin/*.apk
         if-no-files-found: warn
-
-    - name: Upload AndroidManifest analysis
-      if: always()
-      uses: actions/upload-artifact@v4
-      with:
-        name: manifest-analysis
-        path: |
-          full_manifest.txt
-          buildozer.spec
-        if-no-files-found: ignore
-        retention-days: 30
 
     - name: Upload build logs on failure
       if: failure()
       uses: actions/upload-artifact@v4
       with:
-        name: custom-buildozer-logs
+        name: build-logs
         path: |
           ./.buildozer/android/platform/build-*/logs/
           ./.buildozer/**/*.log
