@@ -8,8 +8,8 @@ source.filename = main.py
 source.include_exts = py,png,jpg,kv,atlas,ttf,java
 source.include_patterns = fonts/*.ttf
 
-# 🔥 buildozer 1.4와 호환되는 버전들
-requirements = python3,kivy==2.0.0,kivymd==1.0.2,requests,pillow,certifi,urllib3,charset-normalizer,plyer,sqlite3,android
+# 🔥 buildozer 1.4와 호환되는 버전들 (pip 호환성 개선)
+requirements = python3,kivy==2.1.0,kivymd==1.1.1,requests,pillow,certifi,urllib3,charset-normalizer,plyer,sqlite3,android
 
 version = 0.1
 orientation = portrait
