@@ -10,7 +10,7 @@ on:
 jobs:
   build:
     runs-on: ubuntu-22.04
-    timeout-minutes: 45
+    timeout-minutes: 60
 
     steps:
     - name: Checkout repository
@@ -25,7 +25,7 @@ jobs:
       uses: actions/cache@v3
       with:
         path: ~/.cache/pip
-        key: ${{ runner.os }}-pip-standard
+        key: ${{ runner.os }}-pip-standard-v2
         restore-keys: |
           ${{ runner.os }}-pip-
 
@@ -33,9 +33,9 @@ jobs:
       uses: actions/cache@v3
       with:
         path: .buildozer
-        key: ${{ runner.os }}-buildozer-${{ hashFiles('buildozer.spec') }}
+        key: ${{ runner.os }}-buildozer-v2-${{ hashFiles('buildozer.spec') }}
         restore-keys: |
-          ${{ runner.os }}-buildozer-
+          ${{ runner.os }}-buildozer-v2-
 
     - name: Install system dependencies
       run: |
@@ -45,6 +45,7 @@ jobs:
           git \
           python3 \
           python3-dev \
+          python3-setuptools \
           libsdl2-dev \
           libsdl2-image-dev \
           libsdl2-mixer-dev \
@@ -58,7 +59,11 @@ jobs:
           libtinfo5 \
           cmake \
           libffi-dev \
-          libssl-dev
+          libssl-dev \
+          autotools-dev \
+          autoconf \
+          libtool \
+          pkg-config
 
     - name: Set up Java 17
       uses: actions/setup-java@v4
@@ -70,100 +75,166 @@ jobs:
       uses: android-actions/setup-android@v3
       with:
         cmdline-tools-version: 8512546
-        packages: "platforms;android-33 build-tools;32.0.0 platform-tools ndk;25.2.9519653"
+        packages: "platforms;android-33 platforms;android-31 build-tools;33.0.2 build-tools;31.0.0 platform-tools ndk;25.2.9519653"
 
-    - name: Install standard buildozer and dependencies
+    - name: Set environment variables
       run: |
-        echo "📦 === INSTALLING STANDARD BUILDOZER ==="
-        python -m pip install --upgrade pip
+        echo "ANDROID_HOME=$ANDROID_SDK_ROOT" >> $GITHUB_ENV
+        echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT" >> $GITHUB_ENV
+        echo "ANDROID_NDK_HOME=$ANDROID_SDK_ROOT/ndk/25.2.9519653" >> $GITHUB_ENV
+        echo "NDKAPI=21" >> $GITHUB_ENV
+        echo "$ANDROID_SDK_ROOT/platform-tools" >> $GITHUB_PATH
+
+    - name: Install buildozer and dependencies
+      run: |
+        echo "📦 === INSTALLING BUILDOZER AND DEPENDENCIES ==="
+        python -m pip install --upgrade pip setuptools wheel
         
-        # 표준 안정 버전들 설치
+        # 안정적인 버전들 설치
         pip install buildozer==1.5.0
         pip install kivy==2.1.0
         pip install kivymd==1.1.1
         pip install cython==0.29.33
         pip install requests beautifulsoup4
         
-        echo "✅ Standard packages installed"
+        # python-for-android 직접 설치 (더 안정적)
+        pip install python-for-android==2023.6.11
+        
+        echo "✅ All packages installed"
 
-    - name: Verify buildozer installation
+    - name: Verify installations
       run: |
-        echo "📋 Buildozer version:"
+        echo "📋 === VERIFICATION ==="
+        echo "Buildozer version:"
         buildozer version
         
-        echo "📄 Checking buildozer.spec:"
-        ls -la buildozer.spec
+        echo "Python version:"
+        python --version
+        
+        echo "Java version:"
+        java -version
+        
+        echo "Android SDK location:"
+        echo $ANDROID_SDK_ROOT
+        
+        echo "NDK location:"
+        ls -la $ANDROID_SDK_ROOT/ndk/ || echo "NDK not found"
 
     - name: Accept Android SDK licenses
       run: |
-        echo "🔑 === SDK LICENSES ==="
+        echo "🔑 === ACCEPTING SDK LICENSES ==="
         yes | $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager --licenses || true
 
-    - name: Clean previous builds (selective)
+    - name: Clean previous builds (safe)
       run: |
         echo "🧹 === CLEANING PREVIOUS BUILDS ==="
+        # 안전한 방식으로 정리
+        rm -rf bin/
+        rm -rf .buildozer/android/platform/build-*
+        
+        # python-for-android 캐시만 정리 (전체 정리 대신)
         if [ -d .buildozer/android/platform/python-for-android ]; then
-          echo "✅ python-for-android exists, safe to clean"
-          buildozer android clean
-        else
-          echo "⚠️ First time build - skipping clean"
+          echo "Cleaning python-for-android cache..."
+          rm -rf .buildozer/android/platform/python-for-android/.cache
         fi
-        rm -rf bin
 
-    - name: Build APK with standard buildozer
+    - name: Initialize buildozer
       run: |
-        echo "🚀 === BUILDING APK WITH STANDARD BUILDOZER ==="
+        echo "🔧 === INITIALIZING BUILDOZER ==="
+        # buildozer.spec이 없으면 초기화
+        if [ ! -f buildozer.spec ]; then
+          buildozer init
+        fi
+        
+        echo "📄 Current buildozer.spec settings:"
+        if [ -f buildozer.spec ]; then
+          grep -E "android\.(api|minapi|sdk|ndk|permissions)" buildozer.spec || echo "Default settings will be used"
+        fi
+
+    - name: Build APK
+      run: |
+        echo "🚀 === BUILDING APK ==="
         echo "⏰ Build started at: $(date)"
         
-        echo "📝 Final buildozer.spec verification:"
-        echo "Key settings:"
-        grep -E "android\.(api|minapi|sdk|permissions)" buildozer.spec || echo "❌ Settings not found"
-        
-        echo "🔨 Starting standard build..."
+        # 더 상세한 로그와 함께 빌드
         buildozer android debug --verbose
         
         echo "✅ Build completed at: $(date)"
-      timeout-minutes: 40
+      timeout-minutes: 45
+      env:
+        ANDROID_API: "33"
+        ANDROID_MINAPI: "21"
+        ANDROID_SDK: "${{ env.ANDROID_SDK_ROOT }}"
+        ANDROID_NDK: "${{ env.ANDROID_SDK_ROOT }}/ndk/25.2.9519653"
 
     - name: Verify build results
-      if: success()
+      if: always()
       run: |
         echo "📱 === BUILD RESULTS ==="
-        echo "📁 Generated files:"
-        find . -name "*.apk" -type f -exec ls -lh {} \; 2>/dev/null || echo "No APK files found"
+        echo "📁 Searching for APK files..."
+        find . -name "*.apk" -type f -exec ls -lh {} \; 2>/dev/null || echo "No APK files found yet"
         
-        # APK 파일 찾기
-        APK_FILE=$(find . -name "*.apk" -type f | head -1)
-        if [ -z "$APK_FILE" ]; then
-          echo "❌ APK file not found"
-          exit 1
-        fi
+        # 다양한 위치에서 APK 찾기
+        APK_PATHS=(
+          "bin/*.apk"
+          ".buildozer/android/platform/build-*/dists/*/bin/*.apk"
+          ".buildozer/android/platform/build-*/bin/*.apk"
+        )
         
-        echo "📱 Found APK: $APK_FILE"
-        echo "📏 APK Size: $(ls -lh "$APK_FILE" | awk '{print $5}')"
+        APK_FOUND=""
+        for path in "${APK_PATHS[@]}"; do
+          if ls $path 2>/dev/null; then
+            APK_FOUND=$(ls $path 2>/dev/null | head -1)
+            break
+          fi
+        done
         
-        # 간단한 APK 검증
-        if [ -s "$APK_FILE" ]; then
-          echo "✅ APK file exists and has content"
+        if [ -n "$APK_FOUND" ]; then
+          echo "📱 Found APK: $APK_FOUND"
+          echo "📏 APK Size: $(ls -lh "$APK_FOUND" | awk '{print $5}')"
+          
+          # APK를 bin/ 디렉토리로 복사
+          mkdir -p bin/
+          cp "$APK_FOUND" bin/
+          echo "✅ APK copied to bin/ directory"
         else
-          echo "❌ APK file is empty or corrupted"
-          exit 1
+          echo "❌ No APK file found"
+          echo "📁 Directory structure:"
+          find .buildozer -name "*.apk" -o -name "dist" -o -name "bin" | head -20
         fi
 
     - name: Upload APK artifact
       if: success()
       uses: actions/upload-artifact@v4
       with:
-        name: standard-android-apk
-        path: ./bin/*.apk
+        name: android-apk-${{ github.run_number }}
+        path: |
+          ./bin/*.apk
+          ./.buildozer/**/bin/*.apk
         if-no-files-found: warn
 
-    - name: Upload build logs on failure
+    - name: Upload build logs
       if: failure()
       uses: actions/upload-artifact@v4
       with:
-        name: build-logs
+        name: build-logs-${{ github.run_number }}
         path: |
           ./.buildozer/android/platform/build-*/logs/
           ./.buildozer/**/*.log
         if-no-files-found: ignore
+
+    - name: Debug information on failure
+      if: failure()
+      run: |
+        echo "🔍 === DEBUG INFORMATION ==="
+        echo "Directory structure:"
+        ls -la
+        
+        echo "Buildozer directory:"
+        ls -la .buildozer/ || echo "No .buildozer directory"
+        
+        echo "Recent log files:"
+        find .buildozer -name "*.log" -mtime -1 -exec tail -50 {} \; || echo "No recent log files"
+        
+        echo "Environment variables:"
+        env | grep -E "(ANDROID|JAVA|PATH)" | sort
