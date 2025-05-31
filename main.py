@@ -2325,8 +2325,6 @@ class MainScreen(MDScreen):
             # 🔥🔥🔥 더미 데이터 추가 (새로 추가하는 부분)
             # Clock.schedule_once(lambda dt: self.add_dummy_data(), 2.0)  # 2초 후 더미 데이터 추가
             
-            # 🧪🧪🧪 테스트 버튼 추가 (새로 추가!)
-            Clock.schedule_once(lambda dt: self.add_test_buttons(), 2.5)  # 2.5초 후 테스트 버튼 추가
                         
         except Exception as e:
             print(f"레이아웃 설정 오류: {e}")
@@ -3379,7 +3377,8 @@ if __name__ == "__main__":
     except Exception as e:
         import traceback
         try:
-            with open("/sdcard/doublecheck_error.txt", "w") as f:
+            error_file = os.path.join(App.get_running_app().user_data_dir, "error.txt")
+            with open(error_file, 'w') as f:
                 f.write(traceback.format_exc())
         except:
             print(traceback.format_exc())
