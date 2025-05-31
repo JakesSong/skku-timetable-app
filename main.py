@@ -2771,7 +2771,7 @@ class MainScreen(MDScreen):
                     print("🔄 포어그라운드 서비스로 업그레이드")
             
             # 2단계: 기존 인앱 알람 방식과 동일
-            success = self.schedule_foreground_alarm(class_data_for_alarm, notify_before)
+            success = self.schedule_in_app_alarm(class_data, notify_before)
             
             if success:
                 print(f"✅ 포어그라운드 알람 설정: {class_data['name']}")
