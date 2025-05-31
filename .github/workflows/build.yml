@@ -25,7 +25,7 @@ jobs:
       uses: actions/cache@v3
       with:
         path: ~/.cache/pip
-        key: ${{ runner.os }}-pip-standard-v2
+        key: ${{ runner.os }}-pip-buildozer-1.4
         restore-keys: |
           ${{ runner.os }}-pip-
 
@@ -33,9 +33,9 @@ jobs:
       uses: actions/cache@v3
       with:
         path: .buildozer
-        key: ${{ runner.os }}-buildozer-v2-${{ hashFiles('buildozer.spec') }}
+        key: ${{ runner.os }}-buildozer-1.4-${{ hashFiles('buildozer.spec') }}
         restore-keys: |
-          ${{ runner.os }}-buildozer-v2-
+          ${{ runner.os }}-buildozer-1.4-
 
     - name: Install system dependencies
       run: |
@@ -90,15 +90,15 @@ jobs:
         echo "📦 === INSTALLING BUILDOZER AND DEPENDENCIES ==="
         python -m pip install --upgrade pip setuptools wheel
         
-        # 안정적인 버전들 설치
-        pip install buildozer==1.5.0
-        pip install kivy==2.1.0
-        pip install kivymd==1.1.1
+        # 안정적인 버전들 설치 (buildozer 1.4 + 호환성 버전들)
+        pip install buildozer==1.4.0
+        pip install kivy==2.0.0
+        pip install kivymd==1.0.2
         pip install cython==0.29.33
         pip install requests beautifulsoup4
         
-        # python-for-android 직접 설치 (더 안정적)
-        pip install python-for-android==2023.6.11
+        # python-for-android 최신 안정 버전
+        pip install python-for-android==2024.1.21
         
         echo "✅ All packages installed"
 
@@ -128,15 +128,18 @@ jobs:
     - name: Clean previous builds (safe)
       run: |
         echo "🧹 === CLEANING PREVIOUS BUILDS ==="
-        # 안전한 방식으로 정리
+        # 더 안전한 방식으로 정리
         rm -rf bin/
-        rm -rf .buildozer/android/platform/build-*
         
-        # python-for-android 캐시만 정리 (전체 정리 대신)
-        if [ -d .buildozer/android/platform/python-for-android ]; then
-          echo "Cleaning python-for-android cache..."
-          rm -rf .buildozer/android/platform/python-for-android/.cache
+        # buildozer 1.4에서는 더 조심스럽게 정리
+        if [ -d .buildozer ]; then
+          echo "Removing specific build artifacts..."
+          rm -rf .buildozer/android/platform/build-*
+          rm -rf .buildozer/android/app
+          # 캐시는 보존하되 빌드 결과물만 정리
         fi
+        
+        echo "✅ Safe cleanup completed"
 
     - name: Initialize buildozer
       run: |
@@ -156,16 +159,16 @@ jobs:
         echo "🚀 === BUILDING APK ==="
         echo "⏰ Build started at: $(date)"
         
-        # 더 상세한 로그와 함께 빌드
-        buildozer android debug --verbose
+        # buildozer 1.4에 최적화된 빌드 명령
+        buildozer android debug
         
         echo "✅ Build completed at: $(date)"
       timeout-minutes: 45
       env:
         ANDROID_API: "33"
         ANDROID_MINAPI: "21"
-        ANDROID_SDK: "${{ env.ANDROID_SDK_ROOT }}"
-        ANDROID_NDK: "${{ env.ANDROID_SDK_ROOT }}/ndk/25.2.9519653"
+        ANDROID_SDK_ROOT: "${{ env.ANDROID_SDK_ROOT }}"
+        ANDROID_NDK_ROOT: "${{ env.ANDROID_SDK_ROOT }}/ndk/25.2.9519653"
 
     - name: Verify build results
       if: always()
