@@ -90,17 +90,10 @@ jobs:
         echo "📦 === INSTALLING BUILDOZER AND DEPENDENCIES ==="
         python -m pip install --upgrade pip setuptools wheel
         
-        # 안정적인 버전들 설치 (buildozer 1.4 + 호환성 버전들)
-        pip install buildozer==1.4.0
-        pip install kivy==2.0.0
-        pip install kivymd==1.0.2
-        pip install cython==0.29.33
-        pip install requests beautifulsoup4
-        
-        # python-for-android 최신 안정 버전
-        pip install python-for-android==2024.1.21
-        
-        echo "✅ All packages installed"
+        # buildozer.spec에 맞춘 버전들 설치
+        pip install buildozer==1.5.0
+        pip install kivy==2.1.0
+        pip install kivy
 
     - name: Verify installations
       run: |
