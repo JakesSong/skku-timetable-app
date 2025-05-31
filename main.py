@@ -3202,25 +3202,17 @@ class MainScreen(MDScreen):
 
                 
     def add_test_buttons(self):
-            """즉시 알림 테스트 버튼만 추가"""
-            if hasattr(self, 'layout') and self.layout:
-                from kivymd.uix.button import MDRaisedButton
-                
-                # 🔔 즉시 알림 테스트 버튼 (전자출결 버튼 위에 위치)
-                notify_test_btn = MDRaisedButton(
-                    text="🔔 즉시 알림 테스트", 
-                    size_hint=(None, None),
-                    size=(dp(160), dp(35)),
-                    font_name=FONT_NAME,
-                    md_bg_color=[0.2, 0.2, 0.8, 1],  # 파란색
-                    pos_hint={"right": 0.98, "y": 0.22}  # 전자출결 버튼(y=0.12) 위에 위치
-                )
-                notify_test_btn.bind(on_release=lambda x: self.test_direct_notification())
-                
-                # 메인 스크린에 직접 추가
-                self.add_widget(notify_test_btn)
-                print("✅ 즉시 알림 테스트 버튼 추가 완료")
-
+        """즉시 알림 테스트 버튼만 추가 - 원형 플로팅 버튼"""
+        if hasattr(self, 'layout') and self.layout:
+            # 🔔 즉시 알림 테스트 버튼 (원형 플로팅 버튼)
+            self.test_notification_button = MDFloatingActionButton(
+                icon="bell-ring",  # 알림 벨 아이콘
+                pos_hint={"right": 0.98, "y": 0.22},  # 전자출결 버튼(y=0.12) 위에 위치
+                md_bg_color=[1, 0.5, 0, 1],  # 주황색
+                on_release=self.test_direct_notification
+            )
+            self.add_widget(self.test_notification_button)
+            print("✅ 원형 즉시 알림 테스트 버튼 추가 완료")
 
 class TimeTableApp(MDApp):
     def build(self):
