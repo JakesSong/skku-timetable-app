@@ -1,4 +1,4 @@
-name: Build Android APK (Standard)
+name: Build Android APK
 
 on:
   push:
@@ -16,16 +16,17 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
 
-    - name: Set up Python 3.8
-      uses: actions/setup-python@v4
+    # 성공 사례와 동일한 Python 3.9 사용
+    - name: Set up Python 3.9
+      uses: actions/setup-python@v5
       with:
-        python-version: '3.8'
+        python-version: '3.9'
 
     - name: Cache pip dependencies
       uses: actions/cache@v3
       with:
         path: ~/.cache/pip
-        key: ${{ runner.os }}-pip-buildozer-1.4
+        key: ${{ runner.os }}-pip-buildozer-1.5
         restore-keys: |
           ${{ runner.os }}-pip-
 
@@ -33,38 +34,25 @@ jobs:
       uses: actions/cache@v3
       with:
         path: .buildozer
-        key: ${{ runner.os }}-buildozer-1.4-${{ hashFiles('buildozer.spec') }}
+        key: ${{ runner.os }}-buildozer-1.5-${{ hashFiles('buildozer.spec') }}
         restore-keys: |
-          ${{ runner.os }}-buildozer-1.4-
+          ${{ runner.os }}-buildozer-1.5-
 
+    # 성공 사례와 동일한 시스템 의존성
     - name: Install system dependencies
       run: |
-        sudo apt-get update
+        sudo apt-get update -qq
         sudo apt-get install -y \
-          build-essential \
-          git \
-          python3 \
-          python3-dev \
-          python3-setuptools \
-          libsdl2-dev \
-          libsdl2-image-dev \
-          libsdl2-mixer-dev \
-          libsdl2-ttf-dev \
-          libportmidi-dev \
-          zlib1g-dev \
-          openjdk-17-jdk \
-          unzip \
-          libncurses5-dev \
-          libncursesw5-dev \
-          libtinfo5 \
-          cmake \
-          libffi-dev \
-          libssl-dev \
-          autotools-dev \
-          autoconf \
-          libtool \
-          pkg-config
+          git zip unzip autoconf libtool pkg-config \
+          zlib1g-dev libncurses5-dev libncursesw5-dev libtinfo5 cmake \
+          libffi-dev libssl-dev build-essential libsqlite3-dev sqlite3 \
+          bzip2 libbz2-dev libreadline-dev llvm \
+          xz-utils tk-dev libxml2-dev libxmlsec1-dev liblzma-dev \
+          libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev \
+          libportmidi-dev libswscale-dev libavformat-dev libavcodec-dev \
+          libfreetype6-dev libpng-dev libjpeg-dev
 
+    # 성공 사례와 동일한 Java 17 설정
     - name: Set up Java 17
       uses: actions/setup-java@v4
       with:
@@ -85,15 +73,13 @@ jobs:
         echo "NDKAPI=21" >> $GITHUB_ENV
         echo "$ANDROID_SDK_ROOT/platform-tools" >> $GITHUB_PATH
 
-    - name: Install buildozer and dependencies
+    # 성공 사례와 동일한 buildozer 1.5.0 설치
+    - name: Install Python dependencies
       run: |
-        echo "📦 === INSTALLING BUILDOZER AND DEPENDENCIES ==="
-        python -m pip install --upgrade pip setuptools wheel
-        
-        # buildozer.spec에 맞춘 버전들 설치
+        python -m pip install --upgrade pip
+        pip install --upgrade setuptools wheel
+        pip install Cython==0.29.33
         pip install buildozer==1.5.0
-        pip install kivy==2.1.0
-        pip install kivy
 
     - name: Verify installations
       run: |
@@ -118,50 +104,46 @@ jobs:
         echo "🔑 === ACCEPTING SDK LICENSES ==="
         yes | $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager --licenses || true
 
-    - name: Clean previous builds (safe)
+    # 성공 사례와 동일한 환경 설정
+    - name: Set build environment variables
       run: |
-        echo "🧹 === CLEANING PREVIOUS BUILDS ==="
-        # 더 안전한 방식으로 정리
-        rm -rf bin/
-        
-        # buildozer 1.4에서는 더 조심스럽게 정리
-        if [ -d .buildozer ]; then
-          echo "Removing specific build artifacts..."
-          rm -rf .buildozer/android/platform/build-*
-          rm -rf .buildozer/android/app
-          # 캐시는 보존하되 빌드 결과물만 정리
-        fi
-        
-        echo "✅ Safe cleanup completed"
+        echo "P4A_NUM_PROCS=1" >> $GITHUB_ENV
+        echo "GRADLE_OPTS=-Dorg.gradle.daemon=false -Dorg.gradle.jvmargs='-Xmx3072m -XX:MaxMetaspaceSize=768m' -Dorg.gradle.parallel=false" >> $GITHUB_ENV
+        echo "P4A_GRADLE_OPTS=--stacktrace --info" >> $GITHUB_ENV
+
+    # 성공 사례와 동일한 완전 클린
+    - name: Complete clean build
+      run: |
+        echo "=== Completely cleaning build environment ==="
+        rm -rf .buildozer
+        rm -rf bin
+        rm -rf ~/.buildozer
+        rm -rf ~/.gradle
+        rm -rf ~/.android
 
     - name: Initialize buildozer
       run: |
         echo "🔧 === INITIALIZING BUILDOZER ==="
-        # buildozer.spec이 없으면 초기화
-        if [ ! -f buildozer.spec ]; then
-          buildozer init
-        fi
-        
         echo "📄 Current buildozer.spec settings:"
         if [ -f buildozer.spec ]; then
-          grep -E "android\.(api|minapi|sdk|ndk|permissions)" buildozer.spec || echo "Default settings will be used"
+          grep -E "android\.(api|minapi|sdk|ndk|permissions)" buildozer.spec || echo "Using default settings"
         fi
 
+    # 성공 사례와 동일한 빌드 명령
     - name: Build APK
       run: |
         echo "🚀 === BUILDING APK ==="
         echo "⏰ Build started at: $(date)"
         
-        # buildozer 1.4에 최적화된 빌드 명령
-        buildozer android debug
+        buildozer android debug --verbose
         
         echo "✅ Build completed at: $(date)"
       timeout-minutes: 45
       env:
         ANDROID_API: "33"
         ANDROID_MINAPI: "21"
-        ANDROID_SDK_ROOT: "${{ env.ANDROID_SDK_ROOT }}"
-        ANDROID_NDK_ROOT: "${{ env.ANDROID_SDK_ROOT }}/ndk/25.2.9519653"
+        ANDROID_SDK: "${{ env.ANDROID_SDK_ROOT }}"
+        ANDROID_NDK: "${{ env.ANDROID_SDK_ROOT }}/ndk/25.2.9519653"
 
     - name: Verify build results
       if: always()
@@ -203,7 +185,7 @@ jobs:
       if: success()
       uses: actions/upload-artifact@v4
       with:
-        name: android-apk-${{ github.run_number }}
+        name: doublecheck-apk-${{ github.run_number }}
         path: |
           ./bin/*.apk
           ./.buildozer/**/bin/*.apk
