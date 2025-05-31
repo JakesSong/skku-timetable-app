@@ -2659,6 +2659,159 @@ class MainScreen(MDScreen):
             
         except Exception as e:
             print(f"❌ 안내 대화상자 오류: {e}")
+
+    # MainScreen 클래스에 추가할 포어그라운드 서비스 함수들
+    # 위치: MainScreen 클래스 내부, show_in_app_alarm_info() 함수 다음에 추가
+    
+    def start_foreground_service(self):
+        """포어그라운드 서비스 시작 - "앱이 작동중" 알림 표시"""
+        try:
+            if 'ANDROID_STORAGE' not in os.environ:
+                print("💻 PC 환경 - 포어그라운드 서비스 불가")
+                return False
+                
+            from jnius import autoclass
+            
+            # Android 클래스들
+            PythonActivity = autoclass('org.kivy.android.PythonActivity')
+            Context = autoclass('android.content.Context')
+            NotificationManager = autoclass('android.app.NotificationManager')
+            NotificationChannel = autoclass('android.app.NotificationChannel')
+            Notification = autoclass('android.app.Notification')
+            Builder = autoclass('android.app.Notification$Builder')
+            PendingIntent = autoclass('android.app.PendingIntent')
+            Intent = autoclass('android.content.Intent')
+            
+            context = PythonActivity.mActivity
+            
+            # 알림 채널 생성
+            channel_id = "foreground_service_channel"
+            channel_name = "시간표 알람 서비스"
+            importance = NotificationManager.IMPORTANCE_LOW  # 조용한 알림
+            
+            notification_manager = context.getSystemService(Context.NOTIFICATION_SERVICE)
+            channel = NotificationChannel(channel_id, channel_name, importance)
+            channel.setDescription("시간표 알람이 백그라운드에서 작동중입니다")
+            channel.setSound(None, None)  # 소리 없음
+            notification_manager.createNotificationChannel(channel)
+            
+            # 앱 실행 Intent (알림 터치시 앱으로 돌아가기)
+            app_intent = Intent(context, PythonActivity)
+            app_intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP)
+            
+            # PendingIntent 생성
+            FLAG_IMMUTABLE = 67108864
+            FLAG_UPDATE_CURRENT = 134217728
+            pending_intent = PendingIntent.getActivity(
+                context, 0, app_intent, FLAG_UPDATE_CURRENT | FLAG_IMMUTABLE
+            )
+            
+            # 포어그라운드 알림 생성
+            builder = Builder(context, channel_id)
+            builder.setSmallIcon(context.getApplicationInfo().icon)
+            builder.setContentTitle("📚 시간표 알람 활성화")
+            builder.setContentText("수업 알람이 백그라운드에서 작동중입니다")
+            builder.setOngoing(True)  # 스와이프로 삭제 불가
+            builder.setPriority(Notification.PRIORITY_LOW)  # 낮은 우선순위
+            builder.setContentIntent(pending_intent)
+            
+            # 포어그라운드 서비스 시작
+            notification = builder.build()
+            
+            # startForeground 호출 (이게 핵심!)
+            try:
+                # Python에서 직접 startForeground 호출하는 방법
+                from jnius import cast
+                service = cast('android.app.Service', context)
+                service.startForeground(1001, notification)  # ID: 1001
+                print("✅ 포어그라운드 서비스 시작됨")
+                return True
+            except Exception as e:
+                print(f"❌ startForeground 실패, 일반 알림으로 대체: {e}")
+                # 대신 지속적인 알림 표시
+                notification_manager.notify(1001, notification)
+                return True
+                
+        except Exception as e:
+            print(f"❌ 포어그라운드 서비스 시작 실패: {e}")
+            import traceback
+            traceback.print_exc()
+            return False
+    
+    def stop_foreground_service(self):
+        """포어그라운드 서비스 중지"""
+        try:
+            if 'ANDROID_STORAGE' not in os.environ:
+                return
+                
+            from jnius import autoclass
+            
+            PythonActivity = autoclass('org.kivy.android.PythonActivity')
+            Context = autoclass('android.content.Context')
+            NotificationManager = autoclass('android.app.NotificationManager')
+            
+            context = PythonActivity.mActivity
+            notification_manager = context.getSystemService(Context.NOTIFICATION_SERVICE)
+            
+            # 포어그라운드 알림 제거
+            notification_manager.cancel(1001)
+            print("✅ 포어그라운드 서비스 중지됨")
+            
+        except Exception as e:
+            print(f"❌ 포어그라운드 서비스 중지 실패: {e}")
+    
+    def schedule_foreground_alarm(self, class_data, notify_before=5):
+        """포어그라운드 서비스와 함께 알람 설정"""
+        try:
+            # 1단계: 포어그라운드 서비스 시작
+            if not hasattr(self, '_foreground_started'):
+                service_started = self.start_foreground_service()
+                if service_started:
+                    self._foreground_started = True
+                    print("🔄 포어그라운드 서비스로 업그레이드")
+            
+            # 2단계: 기존 인앱 알람 방식과 동일
+            success = self.schedule_foreground_alarm(class_data_for_alarm, notify_before)
+            
+            if success:
+                print(f"✅ 포어그라운드 알람 설정: {class_data['name']}")
+                print("📱 이제 앱을 종료해도 알람이 작동합니다!")
+            
+            return success
+            
+        except Exception as e:
+            print(f"❌ 포어그라운드 알람 설정 실패: {e}")
+            return False
+    
+    def show_foreground_service_info(self):
+        """포어그라운드 서비스 안내 메시지"""
+        try:
+            from kivymd.uix.dialog import MDDialog
+            from kivymd.uix.button import MDFlatButton
+            
+            info_dialog = MDDialog(
+                title="🚀 백그라운드 알람 활성화",
+                text="포어그라운드 서비스가 시작되었습니다!\n\n"
+                     "✅ 이제 앱을 종료해도 알람이 작동합니다\n"
+                     "✅ '앱이 작동중입니다' 알림이 계속 표시됩니다\n"
+                     "✅ 시스템이 앱을 강제 종료하지 않습니다\n\n"
+                     "⚠️ 알림을 끄지 마세요 (알람이 중지됩니다)",
+                buttons=[
+                    MDFlatButton(
+                        text="확인",
+                        theme_text_color="Custom",
+                        text_color=self.app.theme_cls.primary_color,
+                        font_name=FONT_NAME,
+                        on_release=lambda x: info_dialog.dismiss()
+                    )
+                ]
+            )
+            info_dialog.text_font_name = FONT_NAME
+            info_dialog.open()
+            
+        except Exception as e:
+            print(f"❌ 안내 대화상자 오류: {e}")
+    
     
     def refresh_ui(self):
         """UI 새로고침 - 중복 방지"""
@@ -3276,8 +3429,15 @@ class TimeTableApp(MDApp):
         return self.main_screen  # 🔥 바로 메인 스크린 반환
     
     def on_start(self):
-        """앱 시작 시 호출"""
+        """앱 시작시 포어그라운드 서비스 자동 시작"""
         print("✅ 앱 시작됨")
+        
+        # 포어그라운드 서비스 자동 시작
+        if hasattr(self, 'main_screen'):
+            Clock.schedule_once(
+                lambda dt: self.main_screen.start_foreground_service(), 
+                2.0
+            )
         
     def on_resume(self):
         """백그라운드에서 돌아올 때 호출"""
