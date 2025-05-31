@@ -2304,13 +2304,13 @@ class MainScreen(MDScreen):
             self.add_widget(self.attendance_button)
 
             # 테스트 알람 버튼 (주석처리)
-            # self.test_button = MDFloatingActionButton(
-            #     icon="bell-ring",
-            #     pos_hint={"right": 0.98, "y": 0.22},  # 다른 버튼들 위에
-            #     md_bg_color=[1, 0.5, 0, 1],  # 주황색
-            #     on_release=lambda x: self.test_notification()
-            # )
-            # self.add_widget(self.test_button)
+            self.test_button = MDFloatingActionButton(
+                icon="bell-ring",
+                pos_hint={"right": 0.98, "y": 0.22},  # 다른 버튼들 위에
+                md_bg_color=[1, 0.5, 0, 1],  # 주황색
+                on_release=lambda x: self.test_notification()
+            )
+            self.add_widget(self.test_button)
 
             # 🔥 초기화 완료 플래그 설정
             self.layout_created = True
@@ -3098,121 +3098,7 @@ class MainScreen(MDScreen):
                 print(f"❌ 과목 알림 생성 실패: {e}")
                 import traceback
                 traceback.print_exc()
-
-    def test_direct_notification(self):
-        """🧪 실제 과목 정보가 포함된 즉시 알림 테스트"""
-        try:
-            from jnius import autoclass
-            
-            Context = autoclass('android.content.Context')
-            NotificationManager = autoclass('android.app.NotificationManager')
-            Builder = autoclass('android.app.Notification$Builder')
-            PythonActivity = autoclass('org.kivy.android.PythonActivity')
-            Intent = autoclass('android.content.Intent')
-            PendingIntent = autoclass('android.app.PendingIntent')
-            
-            context = PythonActivity.mActivity
-            notification_manager = context.getSystemService(Context.NOTIFICATION_SERVICE)
-            
-            # 📚 샘플 과목 정보 (실제 과목 정보 스타일)
-            sample_class = {
-                'name': '공학컴퓨터프로그래밍',
-                'room': '61352',
-                'professor': '황숙희',
-                'start_time': '15:00',
-                'day': '월요일'
-            }
-            
-            # 전자출결 앱 Intent 생성
-            try:
-                package_name = 'edu.skku.attend'
-                pm = context.getPackageManager()
-                attendance_intent = pm.getLaunchIntentForPackage(package_name)
                 
-                if attendance_intent:
-                    action_text = "전자출결하기"
-                else:
-                    # 직접 액티비티 지정
-                    attendance_intent = Intent()
-                    attendance_intent.setClassName(package_name, 'edu.skku.attend.ui.activity.IntroActivity')
-                    attendance_intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP)
-                    action_text = "전자출결하기"
-            except:
-                # 실패 시 시간표 앱으로
-                attendance_intent = Intent(context, PythonActivity)
-                attendance_intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                action_text = "시간표 열기"
-            
-            # PendingIntent 생성 (Android 12+ 호환)
-            FLAG_IMMUTABLE = 67108864
-            FLAG_UPDATE_CURRENT = 134217728
-            
-            pending_intent = PendingIntent.getActivity(
-                context,
-                8888,
-                attendance_intent,
-                FLAG_UPDATE_CURRENT | FLAG_IMMUTABLE
-            )
-            
-            # 알림 빌더 생성
-            builder = Builder(context, "timetable_alarm_channel")
-            builder.setSmallIcon(context.getApplicationInfo().icon)
-            builder.setContentTitle(f"🔔 수업 알림: {sample_class['name']}")
-            builder.setContentText(f"{sample_class['start_time']} | {sample_class['room']} | {sample_class['professor']} 교수님")
-            
-            # 확장된 알림 내용 (BigTextStyle)
-            try:
-                BigTextStyle = autoclass('android.app.Notification$BigTextStyle')
-                big_text_style = BigTextStyle()
-                expanded_text = (
-                    f"📚 과목: {sample_class['name']}\n"
-                    f"🕐 시간: {sample_class['day']} {sample_class['start_time']}\n"
-                    f"🏛️ 강의실: {sample_class['room']}\n"
-                    f"👨‍🏫 교수: {sample_class['professor']} 교수님\n\n"
-                    f"📱 {action_text}하려면 터치하세요"
-                )
-                big_text_style.bigText(expanded_text)
-                builder.setStyle(big_text_style)
-            except Exception as e:
-                print(f"BigTextStyle 설정 오류: {e}")
-            
-            # 알림 속성 설정
-            builder.setPriority(autoclass('android.app.Notification').PRIORITY_HIGH)
-            builder.setContentIntent(pending_intent)  # 터치 시 전자출결 앱 실행
-            builder.setAutoCancel(True)  # 터치 시 알림 자동 삭제
-            
-            # 진동 패턴 설정
-            try:
-                builder.setVibrate([0, 250, 250, 250])
-            except:
-                pass
-            
-            # 알림 표시
-            notification_manager.notify(8888, builder.build())
-            print("✅ 실제 과목 정보 알림 생성 성공!")
-            print(f"📚 과목: {sample_class['name']}")
-            print(f"🕐 시간: {sample_class['day']} {sample_class['start_time']}")
-            print(f"🏛️ 강의실: {sample_class['room']}")
-            print(f"👨‍🏫 교수: {sample_class['professor']} 교수님")
-            
-        except Exception as e:
-            print(f"❌ 실제 과목 알림 생성 실패: {e}")
-            import traceback
-            traceback.print_exc()
-
-                
-    def add_test_buttons(self):
-        """즉시 알림 테스트 버튼만 추가 - 원형 플로팅 버튼"""
-        if hasattr(self, 'layout') and self.layout:
-            # 🔔 즉시 알림 테스트 버튼 (원형 플로팅 버튼)
-            self.test_notification_button = MDFloatingActionButton(
-                icon="bell-ring",  # 알림 벨 아이콘
-                pos_hint={"right": 0.98, "y": 0.22},  # 전자출결 버튼(y=0.12) 위에 위치
-                md_bg_color=[1, 0.5, 0, 1],  # 주황색
-                on_release=self.test_direct_notification
-            )
-            self.add_widget(self.test_notification_button)
-            print("✅ 원형 즉시 알림 테스트 버튼 추가 완료")
 
 class TimeTableApp(MDApp):
     def build(self):
