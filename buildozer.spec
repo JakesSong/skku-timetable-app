@@ -16,7 +16,7 @@ orientation = portrait
 fullscreen = 0
 
 # 기본 권한만 (AlarmReceiver 관련 권한 제거)
-android.permissions = INTERNET,WRITE_EXTERNAL_STORAGE,READ_EXTERNAL_STORAGE
+android.permissions = INTERNET,WRITE_EXTERNAL_STORAGE,READ_EXTERNAL_STORAGE, FOREGROUND_SERVICE, WAKE_LOCK, VIBRATE
 
 # 성공 사례와 동일한 Android 설정
 android.api = 33
