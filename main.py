@@ -3096,7 +3096,137 @@ class MainScreen(MDScreen):
                 print(f"❌ 과목 알림 생성 실패: {e}")
                 import traceback
                 traceback.print_exc()
-                
+
+    def test_notification(self):
+            """과목 알림 테스트 - 실제 과목 정보 포함"""
+            try:
+                if 'ANDROID_STORAGE' in os.environ:
+                    # 시스템 알림 직접 호출
+                    from jnius import autoclass
+                    PythonActivity = autoclass('org.kivy.android.PythonActivity')
+                    Context = autoclass('android.content.Context')
+                    
+                    # Android 기본 Notification 클래스 사용
+                    Notification = autoclass('android.app.Notification')
+                    NotificationManager = autoclass('android.app.NotificationManager')
+                    Builder = autoclass('android.app.Notification$Builder')
+                    
+                    Intent = autoclass('android.content.Intent')
+                    PendingIntent = autoclass('android.app.PendingIntent')
+                    
+                    # 컨텍스트 가져오기
+                    context = PythonActivity.mActivity
+                    
+                    # 알림 채널 ID
+                    channel_id = "timetable_alarm_channel"
+                    
+                    # 🔥 전자출결 앱 Intent (로그캣으로 확인한 정확한 액티비티명 사용)
+                    try:
+                        package_name = 'edu.skku.attend'
+                        activity_name = 'edu.skku.attend.ui.activity.IntroActivity'  # 로그캣에서 확인한 정확한 이름
+                        
+                        # 방법 1: PackageManager 사용 (가장 안전)
+                        pm = context.getPackageManager()
+                        attendance_intent = pm.getLaunchIntentForPackage(package_name)
+                        
+                        if attendance_intent:
+                            notification_action_text = "전자출결 앱 열기"
+                            print("✅ PackageManager로 전자출결 앱 Intent 생성 성공")
+                        else:
+                            # 방법 2: 직접 액티비티명 지정 (로그캣에서 확인한 정확한 이름)
+                            print("PackageManager 실패 - 직접 액티비티 지정 시도")
+                            attendance_intent = Intent()
+                            attendance_intent.setClassName(package_name, activity_name)
+                            attendance_intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                            notification_action_text = "전자출결 앱 열기"
+                            print(f"✅ 직접 액티비티 지정: {activity_name}")
+                            
+                    except Exception as e:
+                        print(f"전자출결 앱 Intent 생성 오류: {e}")
+                        # 실패 시 Play Store로
+                        try:
+                            Uri = autoclass('android.net.Uri')
+                            store_uri = Uri.parse("market://details?id=edu.skku.attend")
+                            attendance_intent = Intent(Intent.ACTION_VIEW, store_uri)
+                            notification_action_text = "전자출결 앱 설치"
+                            print("❌ 전자출결 앱 실행 실패 - Play Store로 이동")
+                        except:
+                            # 최후의 수단: 시간표 앱 실행
+                            attendance_intent = Intent(context, PythonActivity)
+                            attendance_intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            notification_action_text = "시간표 앱 열기"
+                    
+                    # 🔥 Android 12+ 호환성을 위한 FLAG_IMMUTABLE 설정
+                    FLAG_IMMUTABLE = 67108864  # PendingIntent.FLAG_IMMUTABLE
+                    FLAG_UPDATE_CURRENT = 134217728  # PendingIntent.FLAG_UPDATE_CURRENT
+                    
+                    # PendingIntent 생성 (크래시 방지를 위해 FLAG_IMMUTABLE 필수)
+                    pending_intent = PendingIntent.getActivity(
+                        context, 
+                        12345,  # 고유한 request code
+                        attendance_intent, 
+                        FLAG_UPDATE_CURRENT | FLAG_IMMUTABLE  # 🔥 중요: FLAG_IMMUTABLE 추가
+                    )
+                    
+                    # 📚 샘플 과목 정보 (실제로는 현재 시간에 해당하는 과목 정보 사용)
+                    sample_class = {
+                        'name': '공학컴퓨터프로그래밍',
+                        'room': '61352',
+                        'professor': '황숙희',
+                        'time': '15:00',
+                        'day': '월요일'
+                    }
+                    
+                    # 알림 빌더 생성
+                    builder = Builder(context, channel_id)
+                    builder.setSmallIcon(context.getApplicationInfo().icon)
+                    
+                    # 📚 과목 정보가 포함된 알림 내용
+                    builder.setContentTitle(f"🔔 수업 알림: {sample_class['name']}")
+                    builder.setContentText(f"{sample_class['time']} | {sample_class['room']} | {sample_class['professor']} 교수님")
+                    
+                    # 확장된 알림 스타일 (BigTextStyle 사용)
+                    try:
+                        BigTextStyle = autoclass('android.app.Notification$BigTextStyle')
+                        big_text_style = BigTextStyle()
+                        expanded_text = (
+                            f"📚 과목: {sample_class['name']}\n"
+                            f"🕐 시간: {sample_class['day']} {sample_class['time']}\n"
+                            f"🏛️ 강의실: {sample_class['room']}\n"
+                            f"👨‍🏫 교수: {sample_class['professor']} 교수님\n\n"
+                            f"📱 {notification_action_text}하려면 터치하세요"
+                        )
+                        big_text_style.bigText(expanded_text)
+                        builder.setStyle(big_text_style)
+                    except Exception as e:
+                        print(f"BigTextStyle 설정 오류: {e}")
+                    
+                    # 알림 속성 설정
+                    builder.setPriority(Notification.PRIORITY_HIGH)
+                    builder.setContentIntent(pending_intent)  # 터치 시 실행될 Intent
+                    builder.setAutoCancel(True)  # 터치 시 알림 자동 삭제
+                    
+                    # 진동 패턴 설정
+                    try:
+                        builder.setVibrate([0, 250, 250, 250])  # 진동 패턴
+                    except:
+                        pass
+                    
+                    # 알림 표시
+                    notification_manager = context.getSystemService(Context.NOTIFICATION_SERVICE)
+                    notification_manager.notify(9999, builder.build())
+                    
+                    print("✅ 과목 알림 전송 완료 (전자출결 앱 연동)")
+                    
+                else:
+                    # PC 환경에서는 플라이어 사용
+                    from plyer import notification
+                    notification.notify(
+                        title="🔔 수업 알림: 소재부품융합공학",
+                        message="14:00 | 61304A | 김범준 교수님\n전자출결을 잊지 마세요!",
+                        timeout=10
+                    )
+                    print("✅ PC용 알림 전송 완료")
 
 class TimeTableApp(MDApp):
     def build(self):
