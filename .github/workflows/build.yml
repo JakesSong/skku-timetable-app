@@ -171,10 +171,14 @@ jobs:
           echo "📱 Found APK: $APK_FOUND"
           echo "📏 APK Size: $(ls -lh "$APK_FOUND" | awk '{print $5}')"
           
-          # APK를 bin/ 디렉토리로 복사
-          mkdir -p bin/
-          cp "$APK_FOUND" bin/
-          echo "✅ APK copied to bin/ directory"
+          # APK가 이미 bin/ 디렉토리에 있는지 확인
+          if [[ "$APK_FOUND" != bin/* ]]; then
+            mkdir -p bin/
+            cp "$APK_FOUND" bin/
+            echo "✅ APK copied to bin/ directory"
+          else
+            echo "✅ APK already in bin/ directory"
+          fi
         else
           echo "❌ No APK file found"
           echo "📁 Directory structure:"
