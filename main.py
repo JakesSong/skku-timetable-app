@@ -1780,12 +1780,13 @@ class EditClassDialog:
             print(f"⚠️ 카드 제거 실패: {e}")
         
         # 3단계: 기존 알람 취소
-        if hasattr(self.screen, 'cancel_system_alarm'):
+        if hasattr(self.screen, 'cancel_in_app_alarm'):
+            # 3단계: 기존 인앱 알람 취소
             try:
-                self.screen.cancel_system_alarm(class_id)
-                print(f"✅ 기존 알람 취소: {class_id}")
+                self.screen.cancel_in_app_alarm(class_id)
+                print(f"✅ 기존 인앱 알람 취소: {class_id}")
             except Exception as e:
-                print(f"⚠️ 알람 취소 실패: {e}")
+                print(f"⚠️ 인앱 알람 취소 실패: {e}")
         
         # 4단계: 색상 정보 준비
         color_str = f"{self.selected_color[0]},{self.selected_color[1]},{self.selected_color[2]},{self.selected_color[3]}"
@@ -2162,6 +2163,9 @@ class MainScreen(MDScreen):
             
             print("🔄 안전한 시간표 로드 시작")
             self.load_saved_timetable()
+
+            # 🔥 새로 추가: 모든 알람 예약
+            Clock.schedule_once(lambda dt: self.load_and_schedule_all_alarms(), 2.0)
             
         except Exception as e:
             print(f"❌ 안전한 시간표 로드 실패: {e}")
@@ -2357,48 +2361,6 @@ class MainScreen(MDScreen):
         if success:
             print("시간표 저장 완료")
 
-    def cancel_system_alarm(self, class_id):
-        """시스템 알람 취소 - 백그라운드 알람 포함"""
-        try:
-            if platform != 'android':
-                return False
-                
-            from jnius import autoclass
-            
-            AlarmManager = autoclass('android.app.AlarmManager')
-            Intent = autoclass('android.content.Intent')
-            PendingIntent = autoclass('android.app.PendingIntent')
-            Context = autoclass('android.content.Context')
-            PythonActivity = autoclass('org.kivy.android.PythonActivity')
-            ComponentName = autoclass('android.content.ComponentName')
-            
-            context = PythonActivity.mActivity
-            alarm_manager = context.getSystemService(Context.ALARM_SERVICE)
-            
-            # 동일한 Intent 생성 (설정할 때와 정확히 동일해야 함)
-            intent = Intent()
-            intent.setComponent(ComponentName(
-                "org.kivy.skkutimetable.doublecheck",
-                "org.kivy.skkutimetable.doublecheck.AlarmReceiver"
-            ))
-            intent.setAction("org.kivy.skkutimetable.doublecheck.ALARM_ACTION")
-            
-            flags = PendingIntent.FLAG_UPDATE_CURRENT
-            if hasattr(PendingIntent, 'FLAG_IMMUTABLE'):
-                flags |= PendingIntent.FLAG_IMMUTABLE
-                
-            pending_intent = PendingIntent.getBroadcast(
-                context, class_id, intent, flags
-            )
-            
-            # 시스템 알람 취소
-            alarm_manager.cancel(pending_intent)
-            print(f"✅ 백그라운드 시스템 알람 취소됨: ID {class_id}")
-            return True
-            
-        except Exception as e:
-            print(f"❌ 시스템 알람 취소 실패: {e}")
-            return False
 
     def add_dummy_data(self):
         """테스트용 더미 과목 데이터 추가"""
@@ -2498,131 +2460,7 @@ class MainScreen(MDScreen):
         
         # 다음 ID 설정 (더미 데이터 이후)
         self.add_class_dialog.next_class_id = 1006
-        
-    def schedule_system_alarm(self, class_data, minutes_before=5):
-        """통합 시스템 알람 설정 - 수정 반영 + 백그라운드 작동"""
-        try:
-            if platform != 'android':
-                print("Android에서만 사용 가능")
-                return False
-                
-            from jnius import autoclass
-            from datetime import datetime, timedelta
-            import time
-            
-            # Android 클래스들
-            AlarmManager = autoclass('android.app.AlarmManager')
-            Intent = autoclass('android.content.Intent')
-            PendingIntent = autoclass('android.app.PendingIntent')
-            Context = autoclass('android.content.Context')
-            PythonActivity = autoclass('org.kivy.android.PythonActivity')
-            ComponentName = autoclass('android.content.ComponentName')
-            
-            context = PythonActivity.mActivity
-            alarm_manager = context.getSystemService(Context.ALARM_SERVICE)
-            
-            # Android 12+ 권한 확인
-            if hasattr(alarm_manager, 'canScheduleExactAlarms'):
-                if not alarm_manager.canScheduleExactAlarms():
-                    print("⚠️ 정확한 알람 권한 필요")
-                    self.request_alarm_permission()
-                    return False
-            
-            # 1단계: 기존 알람 먼저 취소 (중복 방지)
-            self.cancel_system_alarm(class_data['id'])
-            
-            # 2단계: 알람 시간 계산
-            class_time = self.parse_class_time(class_data)
-            alarm_time = class_time - timedelta(minutes=minutes_before)
-            
-            # 과거 시간이지만 오늘이면 알람 설정 허용
-            if alarm_time < datetime.now():
-                if alarm_time.date() == datetime.now().date():
-                    print("✅ 오늘 수업 시간, 아직 안 지남 - 알람 설정 유지")
-                else:
-                    print("⏭ 과거 수업 - 다음 주로 이동")
-                    alarm_time += timedelta(days=7)  # 다음 주로 미룸
-                
-            alarm_millis = int(alarm_time.timestamp() * 1000)
-            
-            # 3단계: 기존 AlarmReceiver로 Intent 전송
-            intent = Intent()
-            intent.setComponent(ComponentName(
-                "org.kivy.skkutimetable.doublecheck",
-                "org.kivy.skkutimetable.doublecheck.AlarmReceiver"
-            ))
-            intent.setAction("org.kivy.skkutimetable.doublecheck.ALARM_ACTION")
-            
-            # 4단계: 수업 정보 전달
-            intent.putExtra("class_name", class_data['name'])
-            intent.putExtra("class_room", class_data['room'])
-            intent.putExtra("class_time", class_data['start_time'])
-            intent.putExtra("class_professor", class_data.get('professor', ''))
-            
-            # 5단계: PendingIntent 생성
-            flags = PendingIntent.FLAG_UPDATE_CURRENT
-            if hasattr(PendingIntent, 'FLAG_IMMUTABLE'):
-                flags |= PendingIntent.FLAG_IMMUTABLE
-                
-            pending_intent = PendingIntent.getBroadcast(
-                context, 
-                class_data['id'],
-                intent, 
-                flags
-            )
-            
-            # 6단계: 시스템 알람 설정
-            alarm_manager.setExactAndAllowWhileIdle(
-                AlarmManager.RTC_WAKEUP, 
-                alarm_millis, 
-                pending_intent
-            )
-            
-            print(f"✅ 통합 시스템 알람 설정 완료!")
-            print(f"📚 과목: {class_data['name']}")
-            print(f"⏰ 알람: {minutes_before}분 전 ({alarm_time.strftime('%Y-%m-%d %H:%M')})")
-            print(f"📱 앱이 꺼져도 시스템이 알람을 울려줍니다!")
-            
-            return True
-            
-        except Exception as e:
-            print(f"❌ 통합 시스템 알람 설정 실패: {e}")
-            import traceback
-            traceback.print_exc()
-            return False
-    
-    def parse_class_time(self, class_data):
-    
-        day_map = {
-            "Monday": 0, "Tuesday": 1, "Wednesday": 2,
-            "Thursday": 3, "Friday": 4,
-            "월요일": 0, "화요일": 1, "수요일": 2,
-            "목요일": 3, "금요일": 4
-        }
-    
-        day = class_data.get("day")
-        start_time = class_data.get("start_time")
-    
-        if not day or not start_time:
-            return None
-    
-        target_weekday = day_map.get(day)
-        if target_weekday is None:
-            return None
-    
-        now = datetime.now()
-        today_weekday = now.weekday()
-    
-        days_ahead = (target_weekday - today_weekday) % 7
-        target_date = now + timedelta(days=days_ahead)
-    
-        hour, minute = map(int, start_time.split(":"))
-        class_datetime = target_date.replace(hour=hour, minute=minute, second=0, microsecond=0)
-    
-        if class_datetime <= now:
-            class_datetime += timedelta(days=7)
-    
-        return class_datetime
+
     
     def request_alarm_permission(self):
         """알람 권한 요청 (Android 12+)"""
@@ -2642,6 +2480,186 @@ class MainScreen(MDScreen):
         except Exception as e:
             print(f"권한 요청 실패: {e}")    
 
+    # MainScreen 클래스에 추가할 인앱 알람 시스템
+    
+    def calculate_next_class_time(self, class_data):
+        """다음 수업 시간 계산"""
+        from datetime import datetime, timedelta
+        
+        day_map = {
+            "Monday": 0, "Tuesday": 1, "Wednesday": 2,
+            "Thursday": 3, "Friday": 4
+        }
+        
+        day = class_data.get("day")
+        start_time = class_data.get("start_time")
+        
+        if not day or not start_time:
+            return None
+        
+        target_weekday = day_map.get(day)
+        if target_weekday is None:
+            return None
+        
+        # 현재 시간
+        now = datetime.now()
+        today_weekday = now.weekday()
+        
+        # 다음 수업까지 남은 날 계산
+        days_ahead = (target_weekday - today_weekday) % 7
+        target_date = now + timedelta(days=days_ahead)
+        
+        # 수업 시간 설정
+        hour, minute = map(int, start_time.split(":"))
+        class_datetime = target_date.replace(hour=hour, minute=minute, second=0, microsecond=0)
+        
+        # 오늘 수업인데 이미 지났으면 다음 주로
+        if class_datetime <= now:
+            class_datetime += timedelta(days=7)
+        
+        return class_datetime
+    
+    def schedule_in_app_alarm(self, class_data, notify_before=5):
+        """앱 실행 중일 때만 작동하는 인앱 알람"""
+        try:
+            # 다음 수업 시간 계산
+            class_time = self.calculate_next_class_time(class_data)
+            if not class_time:
+                print(f"❌ 시간 계산 실패: {class_data['name']}")
+                return False
+            
+            # 알람 시간 계산
+            from datetime import timedelta, datetime
+            alarm_time = class_time - timedelta(minutes=notify_before)
+            
+            # 현재 시간과의 차이 계산
+            now = datetime.now()
+            delay_seconds = (alarm_time - now).total_seconds()
+            
+            if delay_seconds > 0:
+                # 기존 알람이 있으면 취소
+                self.cancel_in_app_alarm(class_data['id'])
+                
+                # Kivy Clock으로 알람 예약
+                event = Clock.schedule_once(
+                    lambda dt: self.show_class_notification(class_data), 
+                    delay_seconds
+                )
+                
+                # 알람 정보 저장 (취소용)
+                if not hasattr(self, 'scheduled_alarms'):
+                    self.scheduled_alarms = {}
+                self.scheduled_alarms[class_data['id']] = event
+                
+                print(f"⏰ 인앱 알람 예약: {class_data['name']} - {delay_seconds/60:.1f}분 후")
+                print(f"📅 수업 시간: {class_time.strftime('%Y-%m-%d %H:%M')}")
+                print(f"⏰ 알람 시간: {alarm_time.strftime('%Y-%m-%d %H:%M')}")
+                return True
+            else:
+                print(f"⏭️ 이미 지난 시간: {class_data['name']}")
+                return False
+                
+        except Exception as e:
+            print(f"❌ 인앱 알람 설정 실패: {e}")
+            import traceback
+            traceback.print_exc()
+            return False
+    
+    def cancel_in_app_alarm(self, class_id):
+        """특정 과목의 인앱 알람 취소"""
+        try:
+            if hasattr(self, 'scheduled_alarms') and class_id in self.scheduled_alarms:
+                event = self.scheduled_alarms[class_id]
+                event.cancel()  # Clock 이벤트 취소
+                del self.scheduled_alarms[class_id]
+                print(f"✅ 인앱 알람 취소됨: ID {class_id}")
+                return True
+        except Exception as e:
+            print(f"❌ 인앱 알람 취소 실패: {e}")
+        return False
+    
+    def cancel_all_in_app_alarms(self):
+        """모든 인앱 알람 취소"""
+        try:
+            if hasattr(self, 'scheduled_alarms'):
+                for class_id, event in self.scheduled_alarms.items():
+                    event.cancel()
+                self.scheduled_alarms.clear()
+                print("✅ 모든 인앱 알람 취소됨")
+        except Exception as e:
+            print(f"❌ 모든 알람 취소 실패: {e}")
+    
+    def show_class_notification(self, class_data):
+        """수업 알림 표시 (실제 알람이 울릴 때 호출됨)"""
+        try:
+            print(f"🔔 알림 표시: {class_data['name']} 수업!")
+            
+            # Android에서는 시스템 알림
+            if 'ANDROID_STORAGE' in os.environ:
+                self.create_class_notification(class_data)
+            else:
+                # PC에서는 콘솔 출력
+                print(f"📚 {class_data['name']} 수업이 곧 시작됩니다!")
+                print(f"🏛️ 강의실: {class_data['room']}")
+                print(f"👨‍🏫 교수: {class_data['professor']}")
+                
+            # 알람이 울린 후 다음 주 알람 자동 설정
+            self.schedule_in_app_alarm(class_data, class_data.get('notify_before', 5))
+            
+        except Exception as e:
+            print(f"❌ 알림 표시 실패: {e}")
+    
+    def load_and_schedule_all_alarms(self):
+        """저장된 모든 과목의 인앱 알람 예약"""
+        try:
+            if not hasattr(self, 'classes_data'):
+                print("📚 시간표 데이터가 없습니다.")
+                return
+            
+            success_count = 0
+            for class_id, class_data in self.classes_data.items():
+                notify_before = class_data.get('notify_before', 5)
+                if self.schedule_in_app_alarm(class_data, notify_before):
+                    success_count += 1
+            
+            print(f"🎉 인앱 알람 일괄 설정 완료: {success_count}/{len(self.classes_data)}개")
+            
+            # 사용자에게 안내 메시지
+            if success_count > 0:
+                self.show_in_app_alarm_info()
+                
+        except Exception as e:
+            print(f"❌ 일괄 알람 설정 실패: {e}")
+    
+    def show_in_app_alarm_info(self):
+        """인앱 알람 사용법 안내"""
+        try:
+            from kivymd.uix.dialog import MDDialog
+            from kivymd.uix.button import MDFlatButton
+            
+            info_dialog = MDDialog(
+                title="📱 인앱 알람 설정 완료",
+                text="알람이 설정되었습니다!\n\n"
+                     "⚠️ 중요: 알람이 울리려면 앱을 켜두세요.\n"
+                     "앱이 꺼지면 알람이 작동하지 않습니다.\n\n"
+                     "💡 팁: 앱을 백그라운드에서 실행하거나\n"
+                     "배터리 절약 모드에서 제외해주세요.",
+                buttons=[
+                    MDFlatButton(
+                        text="확인",
+                        theme_text_color="Custom",
+                        text_color=self.app.theme_cls.primary_color,
+                        font_name=FONT_NAME,
+                        on_release=lambda x: info_dialog.dismiss()
+                    )
+                ]
+            )
+            info_dialog.text_font_name = FONT_NAME
+            info_dialog.open()
+            
+        except Exception as e:
+            print(f"❌ 안내 대화상자 오류: {e}")
+    
     def refresh_ui(self):
         """UI 새로고침 - 중복 방지"""
         try:
@@ -2874,117 +2892,24 @@ class MainScreen(MDScreen):
             # 클릭 이벤트 연결
             card.on_release_callback = lambda card: self.edit_class_dialog.show_edit_dialog(card)
             
-             # 🔥 백그라운드 알람 설정 (Android인 경우에만) - 상세 디버깅 포함
-            if 'ANDROID_STORAGE' in os.environ:
-                print(f"🔔 백그라운드 알람 설정 시도: {name} - {notify_before}분 전")
-                
-                try:
-                    # App을 통해 alarm_manager 접근
-                    app = self.app
-                    print(f"📱 App 확인: {type(app).__name__}")
-                    
-                    # class_data_for_alarm 정의
-                    class_data_for_alarm = {
-                        'id': class_id,
-                        'name': name,
-                        'day': day,
-                        'start_time': start_time,
-                        'end_time': end_time,
-                        'room': room,
-                        'professor': professor,
-                        'color': color,
-                        'notify_before': notify_before
-                    }
-                    
-                    # 디버그: 알람 데이터 출력
-                    print(f"🎯 알람 데이터 확인:")
-                    print(f"   - 과목: {class_data_for_alarm['name']}")
-                    print(f"   - 요일: {class_data_for_alarm['day']}")
-                    print(f"   - 시간: {class_data_for_alarm['start_time']}")
-                    print(f"   - 강의실: {class_data_for_alarm['room']}")
-                    print(f"   - 알람: {class_data_for_alarm['notify_before']}분 전")
-                    
-                    real_alarm_success = False  # 진짜 알람 성공 플래그
-                    
-                    if hasattr(app, 'alarm_manager') and getattr(app, 'alarm_manager', None) is not None:
-                        print(f"🔧 AlarmManager 존재: {app.alarm_manager}")
-                        print(f"🎯 AlarmManager.schedule_alarm() 호출 중...")
-                        
-                        # 🔥 상세한 시간 계산 과정 디버깅 추가
-                        try:
-                            from datetime import datetime, timedelta
-                            
-                            day_map = {'Monday': 0, 'Tuesday': 1, 'Wednesday': 2, 'Thursday': 3, 'Friday': 4}
-                            target_weekday = day_map.get(day, 0)
-                            
-                            now = datetime.now()
-                            print(f"🕐 현재 시간: {now.strftime('%Y-%m-%d %H:%M:%S')}")
-                            
-                            days_ahead = (target_weekday - now.weekday()) % 7
-                            target_date = now + timedelta(days=days_ahead)
-                            print(f"📅 목표 요일: {day} (오늘로부터 {days_ahead}일 후)")
-                            
-                            hour, minute = map(int, start_time.split(':'))
-                            class_datetime = target_date.replace(hour=hour, minute=minute, second=0, microsecond=0)
-                            
-                            # ✅ 오늘이어도 수업 시간이 미래면 유지, 과거면 다음 주로 미룸
-                            if class_datetime <= now:
-                                class_datetime += timedelta(days=7)
-                            
-                            alarm_time = class_datetime - timedelta(minutes=notify_before)
-                            
-                            print(f"📅 다음 수업 시간: {class_datetime.strftime('%Y-%m-%d %H:%M:%S')}")
-                            print(f"⏰ 알람 시간: {alarm_time.strftime('%Y-%m-%d %H:%M:%S')}")
-                            print(f"⏳ 알람까지: {(alarm_time - now).total_seconds() / 60:.1f}분 후")
-                            
-                        except Exception as time_error:
-                            print(f"❌ 시간 계산 오류: {time_error}")
-                            import traceback
-                            traceback.print_exc()
-                        
-                        # 진짜 알람 설정 호출
-                        real_alarm_success = app.alarm_manager.schedule_alarm(
-                            class_id, 
-                            class_data_for_alarm, 
-                            notify_before
-                        )
-                        
-                        if real_alarm_success:
-                            print(f"✅ 진짜 AlarmManager 알람 설정 성공: {name}")
-                        else:
-                            print(f"❌ 진짜 AlarmManager 알람 설정 실패: {name}")
-                    else:
-                        print(f"❌ app.alarm_manager가 존재하지 않거나 None입니다.")
-                        # 시스템 알람 직접 호출 시도
-                        try:
-                            system_alarm_success = self.schedule_system_alarm(class_data_for_alarm, notify_before)
-                            if system_alarm_success:
-                                print(f"✅ 시스템 알람 직접 설정 성공: {name}")
-                                real_alarm_success = True
-                            else:
-                                print(f"❌ 시스템 알람 직접 설정 실패: {name}")
-                        except Exception as sys_e:
-                            print(f"❌ 시스템 알람 직접 설정 오류: {sys_e}")
+            # 🔥 인앱 알람 설정
+            class_data_for_alarm = {
+                'id': class_id,
+                'name': name,
+                'day': day,
+                'start_time': start_time,
+                'end_time': end_time,
+                'room': room,
+                'professor': professor,
+                'color': color,
+                'notify_before': notify_before
+            }
             
-                    # 서비스용 파일 저장 (별개)
-                    file_save_success = app.save_alarm_for_service(class_data_for_alarm, notify_before)
-                    if file_save_success:
-                        print(f"✅ 서비스용 파일 저장 성공: {name}")
-                    else:
-                        print(f"❌ 서비스용 파일 저장 실패: {name}")
-                        
-                    # 정직한 결과 보고
-                    if real_alarm_success:
-                        print(f"🎉 최종 결과: 진짜 알람 설정 완료!")
-                    else:
-                        print(f"💥 최종 결과: 알람 설정 실패! (파일 저장만 됨)")
-                
-                except Exception as e:
-                    print(f"❌ 알람 설정 중 오류: {e}")
-                    import traceback
-                    traceback.print_exc()
+            success = self.schedule_in_app_alarm(class_data_for_alarm, notify_before)
+            if success:
+                print(f"✅ 인앱 알람 설정 성공: {name}")
             else:
-                print("💻 PC 환경 - 백그라운드 알람 스킵")
+                print(f"❌ 인앱 알람 설정 실패: {name}")
         
             # 시간표 저장 - 수정 중이 아닐 때만 저장
             if not hasattr(self, '_updating_class'):
@@ -3228,6 +3153,11 @@ class MainScreen(MDScreen):
                     )
                     print("✅ PC용 알림 전송 완료")
 
+            except Exception as e:
+                print(f"❌ 알림 테스트 실패: {e}")
+                import traceback
+                traceback.print_exc()
+
 class TimeTableApp(MDApp):
     def build(self):
         print("✅ build() 실행됨")
@@ -3364,74 +3294,7 @@ class TimeTableApp(MDApp):
         print("📱 앱 일시정지됨")
         return True  # True 반환해야 앱이 종료되지 않음
 
-    def start_background_service(self):
-        """백그라운드 알림 서비스 시작"""
-        try:
-            from jnius import autoclass
-            
-            Intent = autoclass('android.content.Intent')
-            PythonActivity = autoclass('org.kivy.android.PythonActivity')
-            
-            # ✅ 올바른 방식: Intent로 서비스 시작
-            context = PythonActivity.mActivity
-            intent = Intent(context, autoclass('org.kivy.skkutimetable.doublecheck.AlarmService'))
-            
-            # Android O 이상에서는 startForegroundService 사용
-            if hasattr(context, 'startForegroundService'):
-                context.startForegroundService(intent)
-            else:
-                context.startService(intent)
-                
-            print("✅ 백그라운드 알림 서비스 시작")
-            return True
-            
-        except Exception as e:
-            print(f"❌ 서비스 시작 실패: {e}")
-            import traceback
-            traceback.print_exc()
-            return False
-    
-    def save_alarm_for_service(self, class_data, notify_before):
-        """서비스가 읽을 수 있도록 알람 데이터 저장"""
-        try:
-            import pickle
-            from datetime import datetime, timedelta
-            
-            # 🔥 main_screen의 parse_class_time 사용
-            alarm_time = self.main_screen.parse_class_time(class_data) - timedelta(minutes=notify_before)
-            
-            # 알람 데이터 구조
-            alarm_data = {
-                'alarm_time': alarm_time.isoformat(),  # 문자열로 저장
-                'class_name': class_data['name'],
-                'class_room': class_data['room'],
-                'class_time': class_data['start_time'],
-                'class_professor': class_data['professor'],
-                'notify_before': notify_before
-            }
-            
-            # 기존 알람 데이터 로드
-            try:
-                with open(self.alarm_file_path, 'rb') as f:
-                    alarms = pickle.load(f)
-            except:
-                alarms = {}
-            
-            # 새 알람 추가
-            alarms[class_data['id']] = alarm_data
-            
-            # 저장
-            with open(self.alarm_file_path, 'wb') as f:
-                pickle.dump(alarms, f)
-                
-            print(f"✅ 서비스용 알람 데이터 저장: {class_data['name']}")
-            return True
-            
-        except Exception as e:
-            print(f"❌ 서비스용 알람 데이터 저장 실패: {e}")
-            import traceback
-            traceback.print_exc()
-            return False
+
     
     
     def show_alarm_notification(self, class_name, class_room, class_time, class_professor):
