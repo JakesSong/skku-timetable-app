@@ -3000,142 +3000,7 @@ class MainScreen(MDScreen):
             traceback.print_exc()
             return False
                         
-    def test_notification(self):
-            """과목 알림 테스트 - 실제 과목 정보 포함"""
-            try:
-                if 'ANDROID_STORAGE' in os.environ:
-                    # 시스템 알림 직접 호출
-                    from jnius import autoclass
-                    PythonActivity = autoclass('org.kivy.android.PythonActivity')
-                    Context = autoclass('android.content.Context')
-                    
-                    # Android 기본 Notification 클래스 사용
-                    Notification = autoclass('android.app.Notification')
-                    NotificationManager = autoclass('android.app.NotificationManager')
-                    Builder = autoclass('android.app.Notification$Builder')
-                    
-                    Intent = autoclass('android.content.Intent')
-                    PendingIntent = autoclass('android.app.PendingIntent')
-                    
-                    # 컨텍스트 가져오기
-                    context = PythonActivity.mActivity
-                    
-                    # 알림 채널 ID
-                    channel_id = "timetable_alarm_channel"
-                    
-                    # 🔥 전자출결 앱 Intent (로그캣으로 확인한 정확한 액티비티명 사용)
-                    try:
-                        package_name = 'edu.skku.attend'
-                        activity_name = 'edu.skku.attend.ui.activity.IntroActivity'  # 로그캣에서 확인한 정확한 이름
-                        
-                        # 방법 1: PackageManager 사용 (가장 안전)
-                        pm = context.getPackageManager()
-                        attendance_intent = pm.getLaunchIntentForPackage(package_name)
-                        
-                        if attendance_intent:
-                            notification_action_text = "전자출결 앱 열기"
-                            print("✅ PackageManager로 전자출결 앱 Intent 생성 성공")
-                        else:
-                            # 방법 2: 직접 액티비티명 지정 (로그캣에서 확인한 정확한 이름)
-                            print("PackageManager 실패 - 직접 액티비티 지정 시도")
-                            attendance_intent = Intent()
-                            attendance_intent.setClassName(package_name, activity_name)
-                            attendance_intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP)
-                            notification_action_text = "전자출결 앱 열기"
-                            print(f"✅ 직접 액티비티 지정: {activity_name}")
-                            
-                    except Exception as e:
-                        print(f"전자출결 앱 Intent 생성 오류: {e}")
-                        # 실패 시 Play Store로
-                        try:
-                            Uri = autoclass('android.net.Uri')
-                            store_uri = Uri.parse("market://details?id=edu.skku.attend")
-                            attendance_intent = Intent(Intent.ACTION_VIEW, store_uri)
-                            notification_action_text = "전자출결 앱 설치"
-                            print("❌ 전자출결 앱 실행 실패 - Play Store로 이동")
-                        except:
-                            # 최후의 수단: 시간표 앱 실행
-                            attendance_intent = Intent(context, PythonActivity)
-                            attendance_intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                            notification_action_text = "시간표 앱 열기"
-                    
-                    # 🔥 Android 12+ 호환성을 위한 FLAG_IMMUTABLE 설정
-                    FLAG_IMMUTABLE = 67108864  # PendingIntent.FLAG_IMMUTABLE
-                    FLAG_UPDATE_CURRENT = 134217728  # PendingIntent.FLAG_UPDATE_CURRENT
-                    
-                    # PendingIntent 생성 (크래시 방지를 위해 FLAG_IMMUTABLE 필수)
-                    pending_intent = PendingIntent.getActivity(
-                        context, 
-                        12345,  # 고유한 request code
-                        attendance_intent, 
-                        FLAG_UPDATE_CURRENT | FLAG_IMMUTABLE  # 🔥 중요: FLAG_IMMUTABLE 추가
-                    )
-                    
-                    # 📚 샘플 과목 정보 (실제로는 현재 시간에 해당하는 과목 정보 사용)
-                    sample_class = {
-                        'name': '공학컴퓨터프로그래밍',
-                        'room': '61352',
-                        'professor': '황숙희',
-                        'time': '15:00',
-                        'day': '월요일'
-                    }
-                    
-                    # 알림 빌더 생성
-                    builder = Builder(context, channel_id)
-                    builder.setSmallIcon(context.getApplicationInfo().icon)
-                    
-                    # 📚 과목 정보가 포함된 알림 내용
-                    builder.setContentTitle(f"🔔 수업 알림: {sample_class['name']}")
-                    builder.setContentText(f"{sample_class['time']} | {sample_class['room']} | {sample_class['professor']} 교수님")
-                    
-                    # 확장된 알림 스타일 (BigTextStyle 사용)
-                    try:
-                        BigTextStyle = autoclass('android.app.Notification$BigTextStyle')
-                        big_text_style = BigTextStyle()
-                        expanded_text = (
-                            f"📚 과목: {sample_class['name']}\n"
-                            f"🕐 시간: {sample_class['day']} {sample_class['time']}\n"
-                            f"🏛️ 강의실: {sample_class['room']}\n"
-                            f"👨‍🏫 교수: {sample_class['professor']} 교수님\n\n"
-                            f"📱 {notification_action_text}하려면 터치하세요"
-                        )
-                        big_text_style.bigText(expanded_text)
-                        builder.setStyle(big_text_style)
-                    except Exception as e:
-                        print(f"BigTextStyle 설정 오류: {e}")
-                    
-                    # 알림 속성 설정
-                    builder.setPriority(Notification.PRIORITY_HIGH)
-                    builder.setContentIntent(pending_intent)  # 터치 시 실행될 Intent
-                    builder.setAutoCancel(True)  # 터치 시 알림 자동 삭제
-                    
-                    # 진동 패턴 설정
-                    try:
-                        builder.setVibrate([0, 250, 250, 250])  # 진동 패턴
-                    except:
-                        pass
-                    
-                    # 알림 표시
-                    notification_manager = context.getSystemService(Context.NOTIFICATION_SERVICE)
-                    notification_manager.notify(9999, builder.build())
-                    
-                    print("✅ 과목 알림 전송 완료 (전자출결 앱 연동)")
-                    
-                else:
-                    # PC 환경에서는 플라이어 사용
-                    from plyer import notification
-                    notification.notify(
-                        title="🔔 수업 알림: 소재부품융합공학",
-                        message="14:00 | 61304A | 김범준 교수님\n전자출결을 잊지 마세요!",
-                        timeout=10
-                    )
-                    print("✅ PC용 알림 전송 완료")
-                        
-            except Exception as e:
-                print(f"❌ 알림 테스트 실패: {e}")
-                import traceback
-                traceback.print_exc()
-        
+
     def create_class_notification(self, class_data, minutes_before=5):
             """실제 과목 정보로 알림 생성"""
             try:
@@ -3233,151 +3098,9 @@ class MainScreen(MDScreen):
                 print(f"❌ 과목 알림 생성 실패: {e}")
                 import traceback
                 traceback.print_exc()
-    
-    # MainScreen 클래스에 추가할 완전한 테스트 메서드들
-    
-    # ========================================
-    # 기존 메서드들 (수정된 버전으로 교체)
-    # ========================================
-    
-    def test_alarm_now(self):
-        """🧪 30초 후 테스트 알람 설정 - 수정된 버전"""
-        if not self.alarm_manager:
-            print("❌ alarm_manager가 없습니다")
-            return
-        
-        from datetime import datetime, timedelta
-        
-        # 🔥 핵심 수정: 30초 후 시간을 정확히 계산
-        test_time = datetime.now() + timedelta(seconds=30)
-        
-        # 🔥 오늘 날짜와 요일을 정확히 사용
-        today_weekday = test_time.weekday()  # 0=월요일, 1=화요일, ...
-        day_names = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
-        today_day_name = day_names[today_weekday]
-        
-        test_class_data = {
-            'id': 999,
-            'name': '🧪 테스트 알람',
-            'day': today_day_name,  # 🔥 오늘 날짜의 실제 요일 사용
-            'start_time': test_time.strftime('%H:%M'),  # 🔥 30초 후의 실제 시간 사용
-            'room': '테스트 강의실',
-            'professor': '테스트 교수'
-        }
-        
-        print(f"🧪 테스트 알람 설정 중...")
-        print(f"⏰ 현재 시간: {datetime.now().strftime('%H:%M:%S')}")
-        print(f"⏰ 알람 시간: {test_time.strftime('%H:%M:%S')}")
-        print(f"📅 오늘 요일: {today_day_name}")
-        print(f"🎯 예상 알람 발생: {test_time.strftime('%Y-%m-%d %H:%M:%S')}")
-        
-        # 🔥 AlarmManager의 schedule_alarm 직접 호출 (parse_class_time 우회)
-        try:
-            # 직접 시스템 알람 설정
-            alarm_millis = int(test_time.timestamp() * 1000)
-            
-            from jnius import autoclass
-            AlarmManager = autoclass('android.app.AlarmManager')
-            Intent = autoclass('android.content.Intent')
-            PendingIntent = autoclass('android.app.PendingIntent')
-            Context = autoclass('android.content.Context')
-            PythonActivity = autoclass('org.kivy.android.PythonActivity')
-            ComponentName = autoclass('android.content.ComponentName')
-            
-            context = PythonActivity.mActivity
-            alarm_manager = context.getSystemService(Context.ALARM_SERVICE)
-            package_name = context.getPackageName()
-            
-            # Intent 생성
-            intent = Intent()
-            intent.setComponent(ComponentName(package_name, f"{package_name}.AlarmReceiver"))
-            intent.setAction("org.kivy.skkutimetable.doublecheck.ALARM_ACTION")
-            
-            # 테스트 데이터 전달
-            intent.putExtra("class_name", test_class_data['name'])
-            intent.putExtra("class_room", test_class_data['room'])
-            intent.putExtra("class_time", test_class_data['start_time'])
-            intent.putExtra("class_professor", test_class_data['professor'])
-            
-            # PendingIntent 생성
-            flags = PendingIntent.FLAG_UPDATE_CURRENT
-            if hasattr(PendingIntent, 'FLAG_IMMUTABLE'):
-                flags |= PendingIntent.FLAG_IMMUTABLE
-                
-            pending_intent = PendingIntent.getBroadcast(context, 999, intent, flags)
-            
-            # 🔥 핵심: setExact로 정확한 시간에 알람 설정
-            alarm_manager.setExact(AlarmManager.RTC_WAKEUP, alarm_millis, pending_intent)
-            
-            print(f"✅ 직접 시스템 알람 설정 성공!")
-            print(f"📱 정확히 30초 후에 알람이 울릴 것입니다!")
-            
-            return True
-            
-        except Exception as e:
-            print(f"❌ 직접 시스템 알람 설정 실패: {e}")
-            import traceback
-            traceback.print_exc()
-            return False
-    
-    def test_immediate_alarm(self):
-        """🧪 5초 후 즉시 테스트 알람 - 더 빠른 테스트용"""
-        if not self.alarm_manager:
-            print("❌ alarm_manager가 없습니다")
-            return
-        
-        from datetime import datetime, timedelta
-        
-        # 🔥 5초 후 알람 설정
-        test_time = datetime.now() + timedelta(seconds=5)
-        
-        try:
-            from jnius import autoclass
-            AlarmManager = autoclass('android.app.AlarmManager')
-            Intent = autoclass('android.content.Intent')
-            PendingIntent = autoclass('android.app.PendingIntent')
-            Context = autoclass('android.content.Context')
-            PythonActivity = autoclass('org.kivy.android.PythonActivity')
-            ComponentName = autoclass('android.content.ComponentName')
-            
-            context = PythonActivity.mActivity
-            alarm_manager = context.getSystemService(Context.ALARM_SERVICE)
-            package_name = context.getPackageName()
-            
-            # Intent 생성
-            intent = Intent()
-            intent.setComponent(ComponentName(package_name, f"{package_name}.AlarmReceiver"))
-            intent.setAction("org.kivy.skkutimetable.doublecheck.ALARM_ACTION")  
-            
-            # 테스트 데이터 전달
-            intent.putExtra("class_name", "🚀 5초 테스트")
-            intent.putExtra("class_room", "즉시 테스트")
-            intent.putExtra("class_time", test_time.strftime('%H:%M'))
-            intent.putExtra("class_professor", "긴급 테스트")
-            
-            # PendingIntent 생성
-            flags = PendingIntent.FLAG_UPDATE_CURRENT
-            if hasattr(PendingIntent, 'FLAG_IMMUTABLE'):
-                flags |= PendingIntent.FLAG_IMMUTABLE
-                
-            pending_intent = PendingIntent.getBroadcast(context, 888, intent, flags)
-            
-            # 알람 설정
-            alarm_millis = int(test_time.timestamp() * 1000)
-            alarm_manager.setExact(AlarmManager.RTC_WAKEUP, alarm_millis, pending_intent)
-            
-            print(f"🚀 5초 후 즉시 알람 설정 완료!")
-            print(f"⏰ 현재: {datetime.now().strftime('%H:%M:%S')}")
-            print(f"⏰ 알람: {test_time.strftime('%H:%M:%S')}")
-            
-            return True
-            
-        except Exception as e:
-            print(f"❌ 즉시 알람 설정 실패: {e}")
-            return False
-    
+
     def test_direct_notification(self):
-        """🧪 즉시 알림 생성 테스트 (AlarmManager 우회) - 기존 유지"""
+        """🧪 실제 과목 정보가 포함된 즉시 알림 테스트"""
         try:
             from jnius import autoclass
             
@@ -3385,573 +3108,120 @@ class MainScreen(MDScreen):
             NotificationManager = autoclass('android.app.NotificationManager')
             Builder = autoclass('android.app.Notification$Builder')
             PythonActivity = autoclass('org.kivy.android.PythonActivity')
+            Intent = autoclass('android.content.Intent')
+            PendingIntent = autoclass('android.app.PendingIntent')
             
             context = PythonActivity.mActivity
             notification_manager = context.getSystemService(Context.NOTIFICATION_SERVICE)
             
-            builder = Builder(context, "timetable_alarm_channel")
-            builder.setContentTitle("🧪 직접 알림 테스트")
-            builder.setContentText("BroadcastReceiver 우회 직접 알림")
-            builder.setSmallIcon(17301659)  # android.R.drawable.ic_dialog_info
-            builder.setAutoCancel(True)
+            # 📚 샘플 과목 정보 (실제 과목 정보 스타일)
+            sample_class = {
+                'name': '공학컴퓨터프로그래밍',
+                'room': '61352',
+                'professor': '황숙희',
+                'start_time': '15:00',
+                'day': '월요일'
+            }
             
-            notification_manager.notify(8888, builder.build())
-            print("✅ 직접 알림 생성 성공!")
-            
-        except Exception as e:
-            print(f"❌ 직접 알림 생성 실패: {e}")
-            import traceback
-            traceback.print_exc()
-    
-    # ========================================
-    # 새로운 진단 메서드들 (추가)
-    # ========================================
-    
-    def test_alarm_receiver_debug(self):
-        """🔍 AlarmReceiver 작동 상태 진단"""
-        try:
-            from datetime import datetime, timedelta
-            from jnius import autoclass
-            
-            # 10초 후 알람 설정 (더 긴 시간으로 확인)
-            test_time = datetime.now() + timedelta(seconds=10)
-            alarm_millis = int(test_time.timestamp() * 1000)
-            
-            print(f"🔍 AlarmReceiver 진단 시작")
-            print(f"⏰ 현재 시간: {datetime.now().strftime('%H:%M:%S')}")
-            print(f"⏰ 알람 시간: {test_time.strftime('%H:%M:%S')}")
-            print(f"📅 알람 밀리초: {alarm_millis}")
-            
-            # Android 클래스들
-            AlarmManager = autoclass('android.app.AlarmManager')
-            Intent = autoclass('android.content.Intent')
-            PendingIntent = autoclass('android.app.PendingIntent')
-            Context = autoclass('android.content.Context')
-            PythonActivity = autoclass('org.kivy.android.PythonActivity')
-            ComponentName = autoclass('android.content.ComponentName')
-            
-            context = PythonActivity.mActivity
-            alarm_manager = context.getSystemService(Context.ALARM_SERVICE)
-            
-            # 🔍 패키지명과 컴포넌트명 확인
-            package_name = context.getPackageName()
-            print(f"📦 실제 패키지명: {package_name}")
-            
-            # Intent 생성 (정확한 패키지명 사용)
-            intent = Intent()
-            receiver_class = f"{package_name}.AlarmReceiver"
-            print(f"🎯 AlarmReceiver 클래스: {receiver_class}")
-            
-            intent.setComponent(ComponentName(package_name, receiver_class))
-            intent.setAction("org.kivy.skkutimetable.doublecheck.ALARM_ACTION")
-            
-            # 🔍 추가 디버그 정보
-            intent.putExtra("DEBUG_MODE", "true")
-            intent.putExtra("class_name", "🔍 진단 테스트")
-            intent.putExtra("class_room", "디버그 룸")
-            intent.putExtra("class_time", test_time.strftime('%H:%M'))
-            intent.putExtra("test_timestamp", str(datetime.now().timestamp()))
-            
-            # PendingIntent 생성
-            flags = PendingIntent.FLAG_UPDATE_CURRENT
-            if hasattr(PendingIntent, 'FLAG_IMMUTABLE'):
-                flags |= PendingIntent.FLAG_IMMUTABLE
-                
-            pending_intent = PendingIntent.getBroadcast(context, 777, intent, flags)
-            
-            # 🔍 알람 매니저 권한 확인
-            if hasattr(alarm_manager, 'canScheduleExactAlarms'):
-                can_schedule = alarm_manager.canScheduleExactAlarms()
-                print(f"🔒 정확한 알람 권한: {can_schedule}")
-            
-            # 알람 설정
-            alarm_manager.setExact(AlarmManager.RTC_WAKEUP, alarm_millis, pending_intent)
-            
-            print(f"✅ 진단 알람 설정 완료!")
-            print(f"📱 10초 후 AlarmReceiver 호출 예정")
-            print(f"🔍 logcat에서 'AlarmReceiver' 키워드 확인하세요")
-            
-            return True
-            
-        except Exception as e:
-            print(f"❌ 진단 테스트 실패: {e}")
-            import traceback
-            traceback.print_exc()
-            return False
-    
-    def test_broadcast_intent_direct(self):
-        """🔍 BroadcastReceiver 직접 호출 테스트"""
-        try:
-            from jnius import autoclass
-            
-            Intent = autoclass('android.content.Intent')
-            PythonActivity = autoclass('org.kivy.android.PythonActivity')
-            ComponentName = autoclass('android.content.ComponentName')
-            
-            context = PythonActivity.mActivity
-            package_name = context.getPackageName()
-            
-            print(f"🔍 BroadcastReceiver 직접 호출 테스트")
-            print(f"📦 패키지명: {package_name}")
-            
-            # Intent 생성
-            intent = Intent()
-            receiver_class = f"{package_name}.AlarmReceiver"
-            intent.setComponent(ComponentName(package_name, receiver_class))
-            intent.setAction("org.kivy.skkutimetable.doublecheck.ALARM_ACTION")  
-            
-            # 테스트 데이터
-            intent.putExtra("class_name", "🔍 직접 호출 테스트")
-            intent.putExtra("class_room", "직접 테스트 룸")
-            intent.putExtra("class_time", "지금")
-            intent.putExtra("DIRECT_CALL", "true")
-            
-            # 🔍 직접 브로드캐스트 전송
-            context.sendBroadcast(intent)
-            
-            print(f"✅ BroadcastReceiver 직접 호출 완료!")
-            print(f"📱 AlarmReceiver가 즉시 호출되어야 합니다")
-            
-            return True
-            
-        except Exception as e:
-            print(f"❌ 직접 호출 테스트 실패: {e}")
-            import traceback
-            traceback.print_exc()
-            return False
-    
-    def check_alarm_receiver_exists(self):
-        """🔍 AlarmReceiver 클래스 존재 여부 확인"""
-        try:
-            from jnius import autoclass
-            
-            PythonActivity = autoclass('org.kivy.android.PythonActivity')
-            context = PythonActivity.mActivity
-            package_name = context.getPackageName()
-            
-            print(f"🔍 AlarmReceiver 존재 여부 확인")
-            print(f"📦 패키지명: {package_name}")
-            
-            # 패키지 매니저로 컴포넌트 확인
+            # 전자출결 앱 Intent 생성
             try:
-                PackageManager = autoclass('android.content.pm.PackageManager')
-                ComponentName = autoclass('android.content.ComponentName')
-                
+                package_name = 'edu.skku.attend'
                 pm = context.getPackageManager()
-                receiver_class = f"{package_name}.AlarmReceiver"
-                component = ComponentName(package_name, receiver_class)
+                attendance_intent = pm.getLaunchIntentForPackage(package_name)
                 
-                # 컴포넌트 정보 가져오기 시도
-                info = pm.getReceiverInfo(component, 0)
-                print(f"✅ AlarmReceiver 발견: {info.name}")
-                return True
-                
-            except Exception as e:
-                print(f"❌ AlarmReceiver 클래스를 찾을 수 없음: {e}")
-                
-                # 대안: 다른 경로로 확인
-                try:
-                    receiver_class = autoclass(f'{package_name}.AlarmReceiver')
-                    print(f"✅ 직접 클래스 로딩 성공: {receiver_class}")
-                    return True
-                except Exception as e2:
-                    print(f"❌ 직접 클래스 로딩도 실패: {e2}")
-                    return False
+                if attendance_intent:
+                    action_text = "전자출결하기"
+                else:
+                    # 직접 액티비티 지정
+                    attendance_intent = Intent()
+                    attendance_intent.setClassName(package_name, 'edu.skku.attend.ui.activity.IntroActivity')
+                    attendance_intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                    action_text = "전자출결하기"
+            except:
+                # 실패 시 시간표 앱으로
+                attendance_intent = Intent(context, PythonActivity)
+                attendance_intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                action_text = "시간표 열기"
             
-        except Exception as e:
-            print(f"❌ AlarmReceiver 확인 실패: {e}")
-            return False
-    
-    def run_comprehensive_test(self):
-        """🎯 종합 진단 테스트 실행"""
-        print("\n" + "="*50)
-        print("🎯 종합 진단 테스트 시작")
-        print("="*50)
-        
-        # 1단계: AlarmReceiver 존재 확인
-        print("\n📋 1단계: AlarmReceiver 존재 확인")
-        receiver_exists = self.check_alarm_receiver_exists()
-        
-        # 2단계: 직접 BroadcastReceiver 호출
-        print("\n📋 2단계: 직접 BroadcastReceiver 호출")
-        direct_call_success = self.test_broadcast_intent_direct()
-        
-        # 3단계: 즉시 알림 테스트
-        print("\n📋 3단계: 즉시 알림 테스트")
-        notification_success = self.test_direct_notification()
-        
-        # 4단계: 10초 알람 진단
-        print("\n📋 4단계: 10초 알람 진단")
-        alarm_success = self.test_alarm_receiver_debug()
-        
-        # 결과 요약
-        print("\n" + "="*50)
-        print("🎯 종합 진단 결과 요약")
-        print("="*50)
-        print(f"📱 AlarmReceiver 존재: {'✅' if receiver_exists else '❌'}")
-        print(f"📱 직접 호출 성공: {'✅' if direct_call_success else '❌'}")
-        print(f"📱 즉시 알림 성공: {'✅' if notification_success else '❌'}")
-        print(f"📱 10초 알람 설정: {'✅' if alarm_success else '❌'}")
-        
-        if receiver_exists and direct_call_success:
-            print("\n✅ AlarmReceiver 기본 구조는 정상입니다!")
-            print("🔍 10초 후 알람이 울리는지 확인하세요")
-        else:
-            print("\n❌ AlarmReceiver에 문제가 있습니다!")
-            print("🔧 buildozer.spec 설정을 확인해주세요")
-        
-        print("="*50)
-
-    def check_manifest_registration(self):
-        """🔍 AndroidManifest.xml에 AlarmReceiver가 제대로 등록되었는지 확인"""
-        try:
-            from jnius import autoclass
+            # PendingIntent 생성 (Android 12+ 호환)
+            FLAG_IMMUTABLE = 67108864
+            FLAG_UPDATE_CURRENT = 134217728
             
-            PythonActivity = autoclass('org.kivy.android.PythonActivity')
-            Context = autoclass('android.content.Context')
-            PackageManager = autoclass('android.content.pm.PackageManager')
-            ComponentName = autoclass('android.content.ComponentName')
+            pending_intent = PendingIntent.getActivity(
+                context,
+                8888,
+                attendance_intent,
+                FLAG_UPDATE_CURRENT | FLAG_IMMUTABLE
+            )
             
-            context = PythonActivity.mActivity
-            package_name = context.getPackageName()
-            pm = context.getPackageManager()
+            # 알림 빌더 생성
+            builder = Builder(context, "timetable_alarm_channel")
+            builder.setSmallIcon(context.getApplicationInfo().icon)
+            builder.setContentTitle(f"🔔 수업 알림: {sample_class['name']}")
+            builder.setContentText(f"{sample_class['start_time']} | {sample_class['room']} | {sample_class['professor']} 교수님")
             
-            print(f"🔍 Manifest 등록 상태 확인")
-            print(f"📦 패키지명: {package_name}")
-            
+            # 확장된 알림 내용 (BigTextStyle)
             try:
-                # 1. AlarmReceiver 컴포넌트 확인
-                receiver_component = ComponentName(package_name, f"{package_name}.AlarmReceiver")
-                receiver_info = pm.getReceiverInfo(receiver_component, 0)
-                
-                print(f"✅ AlarmReceiver Manifest 등록 확인됨!")
-                print(f"   - 클래스명: {receiver_info.name}")
-                print(f"   - 활성화: {receiver_info.enabled}")
-                print(f"   - Export: {receiver_info.exported}")
-                
-                return True
-                
+                BigTextStyle = autoclass('android.app.Notification$BigTextStyle')
+                big_text_style = BigTextStyle()
+                expanded_text = (
+                    f"📚 과목: {sample_class['name']}\n"
+                    f"🕐 시간: {sample_class['day']} {sample_class['start_time']}\n"
+                    f"🏛️ 강의실: {sample_class['room']}\n"
+                    f"👨‍🏫 교수: {sample_class['professor']} 교수님\n\n"
+                    f"📱 {action_text}하려면 터치하세요"
+                )
+                big_text_style.bigText(expanded_text)
+                builder.setStyle(big_text_style)
             except Exception as e:
-                print(f"❌ Manifest에 AlarmReceiver 등록 안됨: {e}")
-                
-                # 2. 모든 Receiver 목록 확인
-                try:
-                    package_info = pm.getPackageInfo(package_name, PackageManager.GET_RECEIVERS)
-                    receivers = package_info.receivers
-                    
-                    print(f"📋 등록된 Receiver 목록 ({len(receivers) if receivers else 0}개):")
-                    if receivers:
-                        for i in range(len(receivers)):
-                            receiver = receivers[i]
-                            print(f"   {i+1}. {receiver.name}")
-                    else:
-                        print("   (등록된 Receiver 없음)")
-                        
-                except Exception as e2:
-                    print(f"❌ Receiver 목록 조회 실패: {e2}")
-                
-                return False
+                print(f"BigTextStyle 설정 오류: {e}")
+            
+            # 알림 속성 설정
+            builder.setPriority(autoclass('android.app.Notification').PRIORITY_HIGH)
+            builder.setContentIntent(pending_intent)  # 터치 시 전자출결 앱 실행
+            builder.setAutoCancel(True)  # 터치 시 알림 자동 삭제
+            
+            # 진동 패턴 설정
+            try:
+                builder.setVibrate([0, 250, 250, 250])
+            except:
+                pass
+            
+            # 알림 표시
+            notification_manager.notify(8888, builder.build())
+            print("✅ 실제 과목 정보 알림 생성 성공!")
+            print(f"📚 과목: {sample_class['name']}")
+            print(f"🕐 시간: {sample_class['day']} {sample_class['start_time']}")
+            print(f"🏛️ 강의실: {sample_class['room']}")
+            print(f"👨‍🏫 교수: {sample_class['professor']} 교수님")
             
         except Exception as e:
-            print(f"❌ Manifest 확인 실패: {e}")
-            return False
-    
-    def test_intent_action_matching(self):
-        """🔍 Intent 액션과 필터 매칭 테스트"""
-        try:
-            from jnius import autoclass
-            from datetime import datetime, timedelta
-            
-            PythonActivity = autoclass('org.kivy.android.PythonActivity')
-            Intent = autoclass('android.content.Intent')
-            ComponentName = autoclass('android.content.ComponentName')
-            
-            context = PythonActivity.mActivity
-            package_name = context.getPackageName()
-            
-            print(f"🔍 Intent 액션 매칭 테스트")
-            
-            # 🔥 테스트 1: 명시적 Intent (컴포넌트 직접 지정)
-            print(f"\n📋 테스트 1: 명시적 Intent")
-            intent1 = Intent()
-            intent1.setComponent(ComponentName(package_name, f"{package_name}.AlarmReceiver"))
-            intent1.putExtra("test_type", "explicit_intent")
-            intent1.putExtra("class_name", "🔍 명시적 테스트")
-            
-            context.sendBroadcast(intent1)
-            print(f"✅ 명시적 Intent 전송 완료")
-            
-            # 🔥 테스트 2: 암시적 Intent (액션 기반)
-            print(f"\n📋 테스트 2: 암시적 Intent")
-            intent2 = Intent("org.kivy.skkutimetable.doublecheck.ALARM_ACTION")
-            intent2.setPackage(package_name)  # 패키지 제한
-            intent2.putExtra("test_type", "implicit_intent")
-            intent2.putExtra("class_name", "🔍 암시적 테스트")
-            
-            context.sendBroadcast(intent2)
-            print(f"✅ 암시적 Intent 전송 완료")
-            
-            # 🔥 테스트 3: 일반 브로드캐스트
-            print(f"\n📋 테스트 3: 일반 브로드캐스트")
-            intent3 = Intent()
-            intent3.setAction("android.intent.action.USER_PRESENT")
-            intent3.setComponent(ComponentName(package_name, f"{package_name}.AlarmReceiver"))
-            intent3.putExtra("test_type", "general_broadcast")
-            intent3.putExtra("class_name", "🔍 일반 테스트")
-            
-            context.sendBroadcast(intent3)
-            print(f"✅ 일반 브로드캐스트 전송 완료")
-            
-            print(f"\n🔍 3가지 Intent 전송 완료!")
-            print(f"📱 logcat에서 AlarmReceiver 호출 확인하세요")
-            
-            return True
-            
-        except Exception as e:
-            print(f"❌ Intent 매칭 테스트 실패: {e}")
+            print(f"❌ 실제 과목 알림 생성 실패: {e}")
             import traceback
             traceback.print_exc()
-            return False
-    
-    def run_detailed_diagnosis(self):
-        """🎯 상세 진단 실행"""
-        print("\n" + "="*60)
-        print("🎯 상세 알람 시스템 진단")
-        print("="*60)
-        
-        # 1단계: Manifest 등록 확인
-        print("\n📋 1단계: AndroidManifest.xml 등록 확인")
-        manifest_ok = self.check_manifest_registration()
-        
-        # 2단계: Intent 액션 매칭 테스트
-        print("\n📋 2단계: Intent 액션 매칭 테스트")
-        intent_ok = self.test_intent_action_matching()
-        
-        # 3단계: 기존 AlarmReceiver 존재 확인
-        print("\n📋 3단계: AlarmReceiver 클래스 존재 재확인")
-        class_ok = self.check_alarm_receiver_exists()
-        
-        # 결과 요약
-        print("\n" + "="*60)
-        print("🎯 상세 진단 결과")
-        print("="*60)
-        print(f"📱 Manifest 등록: {'✅' if manifest_ok else '❌'}")
-        print(f"📱 Intent 매칭: {'✅' if intent_ok else '❌'}")
-        print(f"📱 클래스 존재: {'✅' if class_ok else '❌'}")
-        
-        if not manifest_ok:
-            print(f"\n❌ 문제: AndroidManifest.xml에 AlarmReceiver가 등록되지 않음!")
-            print(f"🔧 해결책: buildozer.spec의 android.add_src를 확인하고")
-            print(f"          AndroidManifest.tmpl.xml 파일을 생성하세요")
-        elif class_ok and intent_ok:
-            print(f"\n✅ 모든 구성요소가 정상입니다!")
-            print(f"🔍 알람이 울리지 않는 이유는 다른 곳에 있습니다")
-        
-        print("="*60)
-    
+
+                
     def add_test_buttons(self):
-        """상세 진단이 포함된 테스트 버튼들 추가"""
-        if hasattr(self, 'layout') and self.layout:
-            from kivymd.uix.button import MDRaisedButton
-            from kivy.uix.boxlayout import BoxLayout
-            
-            # 테스트 버튼 컨테이너 (10개 버튼)
-            test_container = BoxLayout(
-                orientation='vertical',
-                size_hint_y=None,
-                height='400dp',  # 높이 증가 (10개 버튼)
-                spacing='5dp',
-                pos_hint={'center_x': 0.5, 'y': 0.55}  # 화면 상단에 위치
-            )
-            
-            # ===========================================
-            # 🔍 진단 테스트 버튼들 (새로운)
-            # ===========================================
-            
-            # 1. Manifest 등록 확인 버튼 (새로 추가!)
-            manifest_check_btn = MDRaisedButton(
-                text="🔍 Manifest 등록 확인",
-                size_hint_y=None,
-                height='35dp',
-                font_name=FONT_NAME,
-                md_bg_color=[1, 0.8, 0, 1]  # 골드색
-            )
-            manifest_check_btn.bind(on_release=lambda x: self.check_manifest_registration())
-            
-            # 2. Intent 매칭 테스트 버튼 (새로 추가!)
-            intent_test_btn = MDRaisedButton(
-                text="🔍 Intent 매칭 테스트",
-                size_hint_y=None,
-                height='35dp',
-                font_name=FONT_NAME,
-                md_bg_color=[0.8, 0.4, 1, 1]  # 라벤더색
-            )
-            intent_test_btn.bind(on_release=lambda x: self.test_intent_action_matching())
-            
-            # 3. 상세 진단 버튼 (새로 추가!)
-            detailed_diagnosis_btn = MDRaisedButton(
-                text="🎯 상세 진단 실행",
-                size_hint_y=None,
-                height='35dp',
-                font_name=FONT_NAME,
-                md_bg_color=[1, 0.2, 0.8, 1]  # 마젠타색
-            )
-            detailed_diagnosis_btn.bind(on_release=lambda x: self.run_detailed_diagnosis())
-            
-            # 4. AlarmReceiver 존재 확인 버튼
-            check_receiver_btn = MDRaisedButton(
-                text="🔍 AlarmReceiver 확인",
-                size_hint_y=None,
-                height='35dp',
-                font_name=FONT_NAME,
-                md_bg_color=[0.8, 0.8, 0.2, 1]  # 노란색
-            )
-            check_receiver_btn.bind(on_release=lambda x: self.check_alarm_receiver_exists())
-            
-            # 5. 직접 BroadcastReceiver 호출 버튼
-            direct_broadcast_btn = MDRaisedButton(
-                text="🔍 직접 Receiver 호출",
-                size_hint_y=None,
-                height='35dp',
-                font_name=FONT_NAME,
-                md_bg_color=[0.8, 0.2, 0.8, 1]  # 보라색
-            )
-            direct_broadcast_btn.bind(on_release=lambda x: self.test_broadcast_intent_direct())
-            
-            # 6. 10초 알람 진단 버튼
-            debug_alarm_btn = MDRaisedButton(
-                text="🔍 10초 알람 진단",
-                size_hint_y=None,
-                height='35dp',
-                font_name=FONT_NAME,
-                md_bg_color=[1, 0.5, 0, 1]  # 주황색
-            )
-            debug_alarm_btn.bind(on_release=lambda x: self.test_alarm_receiver_debug())
-            
-            # ===========================================
-            # 🧪 기존 테스트 버튼들
-            # ===========================================
-            
-            # 7. 5초 즉시 알람 테스트 버튼
-            immediate_test_btn = MDRaisedButton(
-                text="🚀 5초 알람 테스트",
-                size_hint_y=None,
-                height='35dp',
-                font_name=FONT_NAME,
-                md_bg_color=[1, 0.2, 0.2, 1]  # 빨간색
-            )
-            immediate_test_btn.bind(on_release=lambda x: self.test_immediate_alarm())
-            
-            # 8. 즉시 알림 테스트 버튼  
-            notify_test_btn = MDRaisedButton(
-                text="🔔 즉시 알림 테스트", 
-                size_hint_y=None,
-                height='35dp',
-                font_name=FONT_NAME,
-                md_bg_color=[0.2, 0.2, 0.8, 1]  # 파란색
-            )
-            notify_test_btn.bind(on_release=lambda x: self.test_direct_notification())
-            
-            # ===========================================
-            # 🎯 종합 테스트 버튼들
-            # ===========================================
-            
-            # 9. 종합 진단 테스트 버튼
-            comprehensive_test_btn = MDRaisedButton(
-                text="🎯 종합 진단 테스트",
-                size_hint_y=None,
-                height='35dp',
-                font_name=FONT_NAME,
-                md_bg_color=[0.5, 0.5, 0.5, 1]  # 회색
-            )
-            comprehensive_test_btn.bind(on_release=lambda x: self.run_comprehensive_test())
-            
-            # 10. 테스트 버튼 숨기기 버튼
-            hide_buttons_btn = MDRaisedButton(
-                text="❌ 테스트 버튼 숨기기",
-                size_hint_y=None,
-                height='35dp',
-                font_name=FONT_NAME,
-                md_bg_color=[0.3, 0.3, 0.3, 1]  # 어두운 회색
-            )
-            hide_buttons_btn.bind(on_release=lambda x: self.hide_test_buttons(test_container))
-            
-            # 버튼들을 컨테이너에 추가
-            test_container.add_widget(direct_broadcast_btn)   # 🔍 보라색: 직접 호출
-            test_container.add_widget(debug_alarm_btn)        # 🔍 주황색: 10초 알람 진단
-            test_container.add_widget(manifest_check_btn)     # 🔍 골드: Manifest 등록 확인
-            test_container.add_widget(intent_test_btn)        # 🔍 라벤더: Intent 매칭 테스트
-            test_container.add_widget(detailed_diagnosis_btn) # 🎯 마젠타: 상세 진단
-            test_container.add_widget(check_receiver_btn)     # 🔍 노란색: AlarmReceiver 확인
-            test_container.add_widget(immediate_test_btn)     # 🚀 빨간색: 5초 알람
-            test_container.add_widget(notify_test_btn)        # 🔔 파란색: 즉시 알림
-            test_container.add_widget(comprehensive_test_btn) # 🎯 회색: 종합 진단
-            test_container.add_widget(hide_buttons_btn)       # ❌ 어두운 회색: 숨기기
-            
-            # 메인 레이아웃에 추가
-            self.add_widget(test_container)
-            print("✅ 상세 진단 테스트 버튼 10개 추가 완료")
-            print("\n📋 새로 추가된 진단 버튼들:")
-            print("🔍 골드색: AndroidManifest.xml 등록 확인")
-            print("🔍 라벤더색: Intent 액션 매칭 테스트")
-            print("🎯 마젠타색: 상세 진단 실행")
-            print("\n📋 기존 버튼들:")
-            print("🔍 노란색: AlarmReceiver 존재 확인")
-            print("🔍 보라색: 직접 BroadcastReceiver 호출")  
-            print("🔍 주황색: 10초 알람 진단")
-            print("🚀 빨간색: 5초 알람 테스트")
-            print("🔔 파란색: 즉시 알림 테스트")
-            print("🎯 회색: 종합 진단 테스트")
-            print("❌ 어두운 회색: 테스트 버튼 숨기기")
-    
-    def hide_test_buttons(self, test_container):
-        """테스트 버튼 컨테이너 숨기기"""
-        try:
-            self.remove_widget(test_container)
-            print("✅ 테스트 버튼 숨김 완료")
-        except Exception as e:
-            print(f"❌ 버튼 숨기기 실패: {e}")
-    
-    def run_comprehensive_test(self):
-        """🎯 종합 진단 테스트 실행"""
-        print("\n" + "="*50)
-        print("🎯 종합 진단 테스트 시작")
-        print("="*50)
-        
-        # 1단계: AlarmReceiver 존재 확인
-        print("\n📋 1단계: AlarmReceiver 존재 확인")
-        receiver_exists = self.check_alarm_receiver_exists()
-        
-        # 2단계: 직접 BroadcastReceiver 호출
-        print("\n📋 2단계: 직접 BroadcastReceiver 호출")
-        direct_call_success = self.test_broadcast_intent_direct()
-        
-        # 3단계: 즉시 알림 테스트
-        print("\n📋 3단계: 즉시 알림 테스트")
-        notification_success = self.test_direct_notification()
-        
-        # 4단계: 10초 알람 진단
-        print("\n📋 4단계: 10초 알람 진단")
-        alarm_success = self.test_alarm_receiver_debug()
-        
-        # 결과 요약
-        print("\n" + "="*50)
-        print("🎯 종합 진단 결과 요약")
-        print("="*50)
-        print(f"📱 AlarmReceiver 존재: {'✅' if receiver_exists else '❌'}")
-        print(f"📱 직접 호출 성공: {'✅' if direct_call_success else '❌'}")
-        print(f"📱 즉시 알림 성공: {'✅' if notification_success else '❌'}")
-        print(f"📱 10초 알람 설정: {'✅' if alarm_success else '❌'}")
-        
-        if receiver_exists and direct_call_success:
-            print("\n✅ AlarmReceiver 기본 구조는 정상입니다!")
-            print("🔍 10초 후 알람이 울리는지 확인하세요")
-        else:
-            print("\n❌ AlarmReceiver에 문제가 있습니다!")
-            print("🔧 buildozer.spec 설정을 확인해주세요")
-        
-        print("="*50)
-            
+            """즉시 알림 테스트 버튼만 추가"""
+            if hasattr(self, 'layout') and self.layout:
+                from kivymd.uix.button import MDRaisedButton
+                
+                # 🔔 즉시 알림 테스트 버튼 (전자출결 버튼 위에 위치)
+                notify_test_btn = MDRaisedButton(
+                    text="🔔 즉시 알림 테스트", 
+                    size_hint=(None, None),
+                    size=(dp(160), dp(35)),
+                    font_name=FONT_NAME,
+                    md_bg_color=[0.2, 0.2, 0.8, 1],  # 파란색
+                    pos_hint={"right": 0.98, "y": 0.22}  # 전자출결 버튼(y=0.12) 위에 위치
+                )
+                notify_test_btn.bind(on_release=lambda x: self.test_direct_notification())
+                
+                # 메인 스크린에 직접 추가
+                self.add_widget(notify_test_btn)
+                print("✅ 즉시 알림 테스트 버튼 추가 완료")
+
+
 class TimeTableApp(MDApp):
     def build(self):
         print("✅ build() 실행됨")
