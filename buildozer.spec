@@ -1,6 +1,6 @@
 [app]
 title = DoubleCheck
-icon.filename = icon.png
+icon.filename = icon2.png
 package.name = doublecheck
 package.domain = org.kivy.skkutimetable
 source.dir = .
@@ -32,7 +32,7 @@ android.release_artifact = apk
 android.enable_androidx = True
 
 # splash 이미지
-presplash.filename = presplash.png
+presplash.filename = presplash2.png
 
 [buildozer]
 log_level = 2
