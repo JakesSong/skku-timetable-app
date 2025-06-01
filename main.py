@@ -2715,27 +2715,16 @@ class MainScreen(MDScreen):
             builder.setPriority(Notification.PRIORITY_LOW)  # 낮은 우선순위
             builder.setContentIntent(pending_intent)
             
-            # 포어그라운드 서비스 시작
             notification = builder.build()
             
-            # startForeground 호출 (이게 핵심!)
-            try:
-                # Python에서 직접 startForeground 호출하는 방법
-                from jnius import cast
-                service = cast('android.app.Service', context)
-                service.startForeground(1001, notification)  # ID: 1001
-                print("✅ 포어그라운드 서비스 시작됨")
-                return True
-            except Exception as e:
-                print(f"❌ startForeground 실패, 일반 알림으로 대체: {e}")
-                # 대신 지속적인 알림 표시
-                notification_manager.notify(1001, notification)
-                return True
-                
+            # ❌ 위험한 startForeground 시도 제거
+            # ✅ 바로 일반 지속 알림만 사용
+            notification_manager.notify(1001, notification)
+            print("✅ 백그라운드 알림 표시 완료")
+            return True
+            
         except Exception as e:
-            print(f"❌ 포어그라운드 서비스 시작 실패: {e}")
-            import traceback
-            traceback.print_exc()
+            print(f"❌ 백그라운드 알림 실패: {e}")
             return False
     
     def stop_foreground_service(self):
