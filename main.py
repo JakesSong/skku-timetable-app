@@ -3004,14 +3004,14 @@ class MainScreen(MDScreen):
                 attendance_intent = pm.getLaunchIntentForPackage(package_name)
                 
                 if attendance_intent:
-                    action_text = "전자출결하기"
+                    action_text = "전자출결 앱을 "
                 else:
                     # 방법 2: 직접 액티비티명 지정
                     try:
                         attendance_intent = Intent()
                         attendance_intent.setClassName(package_name, activity_name)
                         attendance_intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP)
-                        action_text = "전자출결하기"
+                        action_text = "전자출결 앱을 "
                     except:
                         # 실패 시 Play Store로
                         Uri = autoclass('android.net.Uri')
@@ -3055,7 +3055,7 @@ class MainScreen(MDScreen):
                         f"🕐 시간: {day_kr} {class_data['start_time']}\n"
                         f"🏛️ 강의실: {class_data['room']}\n"
                         f"👨‍🏫 교수: {class_data['professor']} 교수님\n\n"
-                        f"📱 {action_text}하려면 터치하세요"
+                        f"📱 {action_text} Open 하려면 터치하세요"
                     )
                     big_text_style.bigText(expanded_text)
                     builder.setStyle(big_text_style)
@@ -3111,7 +3111,7 @@ class MainScreen(MDScreen):
                         attendance_intent = pm.getLaunchIntentForPackage(package_name)
                         
                         if attendance_intent:
-                            notification_action_text = "전자출결 앱 열기"
+                            notification_action_text = "전자출결 앱을 "
                             print("✅ PackageManager로 전자출결 앱 Intent 생성 성공")
                         else:
                             # 방법 2: 직접 액티비티명 지정 (로그캣에서 확인한 정확한 이름)
@@ -3119,7 +3119,7 @@ class MainScreen(MDScreen):
                             attendance_intent = Intent()
                             attendance_intent.setClassName(package_name, activity_name)
                             attendance_intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP)
-                            notification_action_text = "전자출결 앱 열기"
+                            notification_action_text = "전자출결 앱을 "
                             print(f"✅ 직접 액티비티 지정: {activity_name}")
                             
                     except Exception as e:
@@ -3175,7 +3175,7 @@ class MainScreen(MDScreen):
                             f"🕐 시간: {sample_class['day']} {sample_class['time']}\n"
                             f"🏛️ 강의실: {sample_class['room']}\n"
                             f"👨‍🏫 교수: {sample_class['professor']} 교수님\n\n"
-                            f"📱 {notification_action_text}하려면 터치하세요"
+                            f"📱 {notification_action_text} Open 하려면 터치하세요"
                         )
                         big_text_style.bigText(expanded_text)
                         builder.setStyle(big_text_style)
