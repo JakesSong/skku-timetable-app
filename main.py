@@ -3035,11 +3035,15 @@ class MainScreen(MDScreen):
                     'Monday': '월요일', 'Tuesday': '화요일', 'Wednesday': '수요일',
                     'Thursday': '목요일', 'Friday': '금요일'
                 }.get(class_data['day'], class_data['day'])
+
+                # 사용자가 설정한 알람 시간 가져오기
+                user_alarm_time = class_data.get('notify_before', 5)  # 기본값 5분
+
                 
                 # 알림 생성
                 builder = Builder(context, channel_id)
                 builder.setSmallIcon(context.getApplicationInfo().icon)
-                builder.setContentTitle(f"🔔 {minutes_before}분 후 수업: {class_data['name']}")
+                builder.setContentTitle(f"🔔 {user_alarm_time}분 후 수업: {class_data['name']}")
                 builder.setContentText(f"{class_data['start_time']} | {class_data['room']} | {class_data['professor']} 교수님")
                 
                 # 확장된 알림 내용
