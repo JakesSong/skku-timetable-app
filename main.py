@@ -2664,145 +2664,145 @@ class MainScreen(MDScreen):
     # 위치: MainScreen 클래스 내부, show_in_app_alarm_info() 함수 다음에 추가
     
     
-from datetime import datetime, timedelta
-from kivy.clock import Clock
-
-def format_remaining_time(target_time):
-    now = datetime.now()
-    delta = target_time - now
-    seconds = int(delta.total_seconds())
-    if seconds <= 0:
-        return "수업 시작됨!"
-    h, rem = divmod(seconds, 3600)
-    m, s = divmod(rem, 60)
-    return f"{h:02d}:{m:02d}:{s:02d} 남음"
-
-def get_class_datetime(self, class_data):
-    day_map = {
-        "Monday": 0, "Tuesday": 1, "Wednesday": 2,
-        "Thursday": 3, "Friday": 4,
-        "월요일": 0, "화요일": 1, "수요일": 2,
-        "목요일": 3, "금요일": 4
-    }
-    weekday = day_map.get(class_data['day'], 0)
-    hour, minute = map(int, class_data['start_time'].split(":"))
-    now = datetime.now()
-    today = now.weekday()
-    delta = (weekday - today + 7) % 7
-    class_time = now.replace(hour=hour, minute=minute, second=0, microsecond=0) + timedelta(days=delta)
-    return class_time
-
-def update_foreground_notification(self, target_time):
-    from jnius import autoclass
-    PythonActivity = autoclass('org.kivy.android.PythonActivity')
-    Context = autoclass('android.content.Context')
-    Notification = autoclass('android.app.Notification')
-    Builder = autoclass('android.app.Notification$Builder')
-    NotificationManager = autoclass('android.app.NotificationManager')
-
-    context = PythonActivity.mActivity
-    channel_id = "foreground_service_channel"
-    text = format_remaining_time(target_time)
-
-    builder = Builder(context, channel_id)
-    builder.setSmallIcon(context.getApplicationInfo().icon)
-    builder.setContentTitle("📚 수업 카운트다운")
-    builder.setContentText(text)
-    builder.setOngoing(True)
-    builder.setPriority(Notification.PRIORITY_LOW)
-
-    notification = builder.build()
-    manager = context.getSystemService(Context.NOTIFICATION_SERVICE)
-    manager.notify(1001, notification)
-
-def trigger_alarm(self, class_data):
-    try:
-        from plyer import notification
-        notification.notify(
-            title=f"{class_data['name']} 수업 시작!",
-            message=f"{class_data['start_time']}에 수업이 시작됩니다.",
-            timeout=10
-        )
-        print(f"🔔 알람 울림: {class_data['name']}")
-    except Exception as e:
-        print(f"❌ 알림 실패: {e}")
-
-def start_countdown_notification(self, class_data):
-    target_time = self.get_class_datetime(class_data)
-
-    def update(dt):
+    from datetime import datetime, timedelta
+    from kivy.clock import Clock
+    
+    def format_remaining_time(target_time):
         now = datetime.now()
-        if (target_time - now).total_seconds() <= 0:
-            Clock.unschedule(update)
-            self.trigger_alarm(class_data)
-        else:
-            self.update_foreground_notification(target_time)
-
-    Clock.schedule_interval(update, 1)
-
-def start_foreground_service(self):
-        """포어그라운드 서비스 시작 - "앱이 작동중" 알림 표시"""
+        delta = target_time - now
+        seconds = int(delta.total_seconds())
+        if seconds <= 0:
+            return "수업 시작됨!"
+        h, rem = divmod(seconds, 3600)
+        m, s = divmod(rem, 60)
+        return f"{h:02d}:{m:02d}:{s:02d} 남음"
+    
+    def get_class_datetime(self, class_data):
+        day_map = {
+            "Monday": 0, "Tuesday": 1, "Wednesday": 2,
+            "Thursday": 3, "Friday": 4,
+            "월요일": 0, "화요일": 1, "수요일": 2,
+            "목요일": 3, "금요일": 4
+        }
+        weekday = day_map.get(class_data['day'], 0)
+        hour, minute = map(int, class_data['start_time'].split(":"))
+        now = datetime.now()
+        today = now.weekday()
+        delta = (weekday - today + 7) % 7
+        class_time = now.replace(hour=hour, minute=minute, second=0, microsecond=0) + timedelta(days=delta)
+        return class_time
+    
+    def update_foreground_notification(self, target_time):
+        from jnius import autoclass
+        PythonActivity = autoclass('org.kivy.android.PythonActivity')
+        Context = autoclass('android.content.Context')
+        Notification = autoclass('android.app.Notification')
+        Builder = autoclass('android.app.Notification$Builder')
+        NotificationManager = autoclass('android.app.NotificationManager')
+    
+        context = PythonActivity.mActivity
+        channel_id = "foreground_service_channel"
+        text = format_remaining_time(target_time)
+    
+        builder = Builder(context, channel_id)
+        builder.setSmallIcon(context.getApplicationInfo().icon)
+        builder.setContentTitle("📚 수업 카운트다운")
+        builder.setContentText(text)
+        builder.setOngoing(True)
+        builder.setPriority(Notification.PRIORITY_LOW)
+    
+        notification = builder.build()
+        manager = context.getSystemService(Context.NOTIFICATION_SERVICE)
+        manager.notify(1001, notification)
+    
+    def trigger_alarm(self, class_data):
         try:
-            if 'ANDROID_STORAGE' not in os.environ:
-                print("💻 PC 환경 - 포어그라운드 서비스 불가")
-                return False
-                
-            from jnius import autoclass
-            
-            # Android 클래스들
-            PythonActivity = autoclass('org.kivy.android.PythonActivity')
-            Context = autoclass('android.content.Context')
-            NotificationManager = autoclass('android.app.NotificationManager')
-            NotificationChannel = autoclass('android.app.NotificationChannel')
-            Notification = autoclass('android.app.Notification')
-            Builder = autoclass('android.app.Notification$Builder')
-            PendingIntent = autoclass('android.app.PendingIntent')
-            Intent = autoclass('android.content.Intent')
-            
-            context = PythonActivity.mActivity
-            
-            # 알림 채널 생성
-            channel_id = "foreground_service_channel"
-            channel_name = "시간표 알람 서비스"
-            importance = NotificationManager.IMPORTANCE_LOW  # 조용한 알림
-            
-            notification_manager = context.getSystemService(Context.NOTIFICATION_SERVICE)
-            channel = NotificationChannel(channel_id, channel_name, importance)
-            channel.setDescription("시간표 알람이 백그라운드에서 작동중입니다")
-            channel.setSound(None, None)  # 소리 없음
-            notification_manager.createNotificationChannel(channel)
-            
-            # 앱 실행 Intent (알림 터치시 앱으로 돌아가기)
-            app_intent = Intent(context, PythonActivity)
-            app_intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP)
-            
-            # PendingIntent 생성
-            FLAG_IMMUTABLE = 67108864
-            FLAG_UPDATE_CURRENT = 134217728
-            pending_intent = PendingIntent.getActivity(
-                context, 0, app_intent, FLAG_UPDATE_CURRENT | FLAG_IMMUTABLE
+            from plyer import notification
+            notification.notify(
+                title=f"{class_data['name']} 수업 시작!",
+                message=f"{class_data['start_time']}에 수업이 시작됩니다.",
+                timeout=10
             )
-            
-            # 포어그라운드 알림 생성
-            builder = Builder(context, channel_id)
-            builder.setSmallIcon(context.getApplicationInfo().icon)
-            builder.setContentTitle("📚 시간표 알람 활성화")
-            builder.setContentText("수업 알람이 백그라운드에서 작동중입니다")
-            builder.setOngoing(True)  # 스와이프로 삭제 불가
-            builder.setPriority(Notification.PRIORITY_LOW)  # 낮은 우선순위
-            builder.setContentIntent(pending_intent)
-            
-            notification = builder.build()
-            
-            # ❌ 위험한 startForeground 시도 제거
-            # ✅ 바로 일반 지속 알림만 사용
-            notification_manager.notify(1001, notification)
-            print("✅ 백그라운드 알림 표시 완료")
-            return True
-            
+            print(f"🔔 알람 울림: {class_data['name']}")
         except Exception as e:
-            print(f"❌ 백그라운드 알림 실패: {e}")
-            return False
+            print(f"❌ 알림 실패: {e}")
+    
+    def start_countdown_notification(self, class_data):
+        target_time = self.get_class_datetime(class_data)
+    
+        def update(dt):
+            now = datetime.now()
+            if (target_time - now).total_seconds() <= 0:
+                Clock.unschedule(update)
+                self.trigger_alarm(class_data)
+            else:
+                self.update_foreground_notification(target_time)
+    
+        Clock.schedule_interval(update, 1)
+    
+    def start_foreground_service(self):
+            """포어그라운드 서비스 시작 - "앱이 작동중" 알림 표시"""
+            try:
+                if 'ANDROID_STORAGE' not in os.environ:
+                    print("💻 PC 환경 - 포어그라운드 서비스 불가")
+                    return False
+                    
+                from jnius import autoclass
+                
+                # Android 클래스들
+                PythonActivity = autoclass('org.kivy.android.PythonActivity')
+                Context = autoclass('android.content.Context')
+                NotificationManager = autoclass('android.app.NotificationManager')
+                NotificationChannel = autoclass('android.app.NotificationChannel')
+                Notification = autoclass('android.app.Notification')
+                Builder = autoclass('android.app.Notification$Builder')
+                PendingIntent = autoclass('android.app.PendingIntent')
+                Intent = autoclass('android.content.Intent')
+                
+                context = PythonActivity.mActivity
+                
+                # 알림 채널 생성
+                channel_id = "foreground_service_channel"
+                channel_name = "시간표 알람 서비스"
+                importance = NotificationManager.IMPORTANCE_LOW  # 조용한 알림
+                
+                notification_manager = context.getSystemService(Context.NOTIFICATION_SERVICE)
+                channel = NotificationChannel(channel_id, channel_name, importance)
+                channel.setDescription("시간표 알람이 백그라운드에서 작동중입니다")
+                channel.setSound(None, None)  # 소리 없음
+                notification_manager.createNotificationChannel(channel)
+                
+                # 앱 실행 Intent (알림 터치시 앱으로 돌아가기)
+                app_intent = Intent(context, PythonActivity)
+                app_intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                
+                # PendingIntent 생성
+                FLAG_IMMUTABLE = 67108864
+                FLAG_UPDATE_CURRENT = 134217728
+                pending_intent = PendingIntent.getActivity(
+                    context, 0, app_intent, FLAG_UPDATE_CURRENT | FLAG_IMMUTABLE
+                )
+                
+                # 포어그라운드 알림 생성
+                builder = Builder(context, channel_id)
+                builder.setSmallIcon(context.getApplicationInfo().icon)
+                builder.setContentTitle("📚 시간표 알람 활성화")
+                builder.setContentText("수업 알람이 백그라운드에서 작동중입니다")
+                builder.setOngoing(True)  # 스와이프로 삭제 불가
+                builder.setPriority(Notification.PRIORITY_LOW)  # 낮은 우선순위
+                builder.setContentIntent(pending_intent)
+                
+                notification = builder.build()
+                
+                # ❌ 위험한 startForeground 시도 제거
+                # ✅ 바로 일반 지속 알림만 사용
+                notification_manager.notify(1001, notification)
+                print("✅ 백그라운드 알림 표시 완료")
+                return True
+                
+            except Exception as e:
+                print(f"❌ 백그라운드 알림 실패: {e}")
+                return False
     
     def stop_foreground_service(self):
         """포어그라운드 서비스 중지"""
