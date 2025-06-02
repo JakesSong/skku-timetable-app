@@ -2663,7 +2663,84 @@ class MainScreen(MDScreen):
     # MainScreen 클래스에 추가할 포어그라운드 서비스 함수들
     # 위치: MainScreen 클래스 내부, show_in_app_alarm_info() 함수 다음에 추가
     
-    def start_foreground_service(self):
+    
+from datetime import datetime, timedelta
+from kivy.clock import Clock
+
+def format_remaining_time(target_time):
+    now = datetime.now()
+    delta = target_time - now
+    seconds = int(delta.total_seconds())
+    if seconds <= 0:
+        return "수업 시작됨!"
+    h, rem = divmod(seconds, 3600)
+    m, s = divmod(rem, 60)
+    return f"{h:02d}:{m:02d}:{s:02d} 남음"
+
+def get_class_datetime(self, class_data):
+    day_map = {
+        "Monday": 0, "Tuesday": 1, "Wednesday": 2,
+        "Thursday": 3, "Friday": 4,
+        "월요일": 0, "화요일": 1, "수요일": 2,
+        "목요일": 3, "금요일": 4
+    }
+    weekday = day_map.get(class_data['day'], 0)
+    hour, minute = map(int, class_data['start_time'].split(":"))
+    now = datetime.now()
+    today = now.weekday()
+    delta = (weekday - today + 7) % 7
+    class_time = now.replace(hour=hour, minute=minute, second=0, microsecond=0) + timedelta(days=delta)
+    return class_time
+
+def update_foreground_notification(self, target_time):
+    from jnius import autoclass
+    PythonActivity = autoclass('org.kivy.android.PythonActivity')
+    Context = autoclass('android.content.Context')
+    Notification = autoclass('android.app.Notification')
+    Builder = autoclass('android.app.Notification$Builder')
+    NotificationManager = autoclass('android.app.NotificationManager')
+
+    context = PythonActivity.mActivity
+    channel_id = "foreground_service_channel"
+    text = format_remaining_time(target_time)
+
+    builder = Builder(context, channel_id)
+    builder.setSmallIcon(context.getApplicationInfo().icon)
+    builder.setContentTitle("📚 수업 카운트다운")
+    builder.setContentText(text)
+    builder.setOngoing(True)
+    builder.setPriority(Notification.PRIORITY_LOW)
+
+    notification = builder.build()
+    manager = context.getSystemService(Context.NOTIFICATION_SERVICE)
+    manager.notify(1001, notification)
+
+def trigger_alarm(self, class_data):
+    try:
+        from plyer import notification
+        notification.notify(
+            title=f"{class_data['name']} 수업 시작!",
+            message=f"{class_data['start_time']}에 수업이 시작됩니다.",
+            timeout=10
+        )
+        print(f"🔔 알람 울림: {class_data['name']}")
+    except Exception as e:
+        print(f"❌ 알림 실패: {e}")
+
+def start_countdown_notification(self, class_data):
+    target_time = self.get_class_datetime(class_data)
+
+    def update(dt):
+        now = datetime.now()
+        if (target_time - now).total_seconds() <= 0:
+            Clock.unschedule(update)
+            self.trigger_alarm(class_data)
+        else:
+            self.update_foreground_notification(target_time)
+
+    Clock.schedule_interval(update, 1)
+
+def start_foreground_service(self):
         """포어그라운드 서비스 시작 - "앱이 작동중" 알림 표시"""
         try:
             if 'ANDROID_STORAGE' not in os.environ:
@@ -2758,6 +2835,7 @@ class MainScreen(MDScreen):
                 if service_started:
                     self._foreground_started = True
                     print("🔄 포어그라운드 서비스로 업그레이드")
+                self.start_countdown_notification(class_data)
             
             # 2단계: 기존 인앱 알람 방식과 동일
             success = self.schedule_in_app_alarm(class_data, notify_before)
@@ -3375,3 +3453,4 @@ if __name__ == "__main__":
                 f.write(traceback.format_exc())
         except:
             print(traceback.format_exc())
+
